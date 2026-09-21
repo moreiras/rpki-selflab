@@ -55,8 +55,8 @@ qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-arm64.qcow2 -F qcow2 selflab-dis
 qemu-system-aarch64 -machine virt,accel=hvf -cpu host -smp 2 -m 4096 \
   -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \
   -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 \
-  -nic user -device virtio-gpu-pci -device qemu-xhci -device usb-kbd -device usb-tablet \
-  -display cocoa
+  -nic user -device virtio-gpu-pci,xres=1600,yres=900 -device qemu-xhci -device usb-kbd -device usb-tablet \
+  -display cocoa,zoom-to-fit=on
 ```
 
 Para recomeçar do zero, apague o `selflab-disk.qcow2` e crie-o de novo.
@@ -70,8 +70,8 @@ qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-amd64.qcow2 -F qcow2 selflab-dis
 
 qemu-system-x86_64 -machine q35,accel=kvm -cpu host -smp 2 -m 4096 \
   -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 \
-  -nic user -device virtio-vga -device qemu-xhci -device usb-kbd -device usb-tablet \
-  -display gtk
+  -nic user -device virtio-vga,xres=1600,yres=900 -device qemu-xhci -device usb-kbd -device usb-tablet \
+  -display gtk,zoom-to-fit=on
 ```
 
 **virt-manager:** *Nova máquina virtual* → *Importar imagem de disco existente* →
@@ -104,8 +104,8 @@ qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-amd64.qcow2 -F qcow2 selflab-dis
 
 qemu-system-x86_64 -machine "q35,accel=whpx:tcg" -cpu max -smp 2 -m 4096 `
   -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 `
-  -nic user -device virtio-vga -device qemu-xhci -device usb-kbd -device usb-tablet `
-  -display sdl
+  -nic user -device virtio-vga,xres=1600,yres=900 -device qemu-xhci -device usb-kbd -device usb-tablet `
+  -display gtk,zoom-to-fit=on
 ```
 
 **Hyper-V** (Windows Pro): `qemu-img convert -O vhdx rpki-selflab-vX.Y.Z-amd64.qcow2 rpki-selflab.vhdx`,
@@ -115,9 +115,11 @@ crie uma VM de **Geração 1** com 4096 MB e esse disco, e inicie.
 
 - **Tela em branco ou preta por um tempo:** espere; o primeiro início leva cerca
   de um minuto (o navegador espera o laboratório e abre sozinho).
-- **A janela é pequena ou não acompanha o tamanho:** ajuste a resolução nas
-  configurações de tela do programa da VM, ou use tela cheia (Alt+F dentro da VM
-  e o modo de tela cheia do seu programa).
+- **Não consigo redimensionar a janela:** o QEMU não muda a resolução do
+  convidado quando você arrasta a janela. Os comandos acima iniciam a tela em
+  1600x900 e o `zoom-to-fit=on` a escala para o tamanho que a janela tiver; para
+  outra resolução, mude `xres`/`yres` em `-device virtio-gpu-pci,xres=...,yres=...`.
+  No VirtualBox use as configurações de *Tela*, e no UTM a resolução da tela dele.
 - **O teclado digita caracteres errados:** Alt+Espaço percorre os layouts US,
   brasileiro (ABNT2) e espanhol.
 - **O painel diz que nada está rodando:** abra o terminal (Alt+2) e rode

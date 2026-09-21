@@ -53,8 +53,8 @@ qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-arm64.qcow2 -F qcow2 selflab-dis
 qemu-system-aarch64 -machine virt,accel=hvf -cpu host -smp 2 -m 4096 \
   -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \
   -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 \
-  -nic user -device virtio-gpu-pci -device qemu-xhci -device usb-kbd -device usb-tablet \
-  -display cocoa
+  -nic user -device virtio-gpu-pci,xres=1600,yres=900 -device qemu-xhci -device usb-kbd -device usb-tablet \
+  -display cocoa,zoom-to-fit=on
 ```
 
 To start over from scratch, delete `selflab-disk.qcow2` and create it again.
@@ -68,8 +68,8 @@ qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-amd64.qcow2 -F qcow2 selflab-dis
 
 qemu-system-x86_64 -machine q35,accel=kvm -cpu host -smp 2 -m 4096 \
   -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 \
-  -nic user -device virtio-vga -device qemu-xhci -device usb-kbd -device usb-tablet \
-  -display gtk
+  -nic user -device virtio-vga,xres=1600,yres=900 -device qemu-xhci -device usb-kbd -device usb-tablet \
+  -display gtk,zoom-to-fit=on
 ```
 
 **virt-manager:** *New virtual machine* → *Import existing disk image* → pick the
@@ -101,8 +101,8 @@ qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-amd64.qcow2 -F qcow2 selflab-dis
 
 qemu-system-x86_64 -machine "q35,accel=whpx:tcg" -cpu max -smp 2 -m 4096 `
   -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 `
-  -nic user -device virtio-vga -device qemu-xhci -device usb-kbd -device usb-tablet `
-  -display sdl
+  -nic user -device virtio-vga,xres=1600,yres=900 -device qemu-xhci -device usb-kbd -device usb-tablet `
+  -display gtk,zoom-to-fit=on
 ```
 
 **Hyper-V** (Windows Pro): `qemu-img convert -O vhdx rpki-selflab-vX.Y.Z-amd64.qcow2 rpki-selflab.vhdx`,
@@ -112,9 +112,11 @@ create a **Generation 1** VM with 4096 MB and that disk, and start it.
 
 - **Blank or black screen for a while:** wait; the first start takes about a
   minute (the browser waits for the lab and then opens it by itself).
-- **The window is small or doesn't follow the size of the window:** set the
-  resolution in the VM program's display settings, or use full screen (Alt+F
-  inside the VM, and your program's full-screen mode).
+- **The window can't be resized:** QEMU doesn't change the guest's resolution
+  when you drag the window. The commands above start the screen at 1600x900 and
+  `zoom-to-fit=on` scales it to whatever size the window has; for another
+  resolution change `xres`/`yres` in `-device virtio-gpu-pci,xres=...,yres=...`.
+  In VirtualBox use the *Display* settings, and in UTM its display resolution.
 - **The keyboard types the wrong characters:** Alt+Space cycles through US,
   Brazilian (ABNT2) and Spanish layouts.
 - **The panel says nothing is running:** open the terminal (Alt+2) and run
