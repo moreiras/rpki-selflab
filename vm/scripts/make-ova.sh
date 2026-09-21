@@ -91,5 +91,8 @@ OVF
     echo "SHA256($f)= $(shasum -a 256 "$f" | cut -d' ' -f1)"; done > "$base.mf" )
 # an OVA is a plain tar with the OVF first
 out_abs="$(cd "$(dirname "$out")" && pwd)/$(basename "$out")"
-( cd "$tmp" && tar -cf "$out_abs.tmp" "$base.ovf" "$base.vmdk" "$base.mf" )
+# Plain ustar, no extras: macOS's tar would otherwise add "._name" resource-fork
+# entries and pax headers, and importers (VirtualBox) take the first entry for
+# the OVF and fail with "empty file".
+( cd "$tmp" && COPYFILE_DISABLE=1 tar --format ustar -cf "$out_abs.tmp" "$base.ovf" "$base.vmdk" "$base.mf" )
 mv "$out_abs.tmp" "$out_abs"
