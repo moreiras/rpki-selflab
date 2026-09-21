@@ -85,7 +85,7 @@ source "qemu" "lab" {
   disk_image       = true
   use_backing_file = false
 
-  disk_size        = "6G"
+  disk_size        = "8G"
   format           = "qcow2"
   disk_compression = true
   vm_name          = "rpki-selflab-${var.arch}.qcow2"
@@ -121,7 +121,7 @@ build {
   sources = ["source.qemu.lab"]
 
   provisioner "shell" {
-    inline = ["mkdir -p /tmp/images"]
+    inline = ["mkdir -p /tmp/images /tmp/desktop"]
   }
 
   provisioner "file" {
@@ -132,6 +132,11 @@ build {
   provisioner "file" {
     source      = "${var.images_dir}/"
     destination = "/tmp/images/"
+  }
+
+  provisioner "file" {
+    source      = "${path.root}/../desktop/"
+    destination = "/tmp/desktop/"
   }
 
   provisioner "shell" {

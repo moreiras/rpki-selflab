@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>RPKI SelfLab</title>
+<style>
+  body { margin: 0; height: 100vh; display: grid; place-items: center; text-align: center;
+         background: #0b1020; color: #e8ecf8; font: 18px system-ui, sans-serif; }
+  small { color: #97a1c4; display: block; margin-top: 6px; }
+</style>
+<div>
+  <h1>RPKI SelfLab</h1>
+  <p>Iniciando o laboratório… / Iniciando el laboratorio… / Starting the lab…</p>
+  <small>Leva cerca de um minuto / Tarda cerca de un minuto / About a minute</small>
+</div>
+<script>
+  const target = "http://localhost:8080/";
+  async function poll() {
+    try { await fetch(target, { mode: "no-cors", cache: "no-store" }); location.href = target; }
+    catch (_) { setTimeout(poll, 3000); }
+  }
+  poll();
+</script>

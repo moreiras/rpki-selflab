@@ -53,8 +53,9 @@ for the virtual machine, where 8080 is the only port that needs forwarding.
 ## As a virtual machine
 
 If you'd rather not install Docker, the lab also comes as a small virtual
-machine that already contains everything, images included, and runs with no
-Internet access. See [vm/README.md](vm/README.md).
+machine with a desktop of its own (browser and terminal) that already contains
+everything, images included: nothing to configure, and it runs with no Internet
+access. See [vm/README.md](vm/README.md).
 
 ## Topology
 

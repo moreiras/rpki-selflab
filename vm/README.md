@@ -1,67 +1,133 @@
 # RPKI SelfLab as a virtual machine
 
-A small Alpine Linux virtual machine with Docker, the lab, and **every Docker
-image the lab needs already loaded**: no Internet access is needed to run it.
-Two builds per release, `amd64` (Intel/AMD) and `arm64` (Apple Silicon and
-other ARM computers), each as:
+A small virtual machine with a desktop of its own, so there is **nothing to
+configure**: no ports to forward, no network mode to pick, no address to look
+up. You start it, and after about a minute a browser opens on the lab's panel
+and a terminal is one key away. Docker, the lab and every image it needs are
+inside (about 650 MB compressed), and it runs with no Internet access.
 
-- `rpki-selflab-vX.Y.Z-<arch>.qcow2`, for QEMU (and UTM);
-- `rpki-selflab-vX.Y.Z-<arch>.ova`, for VirtualBox and VMware.
+Files of a release (`rpki-selflab-vX.Y.Z-<arch>`):
 
-Inside the VM, the lab starts by itself on every boot (about a minute after the
-machine starts). The computer that runs the VM reaches it through two ports,
-both on its own address only (`localhost`):
-
-| Port | What |
+| File | For |
 |---|---|
-| `8080` | the lab: panel, Krill, registry, Routinator and the terminals, all through nginx (`localhost`, `krill.localhost`, ...) |
-| `2222` | ssh: `ssh -p 2222 root@localhost`, password `labpass` |
+| `...-arm64.qcow2` | Apple Silicon Macs (M1 and later), and other ARM computers |
+| `...-amd64.qcow2` | Intel and AMD computers (Windows, Linux, Intel Macs) |
+| `SHA256SUMS` | checksums: `shasum -a 256 -c SHA256SUMS` (Linux/macOS) |
 
-Use ssh for what must not run from the panel's console, such as
-`./scripts/lab.sh reset`. The lab lives in `/opt/lab`. The VM has 2 vCPUs and
-2 GB of RAM; the disk image grows up to 6 GB.
+Give the VM **at least 3 GB of RAM (4 GB is better), 2 CPUs**, and 8 GB of disk
+(the image grows up to that).
 
-## Running it
+## Using it
 
-Download the files of one release into one folder, check them against
-`SHA256SUMS`, then:
+1. Start the VM (instructions per system below) and wait about a minute. The
+   browser shows "Starting the lab..." and then opens the panel by itself.
+2. Inside the VM:
+   - **Alt+1** the browser, with the lab's panel and the guide (the *Script* tab);
+   - **Alt+2** a terminal, already in the lab's folder (`/opt/lab`);
+   - **Alt+Space** switches the keyboard layout (US, Brazilian, Spanish);
+   - **Alt+Enter** opens another terminal, **Alt+F** makes a window full screen.
+3. The desktop logs in by itself as `labuser`. The `root` password is
+   `labpass` (`su -` in the terminal).
+4. To start over, in the terminal: `./scripts/lab.sh reset`, then
+   `./scripts/lab.sh up`. Both work offline.
 
-**Linux and macOS** (QEMU: `brew install qemu`, or `apt install qemu-system`):
+The mouse and keyboard can be captured by the VM window: use your program's
+release key (QEMU: `Ctrl+Alt+G`; UTM and VirtualBox show it in the window).
+
+## macOS
+
+The Apple Silicon (`arm64`) image runs at full speed with **UTM** (free,
+https://mac.getutm.app) or with QEMU.
+
+**UTM:** *Create a New Virtual Machine* → *Virtualize* → *Linux*. Leave the boot
+ISO empty. Set 4096 MB of memory and 2 CPUs. Finish, then edit the VM: remove
+the default drive and *New Drive → Import…* the `.qcow2` (interface *VirtIO*),
+and make sure the display is *virtio-gpu-pci* (not a `-gl` variant). Start it.
+
+**QEMU** (`brew install qemu`), in the folder with the image:
 
 ```sh
-./start-selflab.sh              # starts in this terminal; Ctrl-A then X stops it
-./start-selflab.sh --background # or in the background
-./start-selflab.sh --reset      # throws away the VM's saved state first
+# a throw-away layer on top of the image, so the image itself stays untouched
+qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-arm64.qcow2 -F qcow2 selflab-disk.qcow2
+
+qemu-system-aarch64 -machine virt,accel=hvf -cpu host -smp 2 -m 4096 \
+  -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \
+  -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 \
+  -nic user -device virtio-gpu-pci -device qemu-xhci -device usb-kbd -device usb-tablet \
+  -display cocoa
 ```
 
-The VM runs on a copy-on-write overlay (`selflab-disk.qcow2`) next to the
-image, so the downloaded image stays untouched and `--reset` only deletes the
-overlay. It uses hardware acceleration (KVM on Linux, HVF on macOS) when the
-image matches the computer's CPU.
+To start over from scratch, delete `selflab-disk.qcow2` and create it again.
 
-**Windows** (QEMU for Windows; turn on *Windows Hypervisor Platform* for speed):
+## Linux
+
+**QEMU/KVM** on an Intel/AMD computer:
+
+```sh
+qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-amd64.qcow2 -F qcow2 selflab-disk.qcow2
+
+qemu-system-x86_64 -machine q35,accel=kvm -cpu host -smp 2 -m 4096 \
+  -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 \
+  -nic user -device virtio-vga -device qemu-xhci -device usb-kbd -device usb-tablet \
+  -display gtk
+```
+
+**virt-manager:** *New virtual machine* → *Import existing disk image* → pick the
+`.qcow2`, OS *Generic Linux*, 4096 MB and 2 CPUs; before starting, set *Video* to
+*Virtio* (the `arm64` image also needs UEFI firmware on an ARM computer).
+
+**VirtualBox:** see the Windows section (it is the same).
+
+## Windows
+
+**VirtualBox** (Intel/AMD; https://www.virtualbox.org). Convert the image once
+(`qemu-img` comes with QEMU for Windows, or use any Linux/macOS computer):
+
+```
+qemu-img convert -O vdi rpki-selflab-vX.Y.Z-amd64.qcow2 rpki-selflab.vdi
+```
+
+Then *New*: type *Linux*, version *Other Linux (64-bit)*, 4096 MB, 2 CPUs, *Use an
+existing virtual hard disk file* → the `.vdi`, and leave EFI **off**. Before
+starting: *Display → Graphics Controller: VMSVGA* with 128 MB of video memory,
+and *System → Pointing Device: USB Tablet*. The network can stay at its default
+(NAT); the lab doesn't use it.
+
+**QEMU for Windows** (https://www.qemu.org/download/#windows), in PowerShell,
+with *Windows Hypervisor Platform* turned on for speed:
 
 ```powershell
-.\start-selflab.ps1             # -Reset throws away the VM's saved state
+qemu-img create -f qcow2 -b rpki-selflab-vX.Y.Z-amd64.qcow2 -F qcow2 selflab-disk.qcow2
+
+qemu-system-x86_64 -machine "q35,accel=whpx:tcg" -cpu max -smp 2 -m 4096 `
+  -drive file=selflab-disk.qcow2,if=virtio,format=qcow2 `
+  -nic user -device virtio-vga -device qemu-xhci -device usb-kbd -device usb-tablet `
+  -display sdl
 ```
 
-**VirtualBox** (Windows, Linux, Intel Macs; the `.ova` is experimental, see
-below): import the `.ova`, then forward the two ports:
+**Hyper-V** (Windows Pro): `qemu-img convert -O vhdx rpki-selflab-vX.Y.Z-amd64.qcow2 rpki-selflab.vhdx`,
+create a **Generation 1** VM with 4096 MB and that disk, and start it.
 
-```sh
-VBoxManage modifyvm "RPKI SelfLab <version> (amd64)" \
-  --natpf1 "ssh,tcp,127.0.0.1,2222,,22" --natpf1 "lab,tcp,127.0.0.1,8080,,8080"
-```
+## If something looks wrong
 
-**Hyper-V**: convert the qcow2 with `qemu-img convert -O vhdx image.qcow2 image.vhdx`,
-create a generation 1 VM (2 GB RAM, that disk) on a NAT switch, and forward
-ports 8080 and 22 with `netsh interface portproxy`.
+- **Blank or black screen for a while:** wait; the first start takes about a
+  minute (the browser waits for the lab and then opens it by itself).
+- **The window is small or doesn't follow the size of the window:** set the
+  resolution in the VM program's display settings, or use full screen (Alt+F
+  inside the VM, and your program's full-screen mode).
+- **The keyboard types the wrong characters:** Alt+Space cycles through US,
+  Brazilian (ABNT2) and Spanish layouts.
+- **The panel says nothing is running:** open the terminal (Alt+2) and run
+  `./scripts/lab.sh status`; the start-up log is `/var/log/rpki-selflab.log`.
 
-**WSL2** is lighter than any VM and needs no port forwarding: it is a plain
-Linux with Docker, so install Docker there and run the lab as described in the
-main README.
+## Status
 
-## Building a release
+The `arm64` image was built and started on an Apple Silicon Mac with QEMU
+(hardware acceleration): the desktop, the browser opening the panel, and the
+terminal all worked. The other programs and systems in this file were not
+tried.
+
+## For the maintainer: building a release
 
 ```sh
 vm/release.sh --bump patch     # or minor / major, or --version 1.4.0
@@ -71,7 +137,8 @@ vm/release.sh --dev            # a test build of the working tree, tags nothing
 
 Needs `git`, `docker` with `buildx`, `packer`, `qemu` (with its UEFI firmware
 for arm64) and Internet access for the base images. Options: `--arch
-amd64|arm64|all`, `--accel hvf|kvm|whpx|tcg`, `--skip-images`, `--no-ova`.
+amd64|arm64|all`, `--accel hvf|kvm|whpx|tcg`, `--skip-images`, `--no-ova`,
+`--dry-run`.
 
 **Versioning.** The version *is* the git tag, `vMAJOR.MINOR.PATCH` (semantic
 versioning). A build refuses to run unless the working tree is clean, and takes
@@ -79,25 +146,17 @@ the version from the tag on `HEAD`; with `--bump` or `--version` it works out
 the next one and creates the annotated tag only after the images have been
 built, so a failed build leaves no tag behind. It never pushes: publish with
 `git push origin vX.Y.Z` and attach the files to the release. The version ends
-up in `/opt/lab/VERSION` and in the login banner of the VM.
+up in `/opt/lab/VERSION` and in the console banner.
 
-Everything is written to `vm/releases/vX.Y.Z/` (images, start scripts,
+Everything is written to `vm/releases/vX.Y.Z/` (images, these READMEs,
 `SHA256SUMS`, `BUILDINFO`); that folder and `vm/build/` are ignored by git.
+An `.ova` (for VirtualBox and VMware) is also produced for `amd64`; it has
+never been imported anywhere, so treat it as experimental.
 
 How the images are made: `scripts/build-images.sh` exports each Docker image
 for the target architecture as a tar (without touching your local images);
-Packer boots Alpine's official cloud image, uploads the lab and the tars, and
-`scripts/provision.sh` installs Docker, loads the images and sets up the boot
-service. A build for the architecture your computer doesn't have runs under
+Packer boots Alpine's official cloud image, uploads the lab, the tars and the
+desktop settings (`desktop/`), and `scripts/provision.sh` installs Docker and
+the desktop (sway, foot, Firefox), loads the images and sets up the boot
+services. A build for the architecture your computer doesn't have runs under
 emulation and takes a good while.
-
-## Status
-
-Built and booted so far, on an Apple Silicon Mac: the arm64 image with
-hardware acceleration, and the amd64 image under software emulation (slow, but
-the lab came up in about a minute). In both, the panel, Krill, the registry,
-Routinator and the terminals answered through port 8080, ssh worked with the
-password above, and the 15 containers were running with the lab's 6 BGP
-sessions established on observer1. Not tried yet: the `.ova` in VirtualBox or
-VMware (its XML and checksums are valid, but it has never been imported), the
-Windows script, Linux with KVM, and a release build from a git tag.

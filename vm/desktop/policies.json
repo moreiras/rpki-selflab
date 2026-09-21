@@ -1,0 +1,21 @@
+{
+  "policies": {
+    "Homepage": { "URL": "file:///usr/share/selflab/start.html", "StartPage": "homepage" },
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": "",
+    "DontCheckDefaultBrowser": true,
+    "DisableAppUpdate": true,
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DisablePocket": true,
+    "NoDefaultBookmarks": true,
+    "PasswordManagerEnabled": false,
+    "Preferences": {
+      "browser.translations.enable": { "Value": false, "Status": "locked" },
+      "browser.translations.automaticallyPopup": { "Value": false, "Status": "locked" },
+      "browser.aboutwelcome.enabled": { "Value": false, "Status": "locked" },
+      "browser.shell.checkDefaultBrowser": { "Value": false, "Status": "locked" },
+      "browser.startup.homepage_override.mstone": { "Value": "ignore", "Status": "locked" }
+    }
+  }
+}

@@ -129,13 +129,14 @@ for arch in $archs; do
     name="rpki-selflab-v$version-$arch"
     [ "$dev" = 1 ] && name="rpki-selflab-$version-$arch"
     mv "$out/rpki-selflab-$arch.qcow2" "$release_dir/$name.qcow2"
-    if [ "$ova" = 1 ]; then
+    # (the OVA is for VirtualBox and VMware, which only run x86 guests on most computers)
+    if [ "$ova" = 1 ] && [ "$arch" = amd64 ]; then
         "$here/scripts/make-ova.sh" "$release_dir/$name.qcow2" "$version" "$arch" "$release_dir/$name.ova"
     fi
 done
 
 # --------------------------------------------------------------- wrap up ----
-cp "$here/run/"* "$release_dir/"
+cp "$here/README"*.md "$release_dir/"
 ( cd "$release_dir" && shasum -a 256 * > SHA256SUMS )
 {
     echo "version=$version"

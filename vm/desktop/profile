@@ -1,0 +1,12 @@
+# Starts the graphical session on the first virtual console.
+export XDG_RUNTIME_DIR="/tmp/runtime-$(id -u)"
+mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+export LIBSEAT_BACKEND=seatd
+# software rendering works in every virtual display adapter
+export WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1
+# no Internet in here: never try to rebuild the images
+export LAB_NO_BUILD=1
+export MOZ_ENABLE_WAYLAND=1 XDG_CURRENT_DESKTOP=sway
+if [ -z "${WAYLAND_DISPLAY:-}" ] && [ "$(tty)" = /dev/tty1 ]; then
+    exec sway
+fi

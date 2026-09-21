@@ -24,6 +24,16 @@ resize2fs "$root_dev" || true
 
 # ---- packages ---------------------------------------------------------------
 apk add --no-cache docker docker-cli-compose bash curl python3 openssh jq
+# the graphical session: Wayland compositor, terminal, browser, GPU drivers
+apk add --no-cache sway foot firefox seatd mesa-dri-gallium mesa-egl mesa-gbm \
+    font-dejavu xkeyboard-config adwaita-icon-theme hicolor-icon-theme dbus \
+    spice-vdagent open-vm-tools swaybg
+# sway (libinput) finds keyboards and mice through udev; Alpine's default is mdev
+apk add --no-cache eudev udev-init-scripts udev-init-scripts-openrc
+setup-devd udev >/dev/null 2>&1 || {
+    for s in udev udev-trigger udev-settle; do rc-update add "$s" sysinit; done
+    rc-update del mdev sysinit 2>/dev/null || true; rc-update del hwdrivers sysinit 2>/dev/null || true
+}
 
 # ---- the lab ----------------------------------------------------------------
 mkdir -p /opt/lab
@@ -35,6 +45,31 @@ built=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VERSION
 chmod +x /opt/lab/scripts/*.sh
 rm -f /tmp/lab.tar.gz
+
+# ---- the desktop user and session -------------------------------------------
+adduser -D -s /bin/sh labuser
+echo 'labuser:labpass' | chpasswd
+for g in seat video input audio docker; do addgroup labuser "$g" 2>/dev/null || true; done
+chown -R labuser:labuser /opt/lab
+D=/tmp/desktop
+install -d -o labuser -g labuser /home/labuser/.config/sway /home/labuser/.config/foot
+install -m 644 -o labuser -g labuser "$D/sway.config" /home/labuser/.config/sway/config
+install -m 644 -o labuser -g labuser "$D/foot.ini" /home/labuser/.config/foot/foot.ini
+install -m 644 -o labuser -g labuser "$D/profile" /home/labuser/.profile
+install -d /usr/lib/firefox/distribution /usr/share/selflab /usr/local/sbin
+install -m 644 "$D/policies.json" /usr/lib/firefox/distribution/policies.json
+install -m 644 "$D/start.html" /usr/share/selflab/start.html
+install -m 755 "$D/autologin" /usr/local/sbin/autologin-labuser
+install -m 755 "$D/status.sh" /usr/local/bin/selflab-status
+rm -rf "$D"
+echo 'export LAB_NO_BUILD=1' > /etc/profile.d/selflab.sh
+# log labuser in by itself on the first console (the serial console stays as is)
+sed -i 's#^tty1::.*#tty1::respawn:/sbin/getty -n -l /usr/local/sbin/autologin-labuser 38400 tty1#' /etc/inittab
+grep -q autologin-labuser /etc/inittab || echo 'tty1::respawn:/sbin/getty -n -l /usr/local/sbin/autologin-labuser 38400 tty1' >> /etc/inittab
+rc-update add seatd boot >/dev/null
+rc-update add dbus default >/dev/null
+rc-update add spice-vdagentd default >/dev/null 2>&1 || true
+rc-update add open-vm-tools default >/dev/null 2>&1 || true
 
 # ---- Docker, with every image already loaded ---------------------------------
 rc-update add cgroups boot >/dev/null
@@ -87,7 +122,7 @@ cat > /etc/motd <<MOTD
 
   RPKI SelfLab ${LAB_VERSION} (${LAB_ARCH})
 
-  Panel:   http://localhost:8080   (on the computer that runs this VM)
+  The desktop (browser + terminal) starts by itself on the first console.
   Lab:     cd /opt/lab && ./scripts/lab.sh help
   Logs:    /var/log/rpki-selflab.log
 

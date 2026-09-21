@@ -53,8 +53,9 @@ Isso ajuda na máquina virtual, em que só a 8080 precisa ser encaminhada.
 ## Como máquina virtual
 
 Se você prefere não instalar o Docker, o laboratório também vem como uma
-pequena máquina virtual que já contém tudo, imagens inclusive, e roda sem
-acesso à Internet. Veja [vm/README.md](vm/README.md) (em inglês).
+pequena máquina virtual com área de trabalho própria (navegador e terminal) que
+já contém tudo, imagens inclusive: nada a configurar, e roda sem acesso à
+Internet. Veja [vm/README.pt.md](vm/README.pt.md).
 
 ## Topologia
 
