@@ -32,7 +32,9 @@ command -v qemu-system-x86_64 >/dev/null || command -v qemu-system-aarch64 >/dev
 # "--reset" is just deleting the overlay
 disk="$here/selflab-disk.qcow2"
 [ "$reset" = 1 ] && rm -f "$disk"
-[ -f "$disk" ] || qemu-img create -q -f qcow2 -b "$image" -F qcow2 "$disk"
+# (the backing file is recorded by name, relative to the overlay, so the folder
+# can be moved or renamed without breaking it)
+[ -f "$disk" ] || qemu-img create -q -f qcow2 -b "$(basename "$image")" -F qcow2 "$disk"
 
 case "$(uname -s)" in
     Darwin) accel=hvf ;;

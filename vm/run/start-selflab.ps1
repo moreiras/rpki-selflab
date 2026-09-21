@@ -26,7 +26,7 @@ if (-not $image) { throw "no rpki-selflab-*-amd64.qcow2 next to this script" }
 # just deleting the overlay
 $disk = Join-Path $here "selflab-disk.qcow2"
 if ($Reset) { Remove-Item $disk -ErrorAction SilentlyContinue }
-if (-not (Test-Path $disk)) { & $qimg create -q -f qcow2 -b $image.FullName -F qcow2 $disk }
+if (-not (Test-Path $disk)) { & $qimg create -q -f qcow2 -b $image.Name -F qcow2 $disk }
 
 Write-Host "Starting the RPKI SelfLab. The lab takes about a minute to come up."
 Write-Host "  Panel: http://localhost:8080      ssh: ssh -p 2222 root@localhost   (password: labpass)"
