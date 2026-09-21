@@ -1,8 +1,10 @@
-# lab-aspa
+# RPKI SelfLab
+
+*Standalone Lab and Self-Study Guide for RPKI, ROA, ROV, and ASPA*
 
 *[English](README.md) · [Español](README.es.md) · [Português](README.pt.md)*
 
-RPKI + ASPA lab in containers, meant to run on any computer with Docker (Mac,
+A lab for RPKI (ROAs, ROV and ASPA) in containers, meant to run on any computer with Docker (Mac,
 Windows, or Linux - tested with OrbStack and Docker Desktop). It publishes ROAs
 and an ASPA object, and then shows what **two different validators and two
 different routers** make of exactly the same objects - while a hijacker
@@ -35,12 +37,24 @@ open http://localhost:8080
 | Service | URL | Note |
 |---|---|---|
 | Lab panel | http://localhost:8080 | clickable topology |
-| Krill (CA) | https://localhost:3000 | token `passlab`, self-signed certificate |
-| Routinator | http://localhost:8323 | observer1's validator |
+| Krill (CA) | http://krill.localhost:8080 | token `passlab` |
+| Routinator | http://routinator.localhost:8080 | observer1's validator |
 | FORT (RTR) | localhost:3324 | observer2's validator, no web UI |
-| Console (ttyd) | http://localhost:7681 | browser terminal |
-| Registry panel | http://localhost:8081 | only in `MODE=local` |
-| LabNIC's Krill | https://localhost:3001 | only in `MODE=local`, token `passlab` |
+| Console (ttyd) | http://console.localhost:8080 | browser terminal |
+| Registry panel | http://registry.localhost:8080 | only in `MODE=local` |
+| LabNIC's Krill | http://rir-krill.localhost:8080 | only in `MODE=local`, token `passlab` |
+
+Everything is reachable through the one port, 8080: the panel at `localhost`,
+and each of the other web apps under its own `<name>.localhost` (browsers
+resolve `*.localhost` to your machine, and nginx routes by name). The services'
+own ports (3000, 3001, 7681, 8081, 8323) stay published too. That comes in handy
+for the virtual machine, where 8080 is the only port that needs forwarding.
+
+## As a virtual machine
+
+If you'd rather not install Docker, the lab also comes as a small virtual
+machine that already contains everything, images included, and runs with no
+Internet access. See [vm/README.md](vm/README.md).
 
 ## Topology
 
@@ -212,6 +226,7 @@ guide/
   templates/GUIDE.*.md           the class guide's sources, with {{NAME}} markers (edit these)
   GUIDE.en.md, .es.md, .pt.md    COMPILED from templates/ by generate-config.sh (don't edit)
 web/nginx.conf              serves the panel and proxies Routinator
+vm/                         the virtual machine: Packer template, scripts, releases (see vm/README.md)
 scripts/
   lab.sh                    up / down / refresh / reset / step* (the story's commands)
   validate.sh               text summary of the lab's state

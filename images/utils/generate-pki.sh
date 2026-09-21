@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # ---------------------------------------------------------------------------
 # Why this exists:
 #
@@ -37,12 +37,12 @@ cd "$PKI"
 msg pki_making_ca
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
     -keyout ca.key -out ca.pem \
-    -subj "/CN=RPKI Lab - internal CA/O=lab-aspa" 2>/dev/null
+    -subj "/CN=RPKI Lab - internal CA/O=rpki-selflab" 2>/dev/null
 
 msg pki_making_cert
 openssl req -newkey rsa:2048 -nodes \
     -keyout rir.key -out rir.csr \
-    -subj "/CN=${NAME}/O=lab-aspa" 2>/dev/null
+    -subj "/CN=${NAME}/O=rpki-selflab" 2>/dev/null
 
 cat > rir.ext <<EOF
 basicConstraints = CA:FALSE

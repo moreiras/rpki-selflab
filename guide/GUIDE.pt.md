@@ -1,4 +1,6 @@
-# Laboratório RPKI + ASPA
+# RPKI SelfLab
+
+*Laboratório autônomo e guia de autoestudo para RPKI, ROA, ROV e ASPA*
 
 *[English](GUIDE.en.md) · [Español](GUIDE.es.md) · [Português](GUIDE.pt.md)*
 
@@ -260,10 +262,11 @@ acontece entre um provedor e o seu RIR.
 
 ### O seu lado: a CA no Krill
 
-1. Abra o Krill: **https://localhost:3000**
+1. Abra o Krill: **http://krill.localhost:8080**
 
-   O navegador vai reclamar do certificado autoassinado. Clique em
-   "Advanced" e prossiga.
+   (Ele é servido pelo servidor web do laboratório, então não há aviso de
+   certificado. O endereço direto, `https://localhost:3000`, continua
+   funcionando, com um certificado autoassinado.)
 
 2. Entre com o token **`passlab`**.
 
@@ -272,7 +275,7 @@ acontece entre um provedor e o seu RIR.
 
 ### O lado do registro: o painel do LabNIC
 
-4. Em outra aba, abra o painel do registro: **http://localhost:8081**
+4. Em outra aba, abra o painel do registro: **http://registry.localhost:8080**
 
    Repare na seção *Allocated resources*: são exatamente o ASN e os blocos
    do seu `lab.conf`. O certificado que o registro está prestes a emitir
@@ -326,7 +329,7 @@ a história começa.
 > Faça isto somente se o `lab.conf` tiver `MODE=beta`. Precisa de acesso à Internet e de um
 > login no beta.registro.br.
 
-1. Abra o Krill em **https://localhost:3000**, entre com o token
+1. Abra o Krill em **http://krill.localhost:8080**, entre com o token
    **`passlab`** e crie a CA **`minha_ca`**.
 
 2. Em outra aba, entre em **https://beta.registro.br/login/**. No
@@ -1449,7 +1452,7 @@ Desfaça as duas mudanças (remova a linha `route` extra, restaure o filtro
 A história só olhou os vereditos dos roteadores. Aqui olhamos como eles chegaram
 lá.
 
-1. Abra o Routinator: **http://localhost:8323**
+1. Abra o Routinator: **http://routinator.localhost:8080**
 
    Ele está configurado para validar **apenas** a âncora de confiança do próprio laboratório, não a
    Internet inteira:
@@ -1466,7 +1469,7 @@ lá.
 2. Olhe o conjunto validado, com ROAs e ASPAs:
 
    ```
-   #curl -s http://localhost:8323/json
+   #curl -s http://routinator.localhost:8080/json
    ```
 
 3. Veja o que o observer1 recebeu por RTR:

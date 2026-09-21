@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # observer2's router: OpenBGPD 8.8 (Alpine 3.22).
 #
 # OpenBGPD is the lab's second BGP implementation. Unlike BIRD, it computes

@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # Installs the current deployment stage's configuration and starts OpenBGPD.
 #
 # Stages (one file each, openbgpd/observer2-<stage>.conf):

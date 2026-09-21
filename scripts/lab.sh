@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # Shortcuts to operate the lab.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -73,16 +73,22 @@ stage() {
 case "${1:-help}" in
   up)
       ./scripts/generate-config.sh
-      docker compose up -d --build
+      # LAB_NO_BUILD=1 (used inside the prebuilt virtual machine, which has the
+      # images already and may have no Internet) skips rebuilding them.
+      if [ -n "${LAB_NO_BUILD:-}" ]; then
+          docker compose up -d
+      else
+          docker compose up -d --build
+      fi
       echo
       echo "MODE=$MODE  LANGUAGE=$LANGUAGE"
       if [ "$MODE" = "local" ]; then
-          printf '%-13s%s   %s\n' "$(msg lbl_registry)" "http://localhost:8081" "$(msg note_registry)"
+          printf '%-13s%s   %s\n' "$(msg lbl_registry)" "http://registry.localhost:8080" "$(msg note_registry)"
       fi
       printf '%-13s%s\n' "$(msg lbl_panel)" "$PANEL"
-      printf '%-13s%s   %s\n' "$(msg lbl_krill)" "https://localhost:3000" "$(msg note_krill)"
-      printf '%-13s%s\n' "$(msg lbl_routinator)" "http://localhost:8323"
-      printf '%-13s%s\n' "$(msg lbl_console)" "http://localhost:7681"
+      printf '%-13s%s   %s\n' "$(msg lbl_krill)" "http://krill.localhost:8080" "$(msg note_krill)"
+      printf '%-13s%s\n' "$(msg lbl_routinator)" "http://routinator.localhost:8080"
+      printf '%-13s%s\n' "$(msg lbl_console)" "http://console.localhost:8080"
       ;;
   down)     docker compose down ;;
   reset)    docker compose down -v ;;         # also removes Krill's CA
@@ -91,7 +97,7 @@ case "${1:-help}" in
   panel)    open_url "$PANEL" ;;
   registry)
       if [ "$MODE" = "local" ]; then
-          open_url "http://localhost:8081"
+          open_url "http://registry.localhost:8080"
       else
           open_url "https://beta.registro.br/login/"
       fi ;;

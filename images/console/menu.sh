@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # Opens a terminal inside the container requested by the panel:
 #   http://localhost:7681?arg=<node>&arg=<mode>
 node="${1:-}"

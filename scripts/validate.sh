@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # Text summary of the lab's state - good for projecting during class.
 set -uo pipefail
 cd "$(dirname "$0")/.."

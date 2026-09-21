@@ -1,4 +1,6 @@
-# RPKI + ASPA Lab
+# RPKI SelfLab
+
+*Standalone Lab and Self-Study Guide for RPKI, ROA, ROV, and ASPA*
 
 *[English](GUIDE.en.md) · [Español](GUIDE.es.md) · [Português](GUIDE.pt.md)*
 
@@ -257,10 +259,11 @@ happens between a provider and their RIR.
 
 ### Your side: the CA in Krill
 
-1. Open Krill: **https://localhost:3000**
+1. Open Krill: **http://krill.localhost:8080**
 
-   The browser will complain about the self-signed certificate. Click
-   "Advanced" and proceed.
+   (It's served through the lab's web server, so there's no certificate
+   warning. The direct address, `https://localhost:3000`, still works, with a
+   self-signed certificate.)
 
 2. Log in with the token **`passlab`**.
 
@@ -269,7 +272,7 @@ happens between a provider and their RIR.
 
 ### The registry's side: the {{RIR_NAME}} panel
 
-4. In another tab, open the registry panel: **http://localhost:8081**
+4. In another tab, open the registry panel: **http://registry.localhost:8080**
 
    Notice the *Allocated resources* section: it's exactly the ASN and blocks
    from your `lab.conf`. The certificate the registry is about to issue
@@ -323,7 +326,7 @@ the story begins.
 > Only do this if `lab.conf` has `MODE=beta`. It needs Internet access and a
 > beta.registro.br login.
 
-1. Open Krill at **https://localhost:3000**, log in with the token
+1. Open Krill at **http://krill.localhost:8080**, log in with the token
    **`passlab`**, and create the CA **`minha_ca`**.
 
 2. In another tab, log in to **https://beta.registro.br/login/**. In the
@@ -1446,7 +1449,7 @@ Undo both changes (remove the extra `route` line, restore the original
 The story only looked at the routers' verdicts. This looks at how they got
 there.
 
-1. Open Routinator: **http://localhost:8323**
+1. Open Routinator: **http://routinator.localhost:8080**
 
    It's configured to validate **only** the lab's own trust anchor, not the
    whole Internet:
@@ -1463,7 +1466,7 @@ there.
 2. Look at the validated set, with ROAs and ASPAs:
 
    ```
-   #curl -s http://localhost:8323/json
+   #curl -s http://routinator.localhost:8080/json
    ```
 
 3. See what observer1 received over RTR:

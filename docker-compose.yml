@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # ==============================================================================
-# RPKI + ASPA Lab
+# RPKI SelfLab
 #
 #   start:  ./scripts/lab.sh up
 #   panel:  http://localhost:8080
@@ -10,10 +10,10 @@
 # section of the README before changing any of them.
 # ==============================================================================
 
-name: lab-aspa
+name: rpki-selflab
 
 x-bird: &bird
-  image: lab-aspa/bird
+  image: rpki-selflab/bird
   build: ./images/bird
   cap_add: [NET_ADMIN, SYS_ADMIN]
   sysctls:
@@ -58,7 +58,7 @@ services:
   # ------------------------------------------------- SIMULATED RIR (local) --
   # Generates the lab's internal CA and the RIR's TLS certificate.
   pki-init:
-    image: lab-aspa/utils
+    image: rpki-selflab/utils
     build: ./images/utils
     container_name: lab-pki-init
     environment:
@@ -103,7 +103,7 @@ services:
   # The registry panel: shows the allocated resources and performs the two
   # RFC 8183 XML exchanges (delegation and publication) against the RIR's Krill.
   rir-web:
-    image: lab-aspa/rir-web
+    image: rpki-selflab/rir-web
     build: ./rir-web
     container_name: lab-rir-web
     profiles: [local]
@@ -119,7 +119,7 @@ services:
 
   # Installs the right TAL into /tals, per lab.conf's MODE (runs once and exits).
   tal-init:
-    image: lab-aspa/utils
+    image: rpki-selflab/utils
     build: ./images/utils
     container_name: lab-tal-init
     command: ["/usr/local/bin/tal-init.sh"]
@@ -179,7 +179,7 @@ services:
   # image's entrypoint, because FORT's --http.ca-path wants a hashed
   # directory rather than a single file.
   fort:
-    image: lab-aspa/fort
+    image: rpki-selflab/fort
     build: ./images/fort
     container_name: lab-fort
     hostname: fort
@@ -270,7 +270,7 @@ services:
 
   # observer2: OpenBGPD + FORT Validator
   observer2:
-    image: lab-aspa/openbgpd
+    image: rpki-selflab/openbgpd
     build: ./images/openbgpd
     container_name: lab-observer2
     hostname: observer2
@@ -328,7 +328,7 @@ services:
   # ----------------------------------------------------------------- PANEL --
   # Browser terminal. Each panel node opens this ttyd instance with ?arg=<node>.
   console:
-    image: lab-aspa/console
+    image: rpki-selflab/console
     build: ./images/console
     container_name: lab-console
     # disableLeaveAlert: without it, the browser asks "changes may not be
@@ -351,7 +351,7 @@ services:
   # Collects the lab's state (BGP sessions, RTR, routes and verdicts) into a
   # JSON file that the panel reads every few seconds.
   status:
-    image: lab-aspa/console
+    image: rpki-selflab/console
     build: ./images/console
     container_name: lab-status
     command: ["python3", "/usr/local/bin/status.py"]

@@ -1,0 +1,3 @@
+# Built images and intermediate files (large; published as release assets)
+releases/
+build/

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # Lab support utilities: generates the internal PKI and fetches the TAL.
 # Runs as an init container (executes once and exits).
 FROM alpine:3.22

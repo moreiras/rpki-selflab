@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # Simulated registry panel. Stock Python, no external dependency: the lab
 # needs to come up without pulling anything beyond the images themselves.
 FROM alpine:3.22

@@ -1,8 +1,10 @@
-# lab-aspa
+# RPKI SelfLab
+
+*Laboratorio autónomo y guía de autoestudio para RPKI, ROA, ROV y ASPA*
 
 *[English](README.md) · [Español](README.es.md) · [Português](README.pt.md)*
 
-Laboratorio de RPKI + ASPA en contenedores, para correr en cualquier
+Laboratorio de RPKI (ROA, ROV y ASPA) en contenedores, para correr en cualquier
 computadora con Docker (Mac, Windows o Linux - probado con OrbStack y Docker
 Desktop). Publica ROAs y un objeto ASPA, y luego muestra qué hacen **dos
 validadores distintos y dos routers distintos** con exactamente los mismos
@@ -37,12 +39,25 @@ open http://localhost:8080
 | Servicio | URL | Nota |
 |---|---|---|
 | Panel del laboratorio | http://localhost:8080 | topología clicable |
-| Krill (CA) | https://localhost:3000 | token `passlab`, certificado autofirmado |
-| Routinator | http://localhost:8323 | validador del observer1 |
+| Krill (CA) | http://krill.localhost:8080 | token `passlab` |
+| Routinator | http://routinator.localhost:8080 | validador del observer1 |
 | FORT (RTR) | localhost:3324 | validador del observer2, sin interfaz web |
-| Consola (ttyd) | http://localhost:7681 | terminal en el navegador |
-| Panel del registro | http://localhost:8081 | solo en `MODE=local` |
-| Krill de LabNIC | https://localhost:3001 | solo en `MODE=local`, token `passlab` |
+| Consola (ttyd) | http://console.localhost:8080 | terminal en el navegador |
+| Panel del registro | http://registry.localhost:8080 | solo en `MODE=local` |
+| Krill de LabNIC | http://rir-krill.localhost:8080 | solo en `MODE=local`, token `passlab` |
+
+Todo es accesible por un solo puerto, el 8080: el panel en `localhost`, y cada
+una de las otras aplicaciones web bajo su propio `<nombre>.localhost` (los
+navegadores resuelven `*.localhost` a su máquina, y nginx enruta por el nombre).
+Los puertos propios de los servicios (3000, 3001, 7681, 8081, 8323) siguen
+publicados también. Eso ayuda en la máquina virtual, donde solo el 8080 necesita
+reenvío.
+
+## Como máquina virtual
+
+Si prefiere no instalar Docker, el laboratorio también viene como una pequeña
+máquina virtual que ya contiene todo, imágenes incluidas, y funciona sin
+acceso a Internet. Vea [vm/README.md](vm/README.md) (en inglés).
 
 ## Topología
 
@@ -215,6 +230,7 @@ guide/
   templates/GUIDE.*.md           the class guide's sources, with {{NAME}} markers (edit these)
   GUIDE.en.md, .es.md, .pt.md    COMPILED from templates/ by generate-config.sh (don't edit)
 web/nginx.conf              serves the panel and proxies Routinator
+vm/                         la máquina virtual: plantilla de Packer, scripts, releases (vea vm/README.md)
 scripts/
   lab.sh                    up / down / refresh / reset / step* (the story's commands)
   validate.sh               text summary of the lab's state

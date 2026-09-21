@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 The lab-aspa authors
+// Copyright 2026 The rpki-selflab authors
 // ============================================================================
 // Shared language-switching mechanism for the lab's two panels (the main
 // dashboard and the registry panel). Loaded by both dashboard/index.html and
@@ -16,7 +16,7 @@
 const LANGUAGES = ["en", "es", "pt"];
 const LANGUAGE_NAMES = { pt: "Português", es: "Español", en: "English" };
 const HTML_LANG = { pt: "pt-BR", es: "es", en: "en" };
-const STORAGE_KEY = "lab-aspa-language";
+const STORAGE_KEY = "rpki-selflab-language";
 
 function currentLanguage() {
   try {

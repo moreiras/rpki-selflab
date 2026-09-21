@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # Trust the lab's internal CA before starting FORT.
 #
 # FORT fetches the simulated RIR's RRDP over HTTPS, and the RIR's certificate

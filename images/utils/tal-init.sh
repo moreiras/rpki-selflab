@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # ---------------------------------------------------------------------------
 # Puts into /tals the TAL that BOTH validators (Routinator and FORT) will
 # use. Which TAL depends on the MODE chosen in lab.conf:

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Only used while the image is being built: lets Packer log in over SSH.
+echo 'root:labpass' | chpasswd
+sed -i -e 's/^#*PermitRootLogin.*/PermitRootLogin yes/' \
+       -e 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+rc-service sshd restart

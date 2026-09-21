@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 """Collects the lab's state and writes /srv/status/status.json.
 
 The panel (dashboard/index.html) reads this file to color the topology and

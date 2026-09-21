@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # ---------------------------------------------------------------------------
 # Shared message catalog for this image's scripts (generate-pki.sh, tal-init.sh).
 # POSIX sh (Alpine's ash has no associative arrays), so a case statement.

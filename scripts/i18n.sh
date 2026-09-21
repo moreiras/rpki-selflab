@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # ---------------------------------------------------------------------------
 # Shared message catalog for the scripts in this directory
 # (lab.sh, validate.sh, generate-config.sh).

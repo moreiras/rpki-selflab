@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 # Translates lab.conf into the per-router parameter files:
 #
 #   bird/vars.conf       "define" statements, included by the BIRD routers

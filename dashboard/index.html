@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <!-- SPDX-License-Identifier: Apache-2.0
-     Copyright 2026 The lab-aspa authors -->
+     Copyright 2026 The rpki-selflab authors -->
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RPKI + ASPA Lab</title>
+<title>RPKI SelfLab</title>
 <script>
-  try { const th = localStorage.getItem("lab-aspa-theme");
+  try { const th = localStorage.getItem("rpki-selflab-theme");
         if (th === "light" || th === "dark") document.documentElement.dataset.theme = th; } catch (_) {}
 </script>
 <style>
@@ -68,6 +68,8 @@
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
     padding: 9px 18px; border-bottom: 1px solid var(--line); background: var(--bg-alt);
   }
+  header .brand { display: flex; flex-direction: column; gap: 1px; }
+  header .tagline { font-size: 10.5px; color: var(--text-weak); letter-spacing: .1px; }
   header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px; }
   header .clock { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--text-weak); }
 
@@ -244,7 +246,10 @@
 <body>
 
 <header>
-  <h1 data-i18n="h1">RPKI + ASPA Lab</h1>
+  <div class="brand">
+    <h1 data-i18n="h1">RPKI SelfLab</h1>
+    <div class="tagline" data-i18n="tagline">Standalone Lab and Self-Study Guide for RPKI, ROA, ROV, and ASPA</div>
+  </div>
   <span class="tabs">
     <button id="tab-topology" class="active" data-i18n="tab_topology">Topology</button>
     <button id="tab-guide" data-i18n="tab_guide">Script</button>
@@ -466,9 +471,17 @@
 // All links point to the same host the panel was opened from (localhost,
 // 127.0.0.1, the machine's IP...), so nothing breaks in any setup.
 const HOST     = location.hostname;
-const TTYD_URL  = `http://${HOST}:7681`;
-const KRILL_URL = `https://${HOST}:3000`;
-const ROUTINATOR_URL = `http://${HOST}:8323`;
+// Opened as localhost, every service is reached through the panel's own port,
+// under <name>.localhost (nginx routes by name). Opened by IP or by another
+// name, those names wouldn't resolve, so fall back to each service's own port.
+const VHOST = HOST === "localhost";
+const PANEL_PORT = location.port ? `:${location.port}` : "";
+const svcUrl = (name, scheme, port) =>
+  VHOST ? `http://${name}.localhost${PANEL_PORT}` : `${scheme}://${HOST}:${port}`;
+const TTYD_URL  = svcUrl("console", "http", 7681);
+const KRILL_URL = svcUrl("krill", "https", 3000);
+const ROUTINATOR_URL = svcUrl("routinator", "http", 8323);
+const REGISTRY_URL = svcUrl("registry", "http", 8081);
 
 // ---------------------------------------------------------------------------
 // UI strings. Protocol/technical terms (BGP, ROA, ASPA, RTR, RRDP, RFC
@@ -478,7 +491,8 @@ const ROUTINATOR_URL = `http://${HOST}:8323`;
 // keeping it consistent makes the lab and the tools easier to cross-reference.
 // ---------------------------------------------------------------------------
 const I18N = {
-  h1:              { pt: "Laboratório RPKI + ASPA", es: "Laboratorio RPKI + ASPA", en: "RPKI + ASPA Lab" },
+  h1:              { pt: "RPKI SelfLab", es: "RPKI SelfLab", en: "RPKI SelfLab" },
+  tagline:         { pt: "Laboratório autônomo e guia de autoestudo para RPKI, ROA, ROV e ASPA", es: "Laboratorio autónomo y guía de autoestudio para RPKI, ROA, ROV y ASPA", en: "Standalone Lab and Self-Study Guide for RPKI, ROA, ROV, and ASPA" },
   tab_topology:    { pt: "Topologia", es: "Topología", en: "Topology" },
   tab_guide:       { pt: "Roteiro", es: "Guion", en: "Script" },
   legend_no_data:  { pt: "sem dado", es: "sin dato", en: "no data" },
@@ -647,7 +661,7 @@ const NODES = {
       role: "A sua CA. É aqui que você cria as ROAs (pela interface web) e o objeto ASPA (pela CLI).",
       info: {
         "Imagem": "nlnetlabs/krill:v0.16.0",
-        "Interface web": "https://<host>:3000",
+        "Interface web": KRILL_URL,
         "Token": "passlab",
         "Nome da CA": "minha_ca",
         "ASPA": "só via krillc (CLI)",
@@ -661,7 +675,7 @@ const NODES = {
       role: "Valida os objetos publicados sob a TA do laboratório e entrega ROAs e ASPAs ao observer1 pelo protocolo RTR.",
       info: {
         "Imagem": "nlnetlabs/routinator:v0.15.2",
-        "Interface web": "http://<host>:8323",
+        "Interface web": ROUTINATOR_URL,
         "RTR": "172.30.0.20:3323",
         "Flags": "--no-rir-tals --extra-tals-dir=/tals --enable-aspa",
       },
@@ -673,7 +687,7 @@ const NODES = {
       name: "FORT Validator — validador do observer2",
       role: "O segundo validador. Faz o mesmo trabalho do Routinator, com outra implementação, e alimenta o observer2 por RTR.",
       info: {
-        "Imagem": "lab-aspa/fort (compilada do fonte)",
+        "Imagem": "rpki-selflab/fort (compilada do fonte)",
         "Versão": "1.7.0.experimental",
         "RTR": "172.30.0.50:3323 (host: 3324)",
         "Por que essa versão": "ASPA e RTR v2 só existem a partir dela",
@@ -748,7 +762,7 @@ const NODES = {
     },
     registry_local: {
       role: "O RIR/NIR simulado que roda dentro do laboratório. Emite o certificado dos recursos alocados e hospeda o repositório. Sem Internet, sem credencial.",
-      info: { "Modo": "local (autocontido)", "Painel do registro": `http://${HOST}:8081`,
+      info: { "Modo": "local (autocontido)", "Painel do registro": REGISTRY_URL,
               "Âncora de confiança": "gerada pelo próprio laboratório", "Publicação": "RRDP em https://rir.lab:3000/rrdp/" },
       link: "Abrir o painel do registro",
       hint: "krillc list\nkrillc children connections --ca testbed\nkrillc pubserver publishers list",
@@ -765,7 +779,7 @@ const NODES = {
       role: "Su CA. Aquí se crean las ROAs (por la interfaz web) y el objeto ASPA (por la CLI).",
       info: {
         "Imagen": "nlnetlabs/krill:v0.16.0",
-        "Interfaz web": "https://<host>:3000",
+        "Interfaz web": KRILL_URL,
         "Token": "passlab",
         "Nombre de la CA": "minha_ca",
         "ASPA": "solo vía krillc (CLI)",
@@ -779,7 +793,7 @@ const NODES = {
       role: "Valida los objetos publicados bajo la TA del laboratorio y entrega ROAs y ASPAs al observer1 por el protocolo RTR.",
       info: {
         "Imagen": "nlnetlabs/routinator:v0.15.2",
-        "Interfaz web": "http://<host>:8323",
+        "Interfaz web": ROUTINATOR_URL,
         "RTR": "172.30.0.20:3323",
         "Flags": "--no-rir-tals --extra-tals-dir=/tals --enable-aspa",
       },
@@ -791,7 +805,7 @@ const NODES = {
       name: "FORT Validator — validador del observer2",
       role: "El segundo validador. Hace el mismo trabajo que Routinator, con otra implementación, y alimenta al observer2 por RTR.",
       info: {
-        "Imagen": "lab-aspa/fort (compilada desde el fuente)",
+        "Imagen": "rpki-selflab/fort (compilada desde el fuente)",
         "Versión": "1.7.0.experimental",
         "RTR": "172.30.0.50:3323 (host: 3324)",
         "Por qué esa versión": "ASPA y RTR v2 existen solo a partir de ella",
@@ -866,7 +880,7 @@ const NODES = {
     },
     registry_local: {
       role: "El RIR/NIR simulado que corre dentro del laboratorio. Emite el certificado de los recursos asignados y aloja el repositorio. Sin Internet, sin credencial.",
-      info: { "Modo": "local (autocontenido)", "Panel del registro": `http://${HOST}:8081`,
+      info: { "Modo": "local (autocontenido)", "Panel del registro": REGISTRY_URL,
               "Ancla de confianza": "generada por el propio laboratorio", "Publicación": "RRDP en https://rir.lab:3000/rrdp/" },
       link: "Abrir el panel del registro",
       hint: "krillc list\nkrillc children connections --ca testbed\nkrillc pubserver publishers list",
@@ -883,7 +897,7 @@ const NODES = {
       role: "Your CA. This is where you create the ROAs (through the web UI) and the ASPA object (through the CLI).",
       info: {
         "Image": "nlnetlabs/krill:v0.16.0",
-        "Web UI": "https://<host>:3000",
+        "Web UI": KRILL_URL,
         "Token": "passlab",
         "CA name": "minha_ca",
         "ASPA": "krillc (CLI) only",
@@ -897,7 +911,7 @@ const NODES = {
       role: "Validates the objects published under the lab's TA and hands ROAs and ASPAs to observer1 over the RTR protocol.",
       info: {
         "Image": "nlnetlabs/routinator:v0.15.2",
-        "Web UI": "http://<host>:8323",
+        "Web UI": ROUTINATOR_URL,
         "RTR": "172.30.0.20:3323",
         "Flags": "--no-rir-tals --extra-tals-dir=/tals --enable-aspa",
       },
@@ -909,7 +923,7 @@ const NODES = {
       name: "FORT Validator — observer2's validator",
       role: "The second validator. Same job as Routinator, different implementation, feeding observer2 over RTR.",
       info: {
-        "Image": "lab-aspa/fort (built from source)",
+        "Image": "rpki-selflab/fort (built from source)",
         "Version": "1.7.0.experimental",
         "RTR": "172.30.0.50:3323 (host: 3324)",
         "Why that version": "ASPA and RTR v2 only exist from it onwards",
@@ -984,7 +998,7 @@ const NODES = {
     },
     registry_local: {
       role: "The simulated RIR/NIR that runs inside the lab. It issues the certificate for the allocated resources and hosts the repository. No Internet, no credentials.",
-      info: { "Mode": "local (self-contained)", "Registry panel": `http://${HOST}:8081`,
+      info: { "Mode": "local (self-contained)", "Registry panel": REGISTRY_URL,
               "Trust anchor": "generated by the lab itself", "Publication": "RRDP at https://rir.lab:3000/rrdp/" },
       link: "Open the registry panel",
       hint: "krillc list\nkrillc children connections --ca testbed\nkrillc pubserver publishers list",
@@ -1000,7 +1014,7 @@ const NODES = {
 document.getElementById("a-krill").href       = KRILL_URL;
 document.getElementById("a-routinator").href  = ROUTINATOR_URL;
 document.getElementById("a-console").href     = TTYD_URL;
-document.getElementById("a-registry").href    = `http://${HOST}:8081`;
+document.getElementById("a-registry").href    = REGISTRY_URL;
 
 let selected = null;
 let lastState = null;
@@ -1065,7 +1079,7 @@ function registryNode(g) {
                 : "beta.registro.br",
     role: base.role,
     info: base.info,
-    links: [[base.link, local ? `http://${HOST}:8081` : "https://beta.registro.br/login/"]],
+    links: [[base.link, local ? REGISTRY_URL : "https://beta.registro.br/login/"]],
     term: local ? [["Terminal (krillc do RIR)", "rir"]] : [],
     hint: base.hint || null,
   };
@@ -1533,7 +1547,7 @@ function showStep(n) {
       setTimeout(() => (b.textContent = t("copy")), 1200);
     };
   });
-  try { localStorage.setItem("lab-aspa-step", String(currentStep)); } catch (_) {}
+  try { localStorage.setItem("rpki-selflab-step", String(currentStep)); } catch (_) {}
 }
 
 async function loadGuide() {
@@ -1562,7 +1576,7 @@ async function loadGuide() {
   selectEl.onchange = () => showStep(+selectEl.value);
 
   let initial = 0;
-  try { initial = +(localStorage.getItem("lab-aspa-step") || 0); } catch (_) {}
+  try { initial = +(localStorage.getItem("rpki-selflab-step") || 0); } catch (_) {}
   showStep(Math.min(initial, steps.length - 1));
 }
 
@@ -1575,7 +1589,7 @@ function setView(view) {
   document.getElementById("view-guide").classList.toggle("hidden", !isGuide);
   document.getElementById("tab-topology").classList.toggle("active", !isGuide);
   document.getElementById("tab-guide").classList.toggle("active", isGuide);
-  try { localStorage.setItem("lab-aspa-view", view); } catch (_) {}
+  try { localStorage.setItem("rpki-selflab-view", view); } catch (_) {}
 }
 document.getElementById("tab-topology").onclick = () => setView("topology");
 document.getElementById("tab-guide").onclick   = () => setView("guide");
@@ -1610,7 +1624,7 @@ function paintThemeButton() {
 document.getElementById("btn-theme").addEventListener("click", () => {
   const next = currentTheme() === "light" ? "dark" : "light";
   document.documentElement.dataset.theme = next;
-  try { localStorage.setItem("lab-aspa-theme", next); } catch (_) {}
+  try { localStorage.setItem("rpki-selflab-theme", next); } catch (_) {}
   paintThemeButton();
 });
 
@@ -1618,7 +1632,7 @@ buildLanguageSwitcher(document.getElementById("language-switcher"));
 translateStatic();
 paintThemeButton();
 loadGuide();
-try { if (localStorage.getItem("lab-aspa-view") === "guide") setView("guide"); } catch (_) {}
+try { if (localStorage.getItem("rpki-selflab-view") === "guide") setView("guide"); } catch (_) {}
 </script>
 </body>
 </html>

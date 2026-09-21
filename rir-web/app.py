@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 The lab-aspa authors
+# Copyright 2026 The rpki-selflab authors
 """Simulated registry (RIR/NIR) panel for the lab.
 
 Plays the role a real registry's panel plays: shows the resources allocated
