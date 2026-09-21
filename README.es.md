@@ -56,8 +56,9 @@ reenvío.
 ## Como máquina virtual
 
 Si prefiere no instalar Docker, el laboratorio también viene como una pequeña
-máquina virtual que ya contiene todo, imágenes incluidas, y funciona sin
-acceso a Internet. Vea [vm/README.md](vm/README.md) (en inglés).
+máquina virtual con escritorio propio (navegador y terminal) que ya contiene
+todo, imágenes incluidas: nada que configurar, y funciona sin acceso a Internet.
+Vea [vm/README.es.md](vm/README.es.md).
 
 ## Topología
 
