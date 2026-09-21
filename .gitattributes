@@ -1,0 +1,15 @@
+# Force LF endings regardless of the platform/editor that checks the repo
+# out. Without this, Windows clones with core.autocrlf=true turn shell
+# scripts' shebang lines into "#!/bin/sh\r", which breaks them.
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.conf  text eol=lf
+*.py    text eol=lf
+*.js    text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+Dockerfile text eol=lf

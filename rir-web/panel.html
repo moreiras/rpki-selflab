@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: Apache-2.0
+     Copyright 2026 The lab-aspa authors -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resource certification — LabNIC</title>
+<style>
+  :root {
+    --ink: #1b2333;
+    --ink-weak: #5b6880;
+    --border: #dfe4ed;
+    --bg: #f4f6fa;
+    --paper: #ffffff;
+    --brand: #1f4e79;
+    --brand-light: #eaf1f8;
+    --ok: #1a7f5a;
+    --ok-bg: #e6f4ee;
+    --warn: #9a6700;
+    --warn-bg: #fdf6e3;
+    --error: #b42318;
+    --error-bg: #fdecea;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .topbar {
+    background: var(--brand); color: #fff; padding: 12px 0;
+  }
+  .topbar .wrap { display: flex; align-items: center; gap: 14px; }
+  .brand { display: flex; align-items: baseline; gap: 9px; }
+  .brand b { font-size: 19px; letter-spacing: .5px; font-weight: 700; }
+  .brand span { font-size: 12.5px; opacity: .85; }
+  .topbar .env-tag {
+    font-size: 11.5px; letter-spacing: .06em;
+    text-transform: uppercase; background: rgba(255,255,255,.16);
+    padding: 3px 10px; border-radius: 99px;
+  }
+  .topbar .language-switcher {
+    margin-left: auto; display: flex; gap: 3px; background: rgba(255,255,255,.12);
+    padding: 3px; border-radius: 8px;
+  }
+  .topbar .language-switcher button {
+    border: none; background: none; color: rgba(255,255,255,.75); cursor: pointer;
+    font: inherit; font-size: 11px; font-family: var(--mono); padding: 4px 9px; border-radius: 6px;
+  }
+  .topbar .language-switcher button.active { background: rgba(255,255,255,.22); color: #fff; }
+
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 20px; }
+
+  .breadcrumb { font-size: 12.5px; color: var(--ink-weak); padding: 14px 0 4px; }
+  .breadcrumb b { color: var(--ink); font-weight: 600; }
+
+  h1 { font-size: 24px; font-weight: 650; margin: 10px 0 20px; }
+
+  .card {
+    background: var(--paper); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px 22px; margin-bottom: 18px;
+  }
+  .card > h2 {
+    font-size: 16px; margin: 0 0 4px; font-weight: 650;
+  }
+  .card > .help {
+    color: var(--ink-weak); font-size: 13px; margin: 0 0 16px; max-width: 70ch;
+  }
+
+  dl.fields { display: grid; grid-template-columns: 170px 1fr; gap: 9px 16px; margin: 0; }
+  dl.fields dt { color: var(--ink-weak); font-size: 13px; }
+  dl.fields dd { margin: 0; }
+
+  .resources { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .resource {
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
+    background: #fbfcfe;
+  }
+  .resource .label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--ink-weak); margin-bottom: 4px;
+  }
+  .resource .value { font-family: var(--mono); font-size: 15px; font-weight: 600; }
+  .resource .note { font-size: 12px; color: var(--ink-weak); margin-top: 3px; }
+
+  .badge {
+    display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 10px;
+    border-radius: 99px; border: 1px solid transparent;
+  }
+  .badge.ok { background: var(--ok-bg); color: var(--ok); }
+  .badge.pending { background: var(--warn-bg); color: var(--warn); }
+  .badge.error { background: var(--error-bg); color: var(--error); }
+
+  .step { border-top: 1px solid var(--border); padding-top: 18px; margin-top: 18px; }
+  .step:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .step h3 {
+    font-size: 14px; margin: 0 0 3px; font-weight: 650;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .step h3 .num {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--brand-light);
+    color: var(--brand); font-size: 12px; display: grid; place-items: center;
+    font-weight: 700; flex: none;
+  }
+  .step .rfc {
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-weak);
+    font-weight: 400;
+  }
+  .step p.help { color: var(--ink-weak); font-size: 13px; margin: 6px 0 12px 31px; }
+  .step .body { margin-left: 31px; }
+
+  textarea {
+    width: 100%; min-height: 120px; font-family: var(--mono); font-size: 12px;
+    line-height: 1.5; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; resize: vertical; background: #fff; color: var(--ink);
+  }
+  textarea:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+  textarea[readonly] { background: #f7f9fc; }
+
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  button, .btn {
+    font: inherit; font-size: 13.5px; padding: 8px 16px; border-radius: 7px;
+    border: 1px solid var(--brand); background: var(--brand); color: #fff;
+    cursor: pointer; text-decoration: none; display: inline-block;
+  }
+  button.secondary, .btn.secondary {
+    background: #fff; color: var(--brand);
+  }
+  button.danger { background: #fff; color: var(--error); border-color: #e6b5b0; }
+  button:disabled { opacity: .5; cursor: default; }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .notice { padding: 10px 13px; border-radius: 8px; font-size: 13.5px; margin-top: 12px; }
+  .notice.ok { background: var(--ok-bg); color: var(--ok); }
+  .notice.error { background: var(--error-bg); color: var(--error); }
+
+  .result { margin-top: 14px; }
+  .result h4 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-weak); margin: 0 0 6px; font-weight: 600;
+  }
+
+  table.objects { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.objects td { padding: 4px 0; border-bottom: 1px solid var(--border); }
+  table.objects td.mono { font-family: var(--mono); font-size: 12px; }
+
+  .footer {
+    color: var(--ink-weak); font-size: 12.5px; padding: 6px 0 40px;
+    border-top: 1px solid var(--border); margin-top: 8px; padding-top: 16px;
+  }
+  .footer code { font-family: var(--mono); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <span class="brand"><b id="m-name">LabNIC</b><span id="m-desc">Internet registry</span></span>
+    <span class="env-tag" data-i18n="env_tag">lab environment</span>
+    <span class="language-switcher" id="language-switcher"></span>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="breadcrumb" data-i18n-html="breadcrumb">Home › Holdership › <b>Resource certification</b></div>
+  <h1 data-i18n="h1">Resource certification (RPKI)</h1>
+
+  <div class="card">
+    <h2 data-i18n="holder_h2">Holder</h2>
+    <dl class="fields">
+      <dt data-i18n="holder_org">Organization</dt><dd id="t-name">—</dd>
+      <dt data-i18n="holder_doc">Document</dt><dd id="t-doc">—</dd>
+      <dt data-i18n="holder_id">Identifier</dt><dd id="t-handle" style="font-family:var(--mono)">—</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="resources_h2">Allocated resources</h2>
+    <p class="help" data-i18n="resources_help">These are the resources this registry certifies for the
+       holder. Any certificate issued below covers exactly this set - no more, no less.</p>
+    <div class="resources">
+      <div class="resource">
+        <div class="label" data-i18n="resource_asn">Autonomous system</div>
+        <div class="value" id="r-asn">—</div>
+      </div>
+      <div class="resource">
+        <div class="label" data-i18n="resource_v4">IPv4 block</div>
+        <div class="value" id="r-v4">—</div>
+        <div class="note" id="r-v4n"></div>
+      </div>
+      <div class="resource">
+        <div class="label" data-i18n="resource_v6">IPv6 block</div>
+        <div class="value" id="r-v6">—</div>
+        <div class="note" id="r-v6n"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span data-i18n="delegated_h2">Delegated RPKI</span> <span class="badge" id="s-overall">—</span></h2>
+    <p class="help" data-i18n="delegated_help">
+      In <b>delegated</b> mode, the holder runs their own certificate authority and keeps their own
+      private key. This registry only issues the certificate that grants the resources to the holder's
+      CA, and hosts the repository where the signed objects get published. These are two independent
+      steps, each with its own XML exchange.
+    </p>
+
+    <div class="step">
+      <h3><span class="num">1</span> <span data-i18n="step1_title">CA delegation</span> <span class="rfc">RFC 6492 · Up-Down protocol</span></h3>
+      <p class="help" data-i18n="step1_help">Paste the holder CA's identity (<code>child request</code>).
+         The registry replies with the parent's identity and the service address
+         (<code>parent response</code>), which needs to be brought back to the holder's CA.</p>
+      <div class="body">
+        <div id="d-form">
+          <textarea id="d-input" spellcheck="false"
+            placeholder="&lt;child_request xmlns=&quot;http://www.hactrn.net/uris/rpki/rpki-setup/&quot; version=&quot;1&quot; child_handle=&quot;...&quot;&gt;"></textarea>
+          <div class="actions">
+            <button id="d-submit" data-i18n="btn_issue">Issue certificate</button>
+          </div>
+        </div>
+        <div id="d-state"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="num">2</span> <span data-i18n="step2_title">Publication service</span> <span class="rfc">RFC 8181</span></h3>
+      <p class="help" data-i18n="step2_help">Paste the publisher request (<code>publisher request</code>).
+         The registry replies with the repository's address and its RRDP publication point
+         (<code>repository response</code>).</p>
+      <div class="body">
+        <div id="p-form">
+          <textarea id="p-input" spellcheck="false"
+            placeholder="&lt;publisher_request xmlns=&quot;http://www.hactrn.net/uris/rpki/rpki-setup/&quot; version=&quot;1&quot; publisher_handle=&quot;...&quot;&gt;"></textarea>
+          <div class="actions">
+            <button id="p-submit" data-i18n="btn_authorize">Authorize publication</button>
+          </div>
+        </div>
+        <div id="p-state"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="repo_h2">Repository and trust anchor</h2>
+    <p class="help" data-i18n="repo_help">Public data for this registry, for whoever needs to
+       validate the objects it certifies.</p>
+    <dl class="fields">
+      <dt data-i18n="repo_rrdp">Publication point</dt><dd class="mono" id="e-rrdp" style="font-family:var(--mono);font-size:13px">—</dd>
+      <dt data-i18n="repo_ta">Trust anchor</dt><dd><a class="btn secondary" href="/ta.tal" download="ta.tal" data-i18n="repo_download_tal">Download the TAL</a></dd>
+      <dt data-i18n="repo_objects">Published objects</dt><dd id="e-objects">—</dd>
+    </dl>
+    <div id="e-list"></div>
+  </div>
+
+  <div class="footer" data-i18n-html="footer">
+    This is a <b>simulated</b> registry, running inside the lab. Its trust anchor is worthless outside
+    of here - it's only recognized by this lab's validator, configured with the TAL above.
+  </div>
+</div>
+
+<script src="language.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+
+// ---------------------------------------------------------------------------
+// UI strings. RPKI/protocol vocabulary (RFC numbers, "child request",
+// "parent response", "publisher request", "repository response", CA, ASN,
+// RRDP, TAL...) is kept as-is in all three languages: that's the vocabulary
+// the RFCs and the Krill CLI already use, and this panel exists specifically
+// to teach that exchange, so keeping the terms recognizable matters more
+// than translating them.
+// ---------------------------------------------------------------------------
+const I18N = {
+  env_tag:         { pt: "ambiente de laboratório", es: "entorno de laboratorio", en: "lab environment" },
+  breadcrumb:      { pt: 'Início › Titularidade › <b>Certificação de recursos</b>',
+                      es: 'Inicio › Titularidad › <b>Certificación de recursos</b>',
+                      en: 'Home › Holdership › <b>Resource certification</b>' },
+  h1:              { pt: "Certificação de recursos (RPKI)", es: "Certificación de recursos (RPKI)", en: "Resource certification (RPKI)" },
+
+  holder_h2:       { pt: "Titular", es: "Titular", en: "Holder" },
+  holder_org:      { pt: "Organização", es: "Organización", en: "Organization" },
+  holder_doc:      { pt: "Documento", es: "Documento", en: "Document" },
+  holder_id:       { pt: "Identificador", es: "Identificador", en: "Identifier" },
+
+  resources_h2:    { pt: "Recursos alocados", es: "Recursos asignados", en: "Allocated resources" },
+  resources_help:  {
+    pt: "São estes os recursos que este registro certifica para o titular. Qualquer certificado emitido abaixo cobre exatamente este conjunto — nem mais, nem menos.",
+    es: "Estos son los recursos que este registro certifica para el titular. Cualquier certificado emitido abajo cubre exactamente este conjunto — ni más, ni menos.",
+    en: "These are the resources this registry certifies for the holder. Any certificate issued below covers exactly this set - no more, no less.",
+  },
+  resource_asn:    { pt: "Sistema autônomo", es: "Sistema autónomo", en: "Autonomous system" },
+  resource_v4:     { pt: "Bloco IPv4", es: "Bloque IPv4", en: "IPv4 block" },
+  resource_v6:     { pt: "Bloco IPv6", es: "Bloque IPv6", en: "IPv6 block" },
+  suggested_roa:   { pt: "ROA sugerida até /{n}", es: "ROA sugerida hasta /{n}", en: "Suggested ROA up to /{n}" },
+
+  delegated_h2:    { pt: "RPKI delegado", es: "RPKI delegado", en: "Delegated RPKI" },
+  delegated_help:  {
+    pt: "No modo <b>delegado</b>, o titular opera a própria autoridade certificadora e guarda a própria chave privada. Este registro apenas emite o certificado que confere os recursos à CA do titular e hospeda o repositório onde os objetos assinados são publicados. São duas etapas independentes, cada uma com a sua troca de XML.",
+    es: "En el modo <b>delegado</b>, el titular opera su propia autoridad certificadora y guarda su propia clave privada. Este registro solo emite el certificado que otorga los recursos a la CA del titular y aloja el repositorio donde se publican los objetos firmados. Son dos etapas independientes, cada una con su propio intercambio de XML.",
+    en: "In <b>delegated</b> mode, the holder runs their own certificate authority and keeps their own private key. This registry only issues the certificate that grants the resources to the holder's CA, and hosts the repository where the signed objects get published. These are two independent steps, each with its own XML exchange.",
+  },
+  step1_title:     { pt: "Delegação da CA", es: "Delegación de la CA", en: "CA delegation" },
+  step1_help:      {
+    pt: "Cole a identidade da CA do titular (<code>child request</code>). O registro responde com a identidade do pai e o endereço do serviço (<code>parent response</code>), que deve ser levado de volta à CA do titular.",
+    es: "Pegue la identidad de la CA del titular (<code>child request</code>). El registro responde con la identidad del padre y la dirección del servicio (<code>parent response</code>), que debe llevarse de vuelta a la CA del titular.",
+    en: "Paste the holder CA's identity (<code>child request</code>). The registry replies with the parent's identity and the service address (<code>parent response</code>), which needs to be brought back to the holder's CA.",
+  },
+  btn_issue:       { pt: "Emitir certificado", es: "Emitir certificado", en: "Issue certificate" },
+
+  step2_title:     { pt: "Serviço de publicação", es: "Servicio de publicación", en: "Publication service" },
+  step2_help:      {
+    pt: "Cole a requisição do publicador (<code>publisher request</code>). O registro responde com o endereço do repositório e o ponto de publicação RRDP (<code>repository response</code>).",
+    es: "Pegue la solicitud del publicador (<code>publisher request</code>). El registro responde con la dirección del repositorio y el punto de publicación RRDP (<code>repository response</code>).",
+    en: "Paste the publisher request (<code>publisher request</code>). The registry replies with the repository's address and its RRDP publication point (<code>repository response</code>).",
+  },
+  btn_authorize:   { pt: "Autorizar publicação", es: "Autorizar publicación", en: "Authorize publication" },
+
+  repo_h2:         { pt: "Repositório e âncora de confiança", es: "Repositorio y ancla de confianza", en: "Repository and trust anchor" },
+  repo_help:       {
+    pt: "Dados públicos deste registro, para quem for validar os objetos que ele certifica.",
+    es: "Datos públicos de este registro, para quien vaya a validar los objetos que certifica.",
+    en: "Public data for this registry, for whoever needs to validate the objects it certifies.",
+  },
+  repo_rrdp:       { pt: "Ponto de publicação", es: "Punto de publicación", en: "Publication point" },
+  repo_ta:         { pt: "Âncora de confiança", es: "Ancla de confianza", en: "Trust anchor" },
+  repo_download_tal: { pt: "Baixar o TAL", es: "Descargar el TAL", en: "Download the TAL" },
+  repo_objects:    { pt: "Objetos publicados", es: "Objetos publicados", en: "Published objects" },
+  repo_none:       { pt: "nenhum", es: "ninguno", en: "none" },
+
+  footer:          {
+    pt: 'Este é um registro <b>simulado</b>, que roda dentro do laboratório. A âncora de confiança dele não vale nada fora daqui — ela só é reconhecida pelo validador deste laboratório, configurado com o TAL acima.',
+    es: 'Este es un registro <b>simulado</b>, que corre dentro del laboratorio. Su ancla de confianza no vale nada fuera de aquí — solo la reconoce el validador de este laboratorio, configurado con el TAL de arriba.',
+    en: 'This is a <b>simulated</b> registry, running inside the lab. Its trust anchor is worthless outside of here - it’s only recognized by this lab’s validator, configured with the TAL above.',
+  },
+
+  registry_unavailable: { pt: "registro indisponível", es: "registro no disponible", en: "registry unavailable" },
+  delegated_ca:    { pt: "CA delegada", es: "CA delegada", en: "Delegated CA" },
+  last_exchange:   { pt: "Última troca Up-Down", es: "Último intercambio Up-Down", en: "Latest Up-Down exchange" },
+  status_label:    { pt: "Situação", es: "Situación", en: "Status" },
+  active:          { pt: "ativa", es: "activa", en: "active" },
+  view_parent_response: { pt: "Ver a resposta do pai novamente", es: "Ver de nuevo la respuesta del padre", en: "View the parent's response again" },
+  revoke_delegation: { pt: "Revogar delegação", es: "Revocar delegación", en: "Revoke delegation" },
+  confirm_revoke_delegation: {
+    pt: "Revogar a delegação apaga o certificado emitido para a CA do titular. Confirma?",
+    es: "Revocar la delegación borra el certificado emitido para la CA del titular. ¿Confirma?",
+    en: "Revoking the delegation deletes the certificate issued to the holder's CA. Confirm?",
+  },
+  parent_response_title: { pt: "Resposta do pai (parent response)", es: "Respuesta del padre (parent response)", en: "Parent's response (parent response)" },
+
+  publisher:       { pt: "Publicador", es: "Publicador", en: "Publisher" },
+  repo_object_count: { pt: "Objetos no repositório", es: "Objetos en el repositorio", en: "Objects in the repository" },
+  view_repo_response: { pt: "Ver a resposta do repositório novamente", es: "Ver de nuevo la respuesta del repositorio", en: "View the repository's response again" },
+  revoke_publication: { pt: "Revogar publicação", es: "Revocar publicación", en: "Revoke publication" },
+  confirm_revoke_publication: {
+    pt: "Revogar a publicação remove todos os objetos do titular do repositório. Confirma?",
+    es: "Revocar la publicación elimina todos los objetos del titular del repositorio. ¿Confirma?",
+    en: "Revoking the publication removes all of the holder's objects from the repository. Confirm?",
+  },
+  repo_response_title: { pt: "Resposta do repositório (repository response)", es: "Respuesta del repositorio (repository response)", en: "Repository's response (repository response)" },
+  objects_from:    { pt: "objeto(s) de {handle}", es: "objeto(s) de {handle}", en: "object(s) from {handle}" },
+
+  badge_active:    { pt: "ativo", es: "activo", en: "active" },
+  badge_incomplete: { pt: "configuração incompleta", es: "configuración incompleta", en: "incomplete configuration" },
+  badge_unconfigured: { pt: "não configurado", es: "no configurado", en: "not configured" },
+
+  paste_xml:       { pt: "Cole o XML antes de enviar.", es: "Pegue el XML antes de enviar.", en: "Paste the XML before submitting." },
+  processing:      { pt: "Processando…", es: "Procesando…", en: "Processing…" },
+  done_take_xml:   { pt: "Pronto. Leve o XML abaixo de volta à CA do titular.", es: "Listo. Lleve el XML de abajo de vuelta a la CA del titular.", en: "Done. Take the XML below back to the holder's CA." },
+  registry_failure: { pt: "Falha ao falar com o registro: {err}", es: "Fallo al hablar con el registro: {err}", en: "Failed to talk to the registry: {err}" },
+
+  copy:            { pt: "Copiar", es: "Copiar", en: "Copy" },
+  copied:          { pt: "Copiado", es: "Copiado", en: "Copied" },
+  download_xml:    { pt: "Baixar XML", es: "Descargar XML", en: "Download XML" },
+};
+
+function t(key, subst) {
+  const language = currentLanguage();
+  let text = (I18N[key] && (I18N[key][language] || I18N[key].pt)) || key;
+  if (subst) for (const [k, v] of Object.entries(subst)) text = text.split(`{${k}}`).join(v);
+  return text;
+}
+
+function translateStatic() {
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"]/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function responseBlock(title, xml, fileName) {
+  const id = "r" + Math.random().toString(36).slice(2, 8);
+  return `<div class="result">
+    <h4>${esc(title)}</h4>
+    <textarea readonly id="${id}" style="min-height:140px">${esc(xml)}</textarea>
+    <div class="actions">
+      <button class="secondary" data-copy="${id}">${t("copy")}</button>
+      <a class="btn secondary" data-download="${id}" download="${fileName}">${t("download_xml")}</a>
+    </div>
+  </div>`;
+}
+
+function wireButtons(root) {
+  root.querySelectorAll("[data-copy]").forEach(b => {
+    b.onclick = () => {
+      const target = $(b.dataset.copy);
+      target.select();
+      navigator.clipboard?.writeText(target.value);
+      b.textContent = t("copied");
+      setTimeout(() => (b.textContent = t("copy")), 1400);
+    };
+  });
+  root.querySelectorAll("[data-download]").forEach(a => {
+    const target = $(a.dataset.download);
+    a.href = URL.createObjectURL(new Blob([target.value], { type: "application/xml" }));
+  });
+}
+
+// appends the chosen language, so the backend answers with matching messages
+function apiUrl(path) {
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}lang=${currentLanguage()}`;
+}
+
+let languageSuggested = false;
+
+async function load() {
+  let e;
+  try {
+    e = await (await fetch(apiUrl("/api/state"), { cache: "no-store" })).json();
+  } catch (_) {
+    $("s-overall").className = "badge error";
+    $("s-overall").textContent = t("registry_unavailable");
+    return;
+  }
+
+  if (!languageSuggested && e.language) { languageSuggested = true; suggestDefaultLanguage(e.language); }
+
+  $("m-name").textContent = e.registry.name;
+  $("m-desc").textContent = e.registry.description;
+  $("t-name").textContent = e.holder.name;
+  $("t-doc").textContent = e.holder.document || "—";
+  $("t-handle").textContent = e.holder.handle || "—";
+
+  $("r-asn").textContent = e.resources.asn ? "AS" + e.resources.asn : "—";
+  $("r-v4").textContent = e.resources.v4 || "—";
+  $("r-v6").textContent = e.resources.v6 || "—";
+  $("r-v4n").textContent = e.resources.v4_maxlen ? t("suggested_roa", { n: e.resources.v4_maxlen }) : "";
+  $("r-v6n").textContent = e.resources.v6_maxlen ? t("suggested_roa", { n: e.resources.v6_maxlen }) : "";
+
+  $("e-rrdp").textContent = e.rrdp;
+
+  // ---- step 1
+  const d = e.delegation;
+  if (d) {
+    $("d-form").style.display = "none";
+    $("d-state").innerHTML =
+      `<dl class="fields">
+         <dt>${t("delegated_ca")}</dt><dd style="font-family:var(--mono)">${esc(d.handle)}</dd>
+         <dt>${t("last_exchange")}</dt><dd>${esc(d.last_exchange || "—")} · ${esc(d.result || "")}</dd>
+         <dt>${t("status_label")}</dt><dd><span class="badge ok">${esc(d.state || t("active"))}</span></dd>
+       </dl>
+       <div class="actions">
+         <button class="secondary" id="d-view">${t("view_parent_response")}</button>
+         <button class="danger" id="d-revoke">${t("revoke_delegation")}</button>
+       </div>
+       <div id="d-xml"></div>`;
+    $("d-revoke").onclick = () => revoke("delegation", t("confirm_revoke_delegation"));
+    $("d-view").onclick = () => viewResponse("delegation", "d-xml", t("parent_response_title"), "parent-response.xml");
+  } else {
+    $("d-form").style.display = "";
+    $("d-state").innerHTML = "";
+  }
+
+  // ---- step 2
+  const p = e.publication;
+  if (p) {
+    $("p-form").style.display = "none";
+    $("p-state").innerHTML =
+      `<dl class="fields">
+         <dt>${t("publisher")}</dt><dd style="font-family:var(--mono)">${esc(p.handle)}</dd>
+         <dt>${t("repo_object_count")}</dt><dd>${p.objects ?? 0}</dd>
+       </dl>
+       <div class="actions">
+         <button class="secondary" id="p-view">${t("view_repo_response")}</button>
+         <button class="danger" id="p-revoke">${t("revoke_publication")}</button>
+       </div>
+       <div id="p-xml"></div>`;
+    $("p-view").onclick = () => viewResponse("publication", "p-xml", t("repo_response_title"), "repository-response.xml");
+    $("p-revoke").onclick = () => revoke("publication", t("confirm_revoke_publication"));
+    $("e-objects").textContent = `${p.objects ?? 0} ${t("objects_from", { handle: p.handle })}`;
+    if (p.list && p.list.length) {
+      $("e-list").innerHTML = "<table class='objects'>" + p.list.map(o =>
+        `<tr><td class="mono">${esc(o.split("/").pop())}</td></tr>`).join("") + "</table>";
+    }
+  } else {
+    $("p-form").style.display = "";
+    $("p-state").innerHTML = "";
+    $("e-objects").textContent = t("repo_none");
+    $("e-list").innerHTML = "";
+  }
+
+  const s = $("s-overall");
+  if (d && p) { s.className = "badge ok"; s.textContent = t("badge_active"); }
+  else if (d || p) { s.className = "badge pending"; s.textContent = t("badge_incomplete"); }
+  else { s.className = "badge pending"; s.textContent = t("badge_unconfigured"); }
+}
+
+async function submit(prefix, route, titleKey, fileName) {
+  const input = $(prefix + "-input");
+  const button = $(prefix + "-submit");
+  const target = $(prefix + "-state");
+  const xml = input.value.trim();
+  if (!xml) { target.innerHTML = `<div class="notice error">${t("paste_xml")}</div>`; return; }
+
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = t("processing");
+  try {
+    const r = await fetch(apiUrl("/api/" + route), { method: "POST", body: xml });
+    const j = await r.json();
+    if (j.ok) {
+      $(prefix + "-form").style.display = "none";
+      target.innerHTML = `<div class="notice ok">${t("done_take_xml")}</div>`
+                     + responseBlock(t(titleKey), j.response, fileName);
+      wireButtons(target);
+      setTimeout(load, 2500);
+    } else {
+      target.innerHTML = `<div class="notice error">${esc(j.error)}</div>`;
+    }
+  } catch (err) {
+    target.innerHTML = `<div class="notice error">${esc(t("registry_failure", { err }))}</div>`;
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+async function viewResponse(route, targetId, title, fileName) {
+  const target = $(targetId);
+  if (target.innerHTML) { target.innerHTML = ""; return; }
+  const j = await (await fetch(apiUrl("/api/" + route + "/response"))).json();
+  if (!j.ok) { target.innerHTML = `<div class="notice error">${esc(j.error)}</div>`; return; }
+  target.innerHTML = responseBlock(title, j.response, fileName);
+  wireButtons(target);
+}
+
+async function revoke(route, question) {
+  if (!confirm(question)) return;
+  const r = await fetch(apiUrl("/api/" + route), { method: "DELETE" });
+  const j = await r.json();
+  if (!j.ok) alert(j.error);
+  load();
+}
+
+$("d-submit").onclick = () => submit("d", "delegation", "parent_response_title", "parent-response.xml");
+$("p-submit").onclick = () => submit("p", "publication", "repo_response_title", "repository-response.xml");
+
+function onLanguageChange() {
+  translateStatic();
+  load();
+}
+
+buildLanguageSwitcher(document.getElementById("language-switcher"));
+translateStatic();
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

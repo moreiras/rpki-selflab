@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: Apache-2.0
+     Copyright 2026 The lab-aspa authors -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPKI + ASPA Lab</title>
+<script>
+  try { const th = localStorage.getItem("lab-aspa-theme");
+        if (th === "light" || th === "dark") document.documentElement.dataset.theme = th; } catch (_) {}
+</script>
+<style>
+  :root {
+    --bg: #0b1020;
+    --bg-alt: #121a33;
+    --bg-soft: #18213f;
+    --line: #2a3560;
+    --text: #e8ecf8;
+    --text-weak: #97a1c4;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --error: #f87171;
+    --info: #60a5fa;
+    --accent: #a78bfa;
+    --link-bgp: #4b5fa8;
+    --link-rpki: #6d5aa0;
+    --sel-bg: #2b2350;
+    --sel-line: #4c3f8a;
+    --term-bg: #070b16;
+    --warn-tint: rgba(251,191,36,.07);
+    color-scheme: dark;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6fb;
+    --bg-alt: #ffffff;
+    --bg-soft: #eceff8;
+    --line: #cfd5e8;
+    --text: #1a2140;
+    --text-weak: #566085;
+    --ok: #0e9467;
+    --warn: #a86a00;
+    --error: #d63a3a;
+    --info: #2a62d4;
+    --accent: #7c4dde;
+    --link-bgp: #7d8fd0;
+    --link-rpki: #9a86cf;
+    --sel-bg: #e4defa;
+    --sel-line: #b9aae8;
+    --term-bg: #e6e9f3;
+    --warn-tint: rgba(168,106,0,.09);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 9px 18px; border-bottom: 1px solid var(--line); background: var(--bg-alt);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  header .clock { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--text-weak); }
+
+  main { display: grid; grid-template-columns: minmax(0,1fr) 360px; min-height: 0;
+         overflow: hidden; transition: grid-template-columns .18s ease; }
+  main.with-term { grid-template-columns: minmax(0,1fr) 320px minmax(380px, 40vw); }
+
+  .left-pane { display: grid; grid-template-rows: minmax(0,1fr); min-height: 0;
+         padding: 10px 16px 12px; overflow: hidden; }
+  .topology-wrap { min-height: 0; display: flex; justify-content: center; }
+  svg { width: 100%; height: 58vh; max-height: 560px; display: block; }
+
+  .node rect { fill: var(--bg-alt); stroke: var(--line); stroke-width: 1.5; rx: 10; transition: all .15s; }
+  .node:hover rect, .node:focus rect { stroke: var(--accent); filter: brightness(1.15); }
+  .node.sel rect { stroke: var(--accent); stroke-width: 2.5; }
+  .node { cursor: pointer; outline: none; }
+  .node .ico { fill: none; stroke: var(--text-weak); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .node .title { fill: var(--text); font-size: 14px; font-weight: 600; }
+  .node .role  { fill: var(--text-weak); font-size: 11px; }
+  .node .asn    { fill: var(--info); font-size: 11px; font-family: var(--mono); }
+  .node .pill   { font-size: 10px; font-family: var(--mono); }
+
+  .link { stroke: var(--line); stroke-width: 2; fill: none; }
+  .link.bgp { stroke: var(--link-bgp); }
+  .link.rpki { stroke: var(--link-rpki); stroke-dasharray: 6 5; }
+  .link.bad { stroke: var(--error); }
+  .link.good  { stroke: var(--ok); }
+  .link.warn  { stroke: var(--warn); }
+  .stage-badge { font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 999px;
+                 border: 1px solid var(--line); color: var(--text-weak); white-space: nowrap; cursor: help; }
+  .stage-badge.mark { color: var(--info); border-color: var(--info); }
+  .stage-badge.drop { color: var(--ok); border-color: var(--ok); }
+  .stage-badge.mixed { color: var(--warn); border-color: var(--warn); }
+  .link.hostile { stroke-dasharray: 4 4; }
+  .node.hostile rect { stroke: var(--error); stroke-dasharray: 5 4; }
+  .label { fill: var(--text-weak); font-size: 10px; font-family: var(--mono); }
+  .org-group { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 5 4; rx: 14; }
+  .org-label { fill: var(--text-weak); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+
+  .verdicts-box { min-height: 0; display: flex; flex-direction: column;
+                 border-top: 1px solid var(--line); padding-top: 8px; }
+  .verdicts-box h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+                    color: var(--text-weak); margin: 0 0 5px; font-weight: 600; }
+  .verdicts-scroll { overflow: auto; min-height: 0; flex: 1; }
+
+  aside {
+    border-left: 1px solid var(--line); padding: 14px 16px 20px;
+    background: var(--bg-alt); overflow-y: auto; min-height: 0;
+  }
+  aside h2 { font-size: 15px; margin: 0 0 2px; }
+  aside .role-large { color: var(--text-weak); font-size: 12px; margin-bottom: 12px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .btn {
+    display: inline-block; padding: 7px 11px; border-radius: 7px; font-size: 12.5px;
+    border: 1px solid var(--line); background: var(--bg-soft); color: var(--text);
+    text-decoration: none; cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.pri { background: var(--sel-bg); border-color: var(--sel-line); }
+
+  dl.info { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12.5px; margin: 0 0 14px; }
+  dl.info dt { color: var(--text-weak); }
+  dl.info dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-all; }
+
+  .section { margin-top: 14px; }
+  .warn-box { margin-top: 14px; padding: 9px 13px; border-left: 3px solid var(--warn);
+              background: rgba(251,191,36,.07); border-radius: 0 7px 7px 0; font-size: 12.5px; }
+  .warn-box code { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 4px;
+                    padding: 1px 5px; font-family: var(--mono); font-size: 12px; }
+  .section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+              color: var(--text-weak); margin: 0 0 6px; font-weight: 600; }
+  pre {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px; overflow: auto; max-height: 200px; font-family: var(--mono);
+    font-size: 11.5px; line-height: 1.45; margin: 0; white-space: pre;
+  }
+
+  table.verdicts { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.verdicts th, table.verdicts td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+  table.verdicts th { color: var(--text-weak); font-weight: 600; font-size: 10.5px;
+                   text-transform: uppercase; letter-spacing: .05em;
+                   position: sticky; top: 0; background: var(--bg); }
+  table.verdicts td.mono { font-family: var(--mono); font-size: 11.5px; }
+
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 11px;
+         font-weight: 600; font-family: var(--mono); }
+  .tag.Valid    { background: rgba(52,211,153,.16); color: var(--ok); }
+  .tag.Invalid  { background: rgba(248,113,113,.16); color: var(--error); }
+  .tag.Unknown, .tag.NotFound { background: rgba(251,191,36,.16); color: var(--warn); }
+  .tag.off      { background: rgba(151,161,196,.15); color: var(--text-weak); }
+  .tag.best   { background: rgba(96,165,250,.16); color: var(--info); }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-weak); }
+  .legend span::before { content: "●"; margin-right: 4px; }
+  .legend .v::before { color: var(--ok); }
+  .legend .i::before { color: var(--error); }
+  .legend .u::before { color: var(--warn); }
+  .legend .d::before { color: var(--text-weak); }
+
+  /* ---- tabs (topology / script) and the language switcher ---- */
+  .tabs, .language-switcher { display: flex; gap: 4px; background: var(--bg-soft); padding: 3px;
+          border-radius: 8px; border: 1px solid var(--line); }
+  .tabs button, .language-switcher button {
+                 border: none; background: none; color: var(--text-weak); cursor: pointer;
+                 font: inherit; font-size: 12.5px; padding: 4px 12px; border-radius: 6px; }
+  .tabs button.active, .language-switcher button.active { background: var(--sel-bg); color: var(--text); }
+  .language-switcher button { padding: 4px 9px; font-size: 11px; font-family: var(--mono); }
+
+  .view { display: grid; grid-template-rows: auto minmax(0,1fr); gap: 10px; min-height: 0; }
+  .view.hidden { display: none; }
+
+  /* ---- step-by-step guide ---- */
+  .guide-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .guide-nav select { background: var(--bg-soft); color: var(--text); border: 1px solid var(--line);
+                    border-radius: 7px; padding: 6px 9px; font: inherit; font-size: 12.5px;
+                    max-width: 380px; flex: 1; }
+  .guide-nav .counter { font-family: var(--mono); font-size: 11.5px; color: var(--text-weak); }
+  .guide-nav .btn:disabled { opacity: .35; cursor: default; }
+
+  .guide-body { overflow-y: auto; min-height: 0; padding-right: 10px; font-size: 14px; }
+  .guide-body h1 { font-size: 20px; margin: 0 0 10px; }
+  .guide-body h2 { font-size: 17px; margin: 0 0 14px; color: var(--text); }
+  .guide-body h3 { font-size: 14px; margin: 20px 0 6px; color: var(--accent);
+                  text-transform: none; letter-spacing: 0; }
+  .guide-body p { margin: 0 0 11px; }
+  .guide-body ol, .guide-body ul { margin: 0 0 12px; padding-left: 22px; }
+  .guide-body li { margin-bottom: 7px; }
+  .guide-body li > p { margin: 0 0 7px; }
+  .guide-body a { color: var(--info); }
+  .guide-body code { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 4px;
+                    padding: 1px 5px; font-family: var(--mono); font-size: 12.5px; }
+  .guide-body blockquote { margin: 0 0 12px; padding: 9px 13px; border-left: 3px solid var(--warn);
+                          background: rgba(251,191,36,.07); border-radius: 0 7px 7px 0; }
+  .guide-body blockquote p:last-child { margin-bottom: 0; }
+  .guide-body table { border-collapse: collapse; margin: 0 0 13px; font-size: 13px; }
+  .guide-body th, .guide-body td { border: 1px solid var(--line); padding: 5px 10px; text-align: left; }
+  .guide-body th { background: var(--bg-soft); color: var(--text-weak); font-size: 11.5px;
+                  text-transform: uppercase; letter-spacing: .04em; }
+  .guide-body hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+
+  .code-block { position: relative; margin: 0 0 13px; }
+  .code-block pre { max-height: none; }
+  .code-block .copy-btn { position: absolute; top: 6px; right: 6px; padding: 2px 8px; font-size: 11px;
+                   opacity: 0; transition: opacity .12s; }
+  .code-block:hover .copy-btn, .code-block .copy-btn:focus { opacity: 1; }
+
+  /* Terminal: opens as a right-hand column, so the page never grows */
+  .term-panel {
+    display: none; min-height: 0; gap: 8px; padding: 10px 12px 14px;
+    border-left: 1px solid var(--line); background: var(--term-bg);
+    grid-template-rows: auto minmax(0,1fr);
+  }
+  main.with-term .term-panel { display: grid; }
+  .term-panel .term-bar { display: flex; align-items: center; gap: 10px; }
+  .term-panel .term-bar h3 { margin: 0; font-size: 11px; text-transform: uppercase;
+                            letter-spacing: .08em; color: var(--text-weak);
+                            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .term-panel .term-bar .btn { margin-left: auto; padding: 4px 9px; font-size: 11.5px; }
+  .term-panel iframe { width: 100%; height: 100%; border: 1px solid var(--line);
+                         border-radius: 8px; background: #000; }
+
+  /* On narrow screens the panel goes back to scrolling normally */
+  @media (max-width: 900px) {
+    body { height: auto; overflow: auto; }
+    main { grid-template-columns: 1fr; overflow: visible; }
+    .left-pane { overflow: visible; }
+    aside { overflow: visible; border-left: none; border-top: 1px solid var(--line); }
+    main.with-term { grid-template-columns: 1fr; }
+    .term-panel { border-left: none; border-top: 1px solid var(--line); height: 60vh; }
+    svg { height: auto; max-height: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 data-i18n="h1">RPKI + ASPA Lab</h1>
+  <span class="tabs">
+    <button id="tab-topology" class="active" data-i18n="tab_topology">Topology</button>
+    <button id="tab-guide" data-i18n="tab_guide">Script</button>
+  </span>
+  <span class="legend">
+    <span class="v">Valid</span><span class="i">Invalid</span>
+    <span class="u">Unknown / NotFound</span><span class="d" data-i18n="legend_no_data">no data</span>
+  </span>
+  <span class="stage-badge" id="stage-badge" data-i18n-title="stage_tip">validation —</span>
+  <button class="btn" id="btn-lab-commands" data-i18n="lab_cmds_btn">Lab commands</button>
+  <button class="btn" id="btn-theme" type="button"></button>
+  <span class="language-switcher" id="language-switcher"></span>
+  <span class="clock" id="clock" data-i18n="connecting">connecting…</span>
+</header>
+
+<main>
+  <div class="left-pane">
+   <div class="view" id="view-topology">
+    <div class="topology-wrap">
+    <svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Lab topology" id="svg-topology">
+      <defs>
+        <symbol id="ico-router" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.3"/><path d="M9.6 6.4L12.5 3.5M9.8 3.5H12.5V6.2M6.4 9.6L3.5 12.5M6.2 12.5H3.5V9.8M3.5 3.5L6.4 6.4M3.8 6.5H6.5V3.8M12.5 12.5L9.6 9.6M9.5 12.2V9.5H12.2"/></symbol>
+        <symbol id="ico-server" viewBox="0 0 16 16"><rect x="1.8" y="2" width="12.4" height="5" rx="1.2"/><rect x="1.8" y="9" width="12.4" height="5" rx="1.2"/><path d="M4.4 4.5H4.5M4.4 11.5H4.5M8 4.5H11.6M8 11.5H11.6"/></symbol>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
+                markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" style="fill: var(--link-bgp)"/>
+        </marker>
+      </defs>
+
+      <!-- RPKI links. Krill <-> LabNIC is routed around the right edge so it
+           doesn't cross the observer boxes; both validators pull the same
+           repository over RRDP. -->
+      <path class="link rpki" d="M795,595 L968,595 L968,54 L590,54"/>
+      <path class="link rpki" d="M430,84 L430,140 L138,140 L138,195"/>
+      <path class="link rpki" d="M550,84 L550,140 L842,140 L842,195"/>
+      <path class="link rpki" id="e-rtr1" d="M221,225 L278,225"/>
+      <path class="link rpki" id="e-rtr2" d="M760,225 L705,225"/>
+      <text class="label" x="976" y="350" transform="rotate(-90 976 350)">RFC 6492 / 8181</text>
+      <text class="label" x="144" y="133" text-anchor="end">RRDP</text>
+      <text class="label" x="700" y="133">RRDP</text>
+      <text class="label" x="250" y="215" text-anchor="middle">RTR :3323</text>
+      <text class="label" x="732" y="215" text-anchor="middle">RTR :3323</text>
+
+      <!-- BGP links. The origin is a customer of both providers, and each
+           provider hands the same prefix to BOTH observers. -->
+      <path class="link bgp" id="e-org-a" d="M450,560 L340,450" marker-end="url(#arrow)"/>
+      <path class="link bgp" id="e-org-b" d="M530,560 L640,450" marker-end="url(#arrow)"/>
+      <path class="link bgp" id="e-a-obs1" d="M300,380 L343,260" marker-end="url(#arrow)"/>
+      <path class="link bgp" id="e-a-obs2" d="M390,380 L575,260" marker-end="url(#arrow)"/>
+      <path class="link bgp" id="e-b-obs1" d="M585,380 L403,260" marker-end="url(#arrow)"/>
+      <path class="link bgp" id="e-b-obs2" d="M680,380 L650,260" marker-end="url(#arrow)"/>
+      <!-- peer: a bilateral peering link with the origin, plus transit from
+           Provider A. The route leak travels over the transit link. -->
+      <path class="link bgp" id="e-peer-org" d="M320,595 L405,595"/>
+      <path class="link bgp" id="e-peer-a" d="M255,560 L300,450" marker-end="url(#arrow)"/>
+      <text class="label" x="362" y="588" text-anchor="middle">peering</text>
+
+      <!-- AS666: a customer of the observers, at the same level as the providers -->
+      <path class="link bgp hostile" id="e-atk-obs1" d="M462,383 L430,260" marker-end="url(#arrow)"/>
+      <path class="link bgp hostile" id="e-atk-obs2" d="M518,383 L550,260" marker-end="url(#arrow)"/>
+
+      <text class="label" x="380" y="515">eBGP</text>
+      <text class="label" x="590" y="515">eBGP</text>
+
+      <!-- same-organization groupings -->
+      <rect class="org-group" x="40" y="175" width="420" height="100"/>
+      <rect class="org-group" x="520" y="175" width="420" height="100"/>
+      <rect class="org-group" x="390" y="545" width="435" height="100"/>
+      <text class="org-label" id="n-holder" x="607" y="538" text-anchor="middle">ACME Internet Ltda.</text>
+
+      <!-- the registry: local RIR/NIR or beta.registro.br, depending on MODE -->
+      <g class="node" data-id="registry" tabindex="0">
+        <rect x="390" y="24" width="200" height="60"/>
+        <use class="ico" href="#ico-server" x="396" y="29" width="21" height="21"/>
+        <text class="title" x="490" y="44" text-anchor="middle" id="n-registry">registry</text>
+        <text class="role" x="490" y="58" text-anchor="middle" id="n-registry-role">RIR/NIR · TA + repository</text>
+        <text class="pill" id="p-registry" x="490" y="74" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="routinator" tabindex="0">
+        <rect x="56" y="195" width="165" height="60"/>
+        <use class="ico" href="#ico-server" x="62" y="200" width="21" height="21"/>
+        <text class="title" x="138" y="215" text-anchor="middle">Routinator</text>
+        <text class="role" x="138" y="229" text-anchor="middle" id="n-routinator-role">validator · RTR</text>
+        <text class="pill" id="p-routinator" x="138" y="245" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="observer1" tabindex="0">
+        <rect x="278" y="190" width="170" height="70"/>
+        <use class="ico" href="#ico-router" x="284" y="195" width="21" height="21"/>
+        <text class="title" x="363" y="213" text-anchor="middle" id="n-observer1-title">observer1</text>
+        <text class="asn" x="363" y="228" text-anchor="middle">AS64510</text>
+        <text class="role" x="363" y="242" text-anchor="middle" id="n-observer1-role">BIRD · ROV + ASPA</text>
+        <text class="pill" id="p-observer1" x="363" y="255" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="observer2" tabindex="0">
+        <rect x="535" y="190" width="170" height="70"/>
+        <use class="ico" href="#ico-router" x="541" y="195" width="21" height="21"/>
+        <text class="title" x="620" y="213" text-anchor="middle" id="n-observer2-title">observer2</text>
+        <text class="asn" x="620" y="228" text-anchor="middle">AS64511</text>
+        <text class="role" x="620" y="242" text-anchor="middle" id="n-observer2-role">OpenBGPD · ROV + ASPA</text>
+        <text class="pill" id="p-observer2" x="620" y="255" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="fort" tabindex="0">
+        <rect x="760" y="195" width="165" height="60"/>
+        <use class="ico" href="#ico-server" x="766" y="200" width="21" height="21"/>
+        <text class="title" x="842" y="215" text-anchor="middle">FORT</text>
+        <text class="role" x="842" y="229" text-anchor="middle" id="n-fort-role">validator · RTR</text>
+        <text class="pill" id="p-fort" x="842" y="245" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="provider-a" tabindex="0">
+        <rect x="255" y="380" width="170" height="70"/>
+        <use class="ico" href="#ico-router" x="261" y="385" width="21" height="21"/>
+        <text class="title" x="340" y="403" text-anchor="middle" id="n-provider-a-title">Provider A</text>
+        <text class="asn" x="340" y="418" text-anchor="middle">AS64501</text>
+        <text class="role" x="340" y="432" text-anchor="middle" id="n-provider-a-role">upstream of the origin</text>
+        <text class="pill" id="p-provider-a" x="340" y="445" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="provider-b" tabindex="0">
+        <rect x="555" y="380" width="170" height="70"/>
+        <use class="ico" href="#ico-router" x="561" y="385" width="21" height="21"/>
+        <text class="title" x="640" y="403" text-anchor="middle" id="n-provider-b-title">Provider B</text>
+        <text class="asn" x="640" y="418" text-anchor="middle">AS64502</text>
+        <text class="role" x="640" y="432" text-anchor="middle" id="n-provider-b-role">upstream of the origin</text>
+        <text class="pill" id="p-provider-b" x="640" y="445" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="origin" tabindex="0">
+        <rect x="405" y="560" width="170" height="70"/>
+        <use class="ico" href="#ico-router" x="411" y="565" width="21" height="21"/>
+        <text class="title" x="490" y="583" text-anchor="middle" id="n-origin-title">origin</text>
+        <text class="asn" x="490" y="598" text-anchor="middle">AS64500</text>
+        <text class="role" x="490" y="612" text-anchor="middle" id="n-origin-role">originates the prefixes</text>
+        <text class="pill" id="p-origin" x="490" y="625" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node hostile" data-id="attacker" tabindex="0">
+        <rect x="429" y="383" width="122" height="67"/>
+        <use class="ico" href="#ico-router" x="435" y="388" width="21" height="21"/>
+        <text class="title" x="490" y="402" text-anchor="middle" id="n-attacker-title">attacker</text>
+        <text class="asn" x="490" y="416" text-anchor="middle">AS666</text>
+        <text class="role" x="490" y="430" text-anchor="middle" id="n-attacker-role">hijacker</text>
+        <text class="pill" id="p-attacker" x="490" y="443" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="peer" tabindex="0">
+        <rect x="150" y="560" width="170" height="70"/>
+        <use class="ico" href="#ico-router" x="156" y="565" width="21" height="21"/>
+        <text class="title" x="235" y="583" text-anchor="middle" id="n-peer-title">peer</text>
+        <text class="asn" x="235" y="598" text-anchor="middle">AS64999</text>
+        <text class="role" x="235" y="612" text-anchor="middle" id="n-peer-role">peers with the origin</text>
+        <text class="pill" id="p-peer" x="235" y="625" text-anchor="middle">&#8212;</text>
+      </g>
+
+      <g class="node" data-id="krill" tabindex="0">
+        <rect x="630" y="565" width="165" height="60"/>
+        <use class="ico" href="#ico-server" x="636" y="570" width="21" height="21"/>
+        <text class="title" x="712" y="585" text-anchor="middle">Krill</text>
+        <text class="role" x="712" y="599" text-anchor="middle" id="n-krill-role">CA · creates ROA and ASPA</text>
+        <text class="pill" id="p-krill" x="712" y="615" text-anchor="middle">&#8212;</text>
+      </g>
+    </svg>
+    </div>
+
+    <div class="verdicts-box">
+      <h3 data-i18n="verdicts_title">Verdicts at both observers</h3>
+      <div class="verdicts-scroll">
+        <table class="verdicts" id="tab-verdicts">
+          <thead><tr>
+            <th data-i18n="th_observer">Observer</th><th data-i18n="th_prefix">Prefix</th><th data-i18n="th_received">Received from</th><th>AS_PATH</th>
+            <th>ROV</th><th>ASPA</th><th>local_pref</th>
+          </tr></thead>
+          <tbody><tr><td colspan="6" style="color:var(--text-weak)" data-i18n="verdicts_waiting">waiting for data…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+   </div>
+
+   <div class="view hidden" id="view-guide">
+    <div class="guide-nav">
+      <button class="btn" id="guide-prev" data-i18n="guide_prev">◀ Back</button>
+      <button class="btn pri" id="guide-next" data-i18n="guide_next">Next ▶</button>
+      <select id="guide-select" aria-label="Go to step" data-i18n-aria="guide_aria_select"></select>
+      <span class="counter" id="guide-counter">—</span>
+    </div>
+    <div class="guide-body" id="guide-body" data-i18n="guide_loading">loading the script…</div>
+   </div>
+  </div>
+
+  <aside id="panel">
+    <h2 data-i18n="panel_initial_title">Select a component</h2>
+    <p class="role-large" data-i18n="panel_initial_text">Click a box in the topology to open its
+       terminal, its web interface, or to see that component's state.</p>
+    <div class="section">
+      <h3 data-i18n="shortcuts">Shortcuts</h3>
+      <div class="actions">
+        <a class="btn" id="a-krill" target="_blank" rel="noopener">Krill (web)</a>
+        <a class="btn" id="a-routinator" target="_blank" rel="noopener">Routinator (web)</a>
+        <a class="btn" id="a-registry" target="_blank" rel="noopener" data-i18n="btn_registry">Registry</a>
+        <a class="btn" id="a-console" target="_blank" rel="noopener" data-i18n="btn_console">Free console</a>
+      </div>
+    </div>
+  </aside>
+  <section class="term-panel" id="term-box">
+    <div class="term-bar">
+      <h3 id="term-title">Terminal</h3>
+      <button class="btn" id="term-close" data-i18n="terminal_close">close (Esc)</button>
+    </div>
+    <iframe id="term" title="Terminal"></iframe>
+  </section>
+</main>
+
+<script src="language.js"></script>
+<script>
+// All links point to the same host the panel was opened from (localhost,
+// 127.0.0.1, the machine's IP...), so nothing breaks in any setup.
+const HOST     = location.hostname;
+const TTYD_URL  = `http://${HOST}:7681`;
+const KRILL_URL = `https://${HOST}:3000`;
+const ROUTINATOR_URL = `http://${HOST}:8323`;
+
+// ---------------------------------------------------------------------------
+// UI strings. Protocol/technical terms (BGP, ROA, ASPA, RTR, RRDP, RFC
+// numbers, the Valid/Invalid/Unknown/NotFound verdict words, command names)
+// are kept in English in all three languages on purpose: that's the
+// vocabulary the Krill/Routinator/BIRD command-line output already uses, and
+// keeping it consistent makes the lab and the tools easier to cross-reference.
+// ---------------------------------------------------------------------------
+const I18N = {
+  h1:              { pt: "Laboratório RPKI + ASPA", es: "Laboratorio RPKI + ASPA", en: "RPKI + ASPA Lab" },
+  tab_topology:    { pt: "Topologia", es: "Topología", en: "Topology" },
+  tab_guide:       { pt: "Roteiro", es: "Guion", en: "Script" },
+  legend_no_data:  { pt: "sem dado", es: "sin dato", en: "no data" },
+  connecting:      { pt: "conectando…", es: "conectando…", en: "connecting…" },
+  no_collector_data: { pt: "sem dados do coletor", es: "sin datos del colector", en: "no data from the collector" },
+
+  verdicts_title:  { pt: "Vereditos nos dois observadores", es: "Veredictos en los dos observadores", en: "Verdicts at both observers" },
+  th_observer:     { pt: "Observador", es: "Observador", en: "Observer" },
+  th_prefix:       { pt: "Prefixo", es: "Prefijo", en: "Prefix" },
+  th_received:     { pt: "Recebido de", es: "Recibido de", en: "Received from" },
+  verdicts_waiting:{ pt: "aguardando dados…", es: "esperando datos…", en: "waiting for data…" },
+  no_routes:       { pt: "nenhuma rota nos observadores ainda", es: "todavía no hay rutas en los observadores", en: "no routes at the observers yet" },
+  provider_a:      { pt: "Provedor A", es: "Proveedor A", en: "Provider A" },
+  provider_b:      { pt: "Provedor B", es: "Proveedor B", en: "Provider B" },
+  best:            { pt: "melhor", es: "mejor", en: "best" },
+
+  guide_prev:      { pt: "◀ Voltar", es: "◀ Atrás", en: "◀ Back" },
+  guide_next:      { pt: "Próximo ▶", es: "Siguiente ▶", en: "Next ▶" },
+  guide_aria_select: { pt: "Ir para a etapa", es: "Ir al paso", en: "Go to step" },
+  guide_loading:   { pt: "carregando o roteiro…", es: "cargando el guion…", en: "loading the script…" },
+  overview:        { pt: "Apresentação", es: "Presentación", en: "Overview" },
+  guide_error:     {
+    pt: 'Não consegui carregar o <code>{file}</code>. Ele é servido pelo contêiner <code>lab-web</code>; confira o <code>docker-compose.yml</code>.',
+    es: 'No pude cargar <code>{file}</code>. Lo sirve el contenedor <code>lab-web</code>; revise <code>docker-compose.yml</code>.',
+    en: 'Couldn’t load <code>{file}</code>. It’s served by the <code>lab-web</code> container; check <code>docker-compose.yml</code>.',
+  },
+  copy:            { pt: "copiar", es: "copiar", en: "copy" },
+  copied:          { pt: "copiado", es: "copiado", en: "copied" },
+
+  panel_initial_title: { pt: "Selecione um componente", es: "Seleccione un componente", en: "Select a component" },
+  panel_initial_text:  {
+    pt: "Clique em uma caixa da topologia para abrir o terminal, a interface web ou ver o estado daquele componente.",
+    es: "Haga clic en un recuadro de la topología para abrir su terminal, su interfaz web o ver el estado de ese componente.",
+    en: "Click a box in the topology to open its terminal, its web interface, or to see that component’s state.",
+  },
+  shortcuts:       { pt: "Atalhos", es: "Atajos", en: "Shortcuts" },
+  btn_registry:    { pt: "Registro", es: "Registro", en: "Registry" },
+  btn_console:     { pt: "Console livre", es: "Consola libre", en: "Free console" },
+  terminal_close:  { pt: "fechar (Esc)", es: "cerrar (Esc)", en: "close (Esc)" },
+  terminal_title:  { pt: "Terminal", es: "Terminal", en: "Terminal" },
+
+  sessions_title:  { pt: "Sessões", es: "Sesiones", en: "Sessions" },
+  rtr_tables:      { pt: "Tabelas vindas do RTR", es: "Tablas recibidas por RTR", en: "Tables received over RTR" },
+  validated_set:   { pt: "Conjunto validado", es: "Conjunto validado", en: "Validated set" },
+  useful_commands: { pt: "Comandos úteis", es: "Comandos útiles", en: "Useful commands" },
+  state_up:        { pt: "up", es: "up", en: "up" },
+  state_down:      { pt: "down", es: "down", en: "down" },
+  pill_stopped:    { pt: "parado", es: "detenido", en: "stopped" },
+  pill_up:         { pt: "no ar", es: "activo", en: "up" },
+  pill_external:   { pt: "externo", es: "externo", en: "external" },
+  error_prefix:    { pt: "erro: ", es: "error: ", en: "error: " },
+  updated_prefix:  { pt: "atualizado ", es: "actualizado ", en: "updated " },
+
+  // topology diagram
+  svg_title_origin:        { pt: "origem", es: "origen", en: "origin" },
+  svg_role_origin:         { pt: "origina os prefixos", es: "origina los prefijos", en: "originates the prefixes" },
+  svg_role_registry:       { pt: "RIR/NIR · TA + repositório", es: "RIR/NIR · TA + repositorio", en: "RIR/NIR · TA + repository" },
+  svg_role_krill:          { pt: "CA · cria ROA e ASPA", es: "CA · crea ROA y ASPA", en: "CA · creates ROA and ASPA" },
+  svg_role_routinator:     { pt: "validador · RTR", es: "validador · RTR", en: "validator · RTR" },
+  svg_role_fort:           { pt: "validador · RTR", es: "validador · RTR", en: "validator · RTR" },
+  svg_title_provider_a:    { pt: "Provedor A", es: "Proveedor A", en: "Provider A" },
+  svg_role_provider_a:     { pt: "upstream da origem", es: "upstream del origen", en: "upstream of the origin" },
+  svg_title_provider_b:    { pt: "Provedor B", es: "Proveedor B", en: "Provider B" },
+  svg_role_provider_b:     { pt: "upstream da origem", es: "upstream del origen", en: "upstream of the origin" },
+  svg_title_observer1:     { pt: "observador 1", es: "observador 1", en: "observer 1" },
+  svg_role_observer1:      { pt: "BIRD · ROV + ASPA", es: "BIRD · ROV + ASPA", en: "BIRD · ROV + ASPA" },
+  svg_title_observer2:     { pt: "observador 2", es: "observador 2", en: "observer 2" },
+  svg_role_observer2:      { pt: "OpenBGPD · ROV + ASPA", es: "OpenBGPD · ROV + ASPA", en: "OpenBGPD · ROV + ASPA" },
+
+  // AS666 / peer scenario - English only for now, other languages fall back to it
+  svg_title_attacker:  { pt: "attacker", es: "attacker", en: "attacker" },
+  svg_role_attacker:   { pt: "sequestrador", es: "secuestrador", en: "hijacker" },
+  svg_title_peer:      { pt: "peer", es: "peer", en: "peer" },
+  svg_role_peer:       { pt: "faz peering com a origem", es: "hace peering con el origen", en: "peers with the origin" },
+  pill_hijacking:      { pt: "sequestrando", es: "secuestrando", en: "hijacking" },
+  pill_silent:         { pt: "calado", es: "callado", en: "silent" },
+  pill_leaking:        { pt: "vazando", es: "filtrando", en: "leaking" },
+  pill_peering:        { pt: "peering", es: "peering", en: "peering" },
+  from_attacker:       { pt: "AS666", es: "AS666", en: "AS666" },
+
+  // observers' deployment-stage indicator - English only for now
+  stage_none:      { pt: "validação: nenhuma", es: "validación: ninguna", en: "validation: none" },
+  stage_rov_mark:  { pt: "ROV: marcando", es: "ROV: marcando", en: "ROV: marking" },
+  stage_rov_drop:  { pt: "ROV: descartando", es: "ROV: descartando", en: "ROV: dropping" },
+  stage_aspa_mark: { pt: "ROV: descartando · ASPA: marcando", es: "ROV: descartando · ASPA: marcando", en: "ROV: dropping · ASPA: marking" },
+  stage_aspa_drop: { pt: "ROV + ASPA: descartando", es: "ROV + ASPA: descartando", en: "ROV + ASPA: dropping" },
+  stage_mixed:     { pt: "observadores diferem: observer1 {a}, observer2 {b}", es: "los observers difieren: observer1 {a}, observer2 {b}", en: "observers differ: observer1 {a}, observer2 {b}" },
+  stage_unknown:   { pt: "validação —", es: "validación —", en: "validation —" },
+  stage_tip: { pt: "O que os dois observadores estão fazendo com o RPKI agora. Marcando: as rotas inválidas ganham uma community e uma preferência menor, mas continuam na tabela. Descartando: são rejeitadas (o que roteadores de verdade fazem). Troque os dois com os comandos dos passos (./scripts/lab.sh step3-rov-mark, step3-rov-drop, step5-aspa-mark, step5-aspa-drop; step1-clean remove toda a validação).", es: "Lo que los dos observers están haciendo con RPKI ahora. Marcando: las rutas inválidas reciben una community y una preferencia menor, pero siguen en la tabla. Descartando: se rechazan (lo que hacen los routers de verdad). Cambie los dos con los comandos de los pasos (./scripts/lab.sh step3-rov-mark, step3-rov-drop, step5-aspa-mark, step5-aspa-drop; step1-clean quita toda la validación).", en: "What the two observers are doing with RPKI right now. Marking: invalid routes get a community and a lower preference but stay in the table. Dropping: they are rejected (what real routers do). Switch both with the step commands (./scripts/lab.sh step3-rov-mark, step3-rov-drop, step5-aspa-mark, step5-aspa-drop; step1-clean removes all validation)." },
+
+  // lab-wide commands panel
+  theme_to_light: { pt: "Tema claro", es: "Tema claro", en: "Light theme" },
+  theme_to_dark:  { pt: "Tema escuro", es: "Tema oscuro", en: "Dark theme" },
+  lab_cmds_btn:        { pt: "Comandos do laboratório", es: "Comandos del laboratorio", en: "Lab commands" },
+  lab_cmds_title:      { pt: "Comandos do laboratório", es: "Comandos del laboratorio", en: "Lab commands" },
+  lab_cmds_intro:      {
+    pt: "Comandos que agem sobre o laboratório inteiro, não sobre um componente específico. Abra o terminal ao lado e rode-os lá - eles já esperam por você na pasta certa.",
+    es: "Comandos que actúan sobre el laboratorio entero, no sobre un componente específico. Abra la terminal de al lado y ejecútelos ahí - ya lo esperan en la carpeta correcta.",
+    en: "Commands that act on the whole lab, not on one specific component. Open the terminal alongside this list and run them there - it already starts in the right folder.",
+  },
+  lab_cmds_col_cmd:    { pt: "Comando", es: "Comando", en: "Command" },
+  lab_cmds_col_desc:   { pt: "O que faz", es: "Qué hace", en: "What it does" },
+  lab_cmd_refresh_desc:{ pt: "reinicia o Routinator e o FORT e recupera as sessões RTR dos observadores", es: "reinicia Routinator y FORT y recupera las sesiones RTR de los observadores", en: "restarts Routinator and FORT and recovers the observers' RTR sessions" },
+  lab_cmd_status_desc: { pt: "mostra o estado de todos os containers do laboratório", es: "muestra el estado de todos los contenedores del laboratorio", en: "shows the state of every container in the lab" },
+  lab_cmd_logs_desc:   { pt: "acompanha os logs de um serviço (ex.: <code>logs observer1</code>)", es: "sigue los logs de un servicio (ej.: <code>logs observer1</code>)", en: "follows a service's logs (e.g. <code>logs observer1</code>)" },
+  "lab_cmd_step1-clean_desc":         { pt: "AS666 e peer calam, e os observadores voltam a BGP comum, sem validação nenhuma (o ponto de partida da história)", es: "AS666 y peer callan, y los observers vuelven a BGP común, sin validación alguna (el punto de partida de la historia)", en: "AS666 and peer go silent, and the observers go back to plain BGP with no validation at all (the story's baseline)" },
+  "lab_cmd_step2-hijack-simple_desc": { pt: "AS666 anuncia os prefixos da origem como se fossem seus (AS_PATH: 666)", es: "AS666 anuncia los prefijos del origen como propios (AS_PATH: 666)", en: "AS666 announces the origin's prefixes as its own (AS_PATH: 666)" },
+  "lab_cmd_step3-rov-mark_desc":      { pt: "implanta o ROV nos dois observadores, em modo de marcação: rotas inválidas ganham uma community e uma preferência menor", es: "implanta ROV en los dos observers, en modo de marcado: las rutas inválidas reciben una community y una preferencia menor", en: "deploys ROV on both observers, in marking mode: invalid routes get a community and a lower preference" },
+  "lab_cmd_step3-rov-drop_desc":      { pt: "o ROV passa a descartar as rotas inválidas (o que roteadores de verdade fazem)", es: "ROV pasa a descartar las rutas inválidas (lo que hacen los routers de verdad)", en: "ROV starts dropping invalid routes (what real routers do)" },
+  "lab_cmd_step4-hijack-posrov_desc": { pt: "AS666 forja o AS_PATH para terminar na origem verdadeira (AS_PATH: 666 64500)", es: "AS666 falsifica el AS_PATH para terminar en el origen verdadero (AS_PATH: 666 64500)", en: "AS666 forges the AS_PATH so it ends in the real origin (AS_PATH: 666 64500)" },
+  "lab_cmd_step5-aspa-mark_desc":     { pt: "implanta a verificação ASPA nos dois observadores, em modo de marcação (o ROV continua descartando)", es: "implanta la verificación ASPA en los dos observers, en modo de marcado (ROV sigue descartando)", en: "deploys ASPA verification on both observers, in marking mode (ROV keeps dropping)" },
+  "lab_cmd_step5-aspa-drop_desc":     { pt: "a verificação ASPA passa a descartar também os caminhos inválidos", es: "la verificación ASPA pasa a descartar también los caminos inválidos", en: "ASPA verification starts dropping invalid paths too" },
+  "lab_cmd_step7-leak-on_desc":       { pt: "o peer começa a vazar as rotas da origem para o Provedor A", es: "el peer empieza a filtrar las rutas del origen hacia el Proveedor A", en: "peer starts leaking the origin's routes to Provider A" },
+  "lab_cmd_step9-leak-off_desc":      { pt: "o peer para de vazar", es: "el peer deja de filtrar", en: "peer stops leaking" },
+  "lab_cmd_step9-hijack-off_desc":    { pt: "AS666 volta a ficar calado", es: "AS666 vuelve a quedar callado", en: "AS666 goes silent" },
+  lab_cmds_open_terminal: { pt: "Abrir terminal", es: "Abrir terminal", en: "Open terminal" },
+  lab_cmds_reset_warning: {
+    pt: "<code>./scripts/lab.sh reset</code> também existe (apaga a CA do Krill, o estado do LabNIC e o cache dos validadores), mas não aparece aqui de propósito: ele derruba <b>todo</b> o laboratório, inclusive este próprio terminal e este painel. Rode-o no terminal do seu computador, na pasta do laboratório - nunca por aqui.",
+    es: "<code>./scripts/lab.sh reset</code> también existe (borra la CA de Krill, el estado de LabNIC y la caché de los validadores), pero no aparece aquí a propósito: tira abajo <b>todo</b> el laboratorio, incluyendo esta misma terminal y este panel. Ejecútelo en la terminal de su computadora, en la carpeta del laboratorio - nunca desde aquí.",
+    en: "<code>./scripts/lab.sh reset</code> also exists (it wipes Krill's CA, LabNIC's own state, and both validators' caches), but it's deliberately left off this list: it tears down <b>the entire</b> lab, including this very terminal and this panel. Run it from your own computer's terminal, in the lab's folder - never from in here.",
+  },
+};
+
+function t(key, subst) {
+  const language = currentLanguage();
+  let text = (I18N[key] && (I18N[key][language] || I18N[key].en || I18N[key].pt)) || key;
+  if (subst) for (const [k, v] of Object.entries(subst)) text = text.split(`{${k}}`).join(v);
+  return text;
+}
+
+// Applies every [data-i18n] text node in the document. Called on load and
+// whenever the language changes.
+function translateStatic() {
+  try { paintThemeButton(); } catch (_) {}
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach(el => {
+    el.setAttribute("title", t(el.dataset.i18nTitle));
+  });
+  document.querySelectorAll("[data-i18n-aria]").forEach(el => {
+    el.setAttribute("aria-label", t(el.dataset.i18nAria));
+  });
+  document.getElementById("svg-topology").setAttribute("aria-label", t("h1"));
+  document.getElementById("term-title").textContent = t("terminal_title");
+  for (const id of ["origin", "provider-a", "provider-b", "observer1", "observer2", "attacker", "peer"]) {
+    const key = id.replace("-", "_");
+    document.getElementById(`n-${id}-title`).textContent = t(`svg_title_${key}`);
+    document.getElementById(`n-${id}-role`).textContent  = t(`svg_role_${key}`);
+  }
+  document.getElementById("n-krill-role").textContent      = t("svg_role_krill");
+  document.getElementById("n-routinator-role").textContent = t("svg_role_routinator");
+  document.getElementById("n-fort-role").textContent       = t("svg_role_fort");
+  document.getElementById("n-registry-role").textContent   = t("svg_role_registry");
+}
+
+// ---------------------------------------------------------------------------
+// Per-node content shown in the side panel: full sentences, one full copy per
+// language (rather than field-by-field dictionaries) since it reads better
+// as connected prose in each language.
+// ---------------------------------------------------------------------------
+const NODES = {
+  pt: {
+    krill: {
+      name: "Krill",
+      role: "A sua CA. É aqui que você cria as ROAs (pela interface web) e o objeto ASPA (pela CLI).",
+      info: {
+        "Imagem": "nlnetlabs/krill:v0.16.0",
+        "Interface web": "https://<host>:3000",
+        "Token": "passlab",
+        "Nome da CA": "minha_ca",
+        "ASPA": "só via krillc (CLI)",
+      },
+      links: [["Interface web do Krill", KRILL_URL]],
+      term: [["Terminal (krillc)", "krill"]],
+      hint: 'krillc aspas list\nkrillc aspas add --aspa "AS64500 => AS64501"\nkrillc roas list',
+    },
+    routinator: {
+      name: "Routinator — validador do observer1",
+      role: "Valida os objetos publicados sob a TA do laboratório e entrega ROAs e ASPAs ao observer1 pelo protocolo RTR.",
+      info: {
+        "Imagem": "nlnetlabs/routinator:v0.15.2",
+        "Interface web": "http://<host>:8323",
+        "RTR": "172.30.0.20:3323",
+        "Flags": "--no-rir-tals --extra-tals-dir=/tals --enable-aspa",
+      },
+      links: [["Interface web", ROUTINATOR_URL], ["Status (texto)", "/api/routinator/status"], ["Saída JSON", "/api/routinator/json"]],
+      term: [["Terminal", "routinator"]],
+      hint: "routinator --no-rir-tals --extra-tals-dir=/tals --enable-aspa vrps",
+    },
+    fort: {
+      name: "FORT Validator — validador do observer2",
+      role: "O segundo validador. Faz o mesmo trabalho do Routinator, com outra implementação, e alimenta o observer2 por RTR.",
+      info: {
+        "Imagem": "lab-aspa/fort (compilada do fonte)",
+        "Versão": "1.7.0.experimental",
+        "RTR": "172.30.0.50:3323 (host: 3324)",
+        "Por que essa versão": "ASPA e RTR v2 só existem a partir dela",
+        "Flags": "--server.max-rtr-version=2 --rsync.enabled=false",
+      },
+      term: [["Terminal", "fort"]],
+      hint: "fort --version\nfort --tal=/tals --mode=print",
+    },
+    attacker: {
+      name: "attacker — AS666",
+      role: "Um sequestrador que é cliente dos dois observadores: abre sessões direto com eles e anuncia os prefixos da origem. Fica calado até o experimento do roteiro ligá-lo.",
+      info: { "ASN": "666 (ASN não reservado - inofensivo, esta rede é isolada)",
+              "Para observer1": "10.200.7.10 / fd00:7::10", "Para observer2": "10.200.8.10 / fd00:8::10",
+              "Configs": "bird/attacker-off.conf, -simple.conf, -posrov.conf" },
+      term: [["Terminal (birdc)", "attacker", "birdc"], ["Shell", "attacker"]],
+      hint: "show protocols\nshow route export observer1_v4",
+    },
+    peer: {
+      name: "peer — AS64999",
+      role: "Uma rede legítima que faz peering privado com a origem e compra trânsito do Provedor A. Normalmente guarda para si o que aprende da origem; quando o vazamento do roteiro é ligado, repassa essas rotas ao Provedor A.",
+      info: { "ASN": "64999 (faixa de uso privado, RFC 6996)",
+              "Peering com a origem": "10.200.9.10 / fd00:9::10", "Trânsito do Provedor A": "10.200.10.10 / fd00:10::10",
+              "Configs": "bird/peer-off.conf, peer-leak.conf" },
+      term: [["Terminal (birdc)", "peer", "birdc"], ["Shell", "peer"]],
+      hint: "show protocols\nshow route export provider_a_v4",
+    },
+    origin: {
+      name: "origem — AS64500",
+      role: "O seu AS. Origina 10.0.0.0/24 e 3fff:cafe::/32 e é multihomed nos Provedores A e B. Prefere o B: o anúncio para o A leva prepend duas vezes.",
+      info: { "ASN": "64500", "IPv4": "10.0.0.0/24", "IPv6": "3fff:cafe::/32",
+              "Enlace A": "10.200.1.10 / fd00:1::10", "Enlace B": "10.200.2.10 / fd00:2::10", "Config": "bird/origin.conf" },
+      term: [["Terminal (birdc)", "origin", "birdc"], ["Shell", "origin"]],
+      hint: "show protocols\nshow route export provider_a_v4",
+    },
+    "provider-a": {
+      name: "Provedor A — AS64501",
+      role: "Upstream de reserva da origem (a origem faz prepend duas vezes ao anunciar para ele). Entrega o prefixo aos DOIS observadores - e, quando o peer começa a vazar, passa adiante o caminho vazado em vez do seu, porque o caminho do peer é mais curto que o da origem com prepend (veja bird/origin.conf).",
+      info: { "ASN": "64501 (RFC 5398)", "Para origem": "10.200.1.20 / fd00:1::20",
+              "Para observer1": "10.200.3.10 / fd00:3::10", "Para observer2": "10.200.5.10 / fd00:5::10",
+              "Config": "bird/provider-a.conf" },
+      term: [["Terminal (birdc)", "provider-a", "birdc"], ["Shell", "provider-a"]],
+      hint: "show route\nshow protocols all observer1_v4",
+    },
+    "provider-b": {
+      name: "Provedor B — AS64502",
+      role: "Upstream preferido da origem. Entrega o prefixo aos dois observadores. Se o objeto ASPA da origem não o listar, os dois observadores marcam o caminho que passa por aqui como ASPA Invalid.",
+      info: { "ASN": "64502 (RFC 5398)", "Para origem": "10.200.2.20 / fd00:2::20",
+              "Para observer1": "10.200.4.10 / fd00:4::10", "Para observer2": "10.200.6.10 / fd00:6::10",
+              "Config": "bird/provider-b.conf" },
+      term: [["Terminal (birdc)", "provider-b", "birdc"], ["Shell", "provider-b"]],
+      hint: "show route",
+    },
+    observer1: {
+      name: "observer1 — AS64510 (BIRD)",
+      role: "Recebe o mesmo prefixo pelos dois caminhos e aplica ROV (RFC 6811) e ASPA (algoritmo upstream) no filtro de import. O BIRD não tem atributo de validação por rota, então o veredito é gravado em large communities.",
+      info: { "ASN": "64510 (RFC 5398)", "Validador": "Routinator (172.30.0.20:3323)",
+              "De Provedor A": "10.200.3.20 / fd00:3::20", "De Provedor B": "10.200.4.20 / fd00:4::20",
+              "Config": "bird/observer1-<stage>.conf" },
+      term: [["Terminal (birdc)", "observer1", "birdc"], ["Shell", "observer1"]],
+      hint: "show route table master4 all\nshow protocols all routinator\nshow route table aspa_table",
+    },
+    observer2: {
+      name: "observer2 — AS64511 (OpenBGPD)",
+      role: "A segunda opinião: mesmo prefixo, mesmos dois caminhos, outro roteador e outro validador. O OpenBGPD calcula os vereditos nativamente nos campos ovs e avs, sem precisar de communities.",
+      info: { "ASN": "64511 (RFC 5398)", "Validador": "FORT (172.30.0.50:3323)",
+              "Imagem": "OpenBGPD 8.8 (Alpine 3.22)",
+              "De Provedor A": "10.200.5.20 / fd00:5::20", "De Provedor B": "10.200.6.20 / fd00:6::20",
+              "Papel RFC 9234": "provider (seleciona o algoritmo upstream)",
+              "Config": "openbgpd/observer2-<stage>.conf" },
+      term: [["Terminal (bgpctl)", "observer2", "bgpctl"], ["Shell", "observer2"]],
+      hint: "bgpctl show rib detail\nbgpctl show rtr\nbgpctl show sets",
+    },
+    registry_local: {
+      role: "O RIR/NIR simulado que roda dentro do laboratório. Emite o certificado dos recursos alocados e hospeda o repositório. Sem Internet, sem credencial.",
+      info: { "Modo": "local (autocontido)", "Painel do registro": `http://${HOST}:8081`,
+              "Âncora de confiança": "gerada pelo próprio laboratório", "Publicação": "RRDP em https://rir.lab:3000/rrdp/" },
+      link: "Abrir o painel do registro",
+      hint: "krillc list\nkrillc children connections --ca testbed\nkrillc pubserver publishers list",
+    },
+    registry_beta: {
+      role: "Sistema de teste do Registro.br: âncora de confiança, CA-pai do seu AS e servidor de publicação remota. Precisa de Internet e de um login no beta.registro.br.",
+      info: { "Modo": "beta (Registro.br)", "TAL": "https://rpki-test-ta.beta.registro.br/ta/ta.tal", "Painel": "https://beta.registro.br/login/" },
+      link: "Abrir o beta.registro.br",
+    },
+  },
+  es: {
+    krill: {
+      name: "Krill",
+      role: "Su CA. Aquí se crean las ROAs (por la interfaz web) y el objeto ASPA (por la CLI).",
+      info: {
+        "Imagen": "nlnetlabs/krill:v0.16.0",
+        "Interfaz web": "https://<host>:3000",
+        "Token": "passlab",
+        "Nombre de la CA": "minha_ca",
+        "ASPA": "solo vía krillc (CLI)",
+      },
+      links: [["Interfaz web de Krill", KRILL_URL]],
+      term: [["Terminal (krillc)", "krill"]],
+      hint: 'krillc aspas list\nkrillc aspas add --aspa "AS64500 => AS64501"\nkrillc roas list',
+    },
+    routinator: {
+      name: "Routinator — validador del observer1",
+      role: "Valida los objetos publicados bajo la TA del laboratorio y entrega ROAs y ASPAs al observer1 por el protocolo RTR.",
+      info: {
+        "Imagen": "nlnetlabs/routinator:v0.15.2",
+        "Interfaz web": "http://<host>:8323",
+        "RTR": "172.30.0.20:3323",
+        "Flags": "--no-rir-tals --extra-tals-dir=/tals --enable-aspa",
+      },
+      links: [["Interfaz web", ROUTINATOR_URL], ["Estado (texto)", "/api/routinator/status"], ["Salida JSON", "/api/routinator/json"]],
+      term: [["Terminal", "routinator"]],
+      hint: "routinator --no-rir-tals --extra-tals-dir=/tals --enable-aspa vrps",
+    },
+    fort: {
+      name: "FORT Validator — validador del observer2",
+      role: "El segundo validador. Hace el mismo trabajo que Routinator, con otra implementación, y alimenta al observer2 por RTR.",
+      info: {
+        "Imagen": "lab-aspa/fort (compilada desde el fuente)",
+        "Versión": "1.7.0.experimental",
+        "RTR": "172.30.0.50:3323 (host: 3324)",
+        "Por qué esa versión": "ASPA y RTR v2 existen solo a partir de ella",
+        "Flags": "--server.max-rtr-version=2 --rsync.enabled=false",
+      },
+      term: [["Terminal", "fort"]],
+      hint: "fort --version\nfort --tal=/tals --mode=print",
+    },
+    attacker: {
+      name: "attacker — AS666",
+      role: "Un secuestrador que es cliente de los dos observers: abre sesiones directo con ellos y anuncia los prefijos del origen. Permanece callado hasta que el experimento de la guía lo activa.",
+      info: { "ASN": "666 (ASN no reservado - inofensivo, esta red está aislada)",
+              "Hacia observer1": "10.200.7.10 / fd00:7::10", "Hacia observer2": "10.200.8.10 / fd00:8::10",
+              "Configs": "bird/attacker-off.conf, -simple.conf, -posrov.conf" },
+      term: [["Terminal (birdc)", "attacker", "birdc"], ["Shell", "attacker"]],
+      hint: "show protocols\nshow route export observer1_v4",
+    },
+    peer: {
+      name: "peer — AS64999",
+      role: "Una red legítima que hace peering privado con el origen y compra tránsito del Proveedor A. Normalmente se guarda lo que aprende del origen; cuando se activa la fuga de la guía, pasa esas rutas al Proveedor A.",
+      info: { "ASN": "64999 (rango de uso privado, RFC 6996)",
+              "Peering con el origen": "10.200.9.10 / fd00:9::10", "Tránsito del Proveedor A": "10.200.10.10 / fd00:10::10",
+              "Configs": "bird/peer-off.conf, peer-leak.conf" },
+      term: [["Terminal (birdc)", "peer", "birdc"], ["Shell", "peer"]],
+      hint: "show protocols\nshow route export provider_a_v4",
+    },
+    origin: {
+      name: "origen — AS64500",
+      role: "Su AS. Origina 10.0.0.0/24 y 3fff:cafe::/32 y es multihomed en los Proveedores A y B. Prefiere B: el anuncio hacia A lleva prepend dos veces.",
+      info: { "ASN": "64500", "IPv4": "10.0.0.0/24", "IPv6": "3fff:cafe::/32",
+              "Enlace A": "10.200.1.10 / fd00:1::10", "Enlace B": "10.200.2.10 / fd00:2::10", "Config": "bird/origin.conf" },
+      term: [["Terminal (birdc)", "origin", "birdc"], ["Shell", "origin"]],
+      hint: "show protocols\nshow route export provider_a_v4",
+    },
+    "provider-a": {
+      name: "Proveedor A — AS64501",
+      role: "Upstream de respaldo del origen (el origen hace prepend dos veces al anunciarle). Entrega el prefijo a AMBOS observers - y, cuando el peer empieza a filtrar, pasa adelante el camino filtrado en lugar del suyo, porque el camino del peer es más corto que el del origen con prepend (vea bird/origin.conf).",
+      info: { "ASN": "64501 (RFC 5398)", "Hacia el origen": "10.200.1.20 / fd00:1::20",
+              "Hacia observer1": "10.200.3.10 / fd00:3::10", "Hacia observer2": "10.200.5.10 / fd00:5::10",
+              "Config": "bird/provider-a.conf" },
+      term: [["Terminal (birdc)", "provider-a", "birdc"], ["Shell", "provider-a"]],
+      hint: "show route\nshow protocols all observer1_v4",
+    },
+    "provider-b": {
+      name: "Proveedor B — AS64502",
+      role: "Upstream preferido del origen. Entrega el prefijo a los dos observers. Si el objeto ASPA del origen no lo lista, los dos observers marcan el camino que pasa por aquí como ASPA Invalid.",
+      info: { "ASN": "64502 (RFC 5398)", "Hacia el origen": "10.200.2.20 / fd00:2::20",
+              "Hacia observer1": "10.200.4.10 / fd00:4::10", "Hacia observer2": "10.200.6.10 / fd00:6::10",
+              "Config": "bird/provider-b.conf" },
+      term: [["Terminal (birdc)", "provider-b", "birdc"], ["Shell", "provider-b"]],
+      hint: "show route",
+    },
+    observer1: {
+      name: "observer1 — AS64510 (BIRD)",
+      role: "Recibe el mismo prefijo por los dos caminos y aplica ROV (RFC 6811) y ASPA (algoritmo upstream) en el filtro de import. BIRD no tiene un atributo de validación por ruta, así que el veredicto se graba en large communities.",
+      info: { "ASN": "64510 (RFC 5398)", "Validador": "Routinator (172.30.0.20:3323)",
+              "Desde Proveedor A": "10.200.3.20 / fd00:3::20", "Desde Proveedor B": "10.200.4.20 / fd00:4::20",
+              "Config": "bird/observer1-<stage>.conf" },
+      term: [["Terminal (birdc)", "observer1", "birdc"], ["Shell", "observer1"]],
+      hint: "show route table master4 all\nshow protocols all routinator\nshow route table aspa_table",
+    },
+    observer2: {
+      name: "observer2 — AS64511 (OpenBGPD)",
+      role: "La segunda opinión: mismo prefijo, mismos dos caminos, otro router y otro validador. OpenBGPD calcula los veredictos nativamente en los campos ovs y avs, sin necesidad de communities.",
+      info: { "ASN": "64511 (RFC 5398)", "Validador": "FORT (172.30.0.50:3323)",
+              "Imagen": "OpenBGPD 8.8 (Alpine 3.22)",
+              "Desde Proveedor A": "10.200.5.20 / fd00:5::20", "Desde Proveedor B": "10.200.6.20 / fd00:6::20",
+              "Rol RFC 9234": "provider (selecciona el algoritmo upstream)",
+              "Config": "openbgpd/observer2-<stage>.conf" },
+      term: [["Terminal (bgpctl)", "observer2", "bgpctl"], ["Shell", "observer2"]],
+      hint: "bgpctl show rib detail\nbgpctl show rtr\nbgpctl show sets",
+    },
+    registry_local: {
+      role: "El RIR/NIR simulado que corre dentro del laboratorio. Emite el certificado de los recursos asignados y aloja el repositorio. Sin Internet, sin credencial.",
+      info: { "Modo": "local (autocontenido)", "Panel del registro": `http://${HOST}:8081`,
+              "Ancla de confianza": "generada por el propio laboratorio", "Publicación": "RRDP en https://rir.lab:3000/rrdp/" },
+      link: "Abrir el panel del registro",
+      hint: "krillc list\nkrillc children connections --ca testbed\nkrillc pubserver publishers list",
+    },
+    registry_beta: {
+      role: "Sistema de prueba de Registro.br: ancla de confianza, CA-padre de su AS y servidor de publicación remota. Necesita Internet y un login en beta.registro.br.",
+      info: { "Modo": "beta (Registro.br)", "TAL": "https://rpki-test-ta.beta.registro.br/ta/ta.tal", "Panel": "https://beta.registro.br/login/" },
+      link: "Abrir beta.registro.br",
+    },
+  },
+  en: {
+    krill: {
+      name: "Krill",
+      role: "Your CA. This is where you create the ROAs (through the web UI) and the ASPA object (through the CLI).",
+      info: {
+        "Image": "nlnetlabs/krill:v0.16.0",
+        "Web UI": "https://<host>:3000",
+        "Token": "passlab",
+        "CA name": "minha_ca",
+        "ASPA": "krillc (CLI) only",
+      },
+      links: [["Krill web UI", KRILL_URL]],
+      term: [["Terminal (krillc)", "krill"]],
+      hint: 'krillc aspas list\nkrillc aspas add --aspa "AS64500 => AS64501"\nkrillc roas list',
+    },
+    routinator: {
+      name: "Routinator — observer1's validator",
+      role: "Validates the objects published under the lab's TA and hands ROAs and ASPAs to observer1 over the RTR protocol.",
+      info: {
+        "Image": "nlnetlabs/routinator:v0.15.2",
+        "Web UI": "http://<host>:8323",
+        "RTR": "172.30.0.20:3323",
+        "Flags": "--no-rir-tals --extra-tals-dir=/tals --enable-aspa",
+      },
+      links: [["Web UI", ROUTINATOR_URL], ["Status (text)", "/api/routinator/status"], ["JSON output", "/api/routinator/json"]],
+      term: [["Terminal", "routinator"]],
+      hint: "routinator --no-rir-tals --extra-tals-dir=/tals --enable-aspa vrps",
+    },
+    fort: {
+      name: "FORT Validator — observer2's validator",
+      role: "The second validator. Same job as Routinator, different implementation, feeding observer2 over RTR.",
+      info: {
+        "Image": "lab-aspa/fort (built from source)",
+        "Version": "1.7.0.experimental",
+        "RTR": "172.30.0.50:3323 (host: 3324)",
+        "Why that version": "ASPA and RTR v2 only exist from it onwards",
+        "Flags": "--server.max-rtr-version=2 --rsync.enabled=false",
+      },
+      term: [["Terminal", "fort"]],
+      hint: "fort --version\nfort --tal=/tals --mode=print",
+    },
+    attacker: {
+      name: "attacker — AS666",
+      role: "A hijacker that is a customer of both observers: it opens sessions straight to them and announces the origin's prefixes. Silent until the guide's experiment turns it on.",
+      info: { "ASN": "666 (not a reserved ASN - harmless, this network is isolated)",
+              "Towards observer1": "10.200.7.10 / fd00:7::10", "Towards observer2": "10.200.8.10 / fd00:8::10",
+              "Configs": "bird/attacker-off.conf, -simple.conf, -posrov.conf" },
+      term: [["Terminal (birdc)", "attacker", "birdc"], ["Shell", "attacker"]],
+      hint: "show protocols\nshow route export observer1_v4",
+    },
+    peer: {
+      name: "peer — AS64999",
+      role: "A legitimate network that peers privately with the origin and buys transit from Provider A. Normally it keeps what it learns from the origin to itself; when the guide's leak is switched on, it passes those routes on to Provider A.",
+      info: { "ASN": "64999 (private-use range, RFC 6996)",
+              "Peering with origin": "10.200.9.10 / fd00:9::10", "Transit from Provider A": "10.200.10.10 / fd00:10::10",
+              "Configs": "bird/peer-off.conf, peer-leak.conf" },
+      term: [["Terminal (birdc)", "peer", "birdc"], ["Shell", "peer"]],
+      hint: "show protocols\nshow route export provider_a_v4",
+    },
+    origin: {
+      name: "origin — AS64500",
+      role: "Your AS. Originates 10.0.0.0/24 and 3fff:cafe::/32 and is multihomed to Providers A and B. It prefers B: the announcement to A is prepended twice.",
+      info: { "ASN": "64500", "IPv4": "10.0.0.0/24", "IPv6": "3fff:cafe::/32",
+              "Link A": "10.200.1.10 / fd00:1::10", "Link B": "10.200.2.10 / fd00:2::10", "Config": "bird/origin.conf" },
+      term: [["Terminal (birdc)", "origin", "birdc"], ["Shell", "origin"]],
+      hint: "show protocols\nshow route export provider_a_v4",
+    },
+    "provider-a": {
+      name: "Provider A — AS64501",
+      role: "The origin's backup upstream (the origin prepends twice when announcing to it). Passes the prefix on to BOTH observers - and, once the peer starts leaking, passes on the leaked path instead of its own, because the peer's path is shorter than the origin's prepended one (see bird/origin.conf).",
+      info: { "ASN": "64501 (RFC 5398)", "Towards origin": "10.200.1.20 / fd00:1::20",
+              "Towards observer1": "10.200.3.10 / fd00:3::10", "Towards observer2": "10.200.5.10 / fd00:5::10",
+              "Config": "bird/provider-a.conf" },
+      term: [["Terminal (birdc)", "provider-a", "birdc"], ["Shell", "provider-a"]],
+      hint: "show route\nshow protocols all observer1_v4",
+    },
+    "provider-b": {
+      name: "Provider B — AS64502",
+      role: "The origin's preferred upstream. Passes the prefix on to both observers. If the origin's ASPA object doesn't list it, both observers mark the path through here ASPA Invalid.",
+      info: { "ASN": "64502 (RFC 5398)", "Towards origin": "10.200.2.20 / fd00:2::20",
+              "Towards observer1": "10.200.4.10 / fd00:4::10", "Towards observer2": "10.200.6.10 / fd00:6::10",
+              "Config": "bird/provider-b.conf" },
+      term: [["Terminal (birdc)", "provider-b", "birdc"], ["Shell", "provider-b"]],
+      hint: "show route",
+    },
+    observer1: {
+      name: "observer1 — AS64510 (BIRD)",
+      role: "Receives the same prefix over both paths and applies ROV (RFC 6811) and ASPA (upstream algorithm) in the import filter. BIRD has no per-route validation attribute, so the verdict is recorded in large communities.",
+      info: { "ASN": "64510 (RFC 5398)", "Validator": "Routinator (172.30.0.20:3323)",
+              "From Provider A": "10.200.3.20 / fd00:3::20", "From Provider B": "10.200.4.20 / fd00:4::20",
+              "Config": "bird/observer1-<stage>.conf" },
+      term: [["Terminal (birdc)", "observer1", "birdc"], ["Shell", "observer1"]],
+      hint: "show route table master4 all\nshow protocols all routinator\nshow route table aspa_table",
+    },
+    observer2: {
+      name: "observer2 — AS64511 (OpenBGPD)",
+      role: "The second opinion: same prefix, same two paths, a different router and a different validator. OpenBGPD computes the verdicts natively into the ovs and avs fields, with no community convention needed.",
+      info: { "ASN": "64511 (RFC 5398)", "Validator": "FORT (172.30.0.50:3323)",
+              "Image": "OpenBGPD 8.8 (Alpine 3.22)",
+              "From Provider A": "10.200.5.20 / fd00:5::20", "From Provider B": "10.200.6.20 / fd00:6::20",
+              "RFC 9234 role": "provider (selects the upstream algorithm)",
+              "Config": "openbgpd/observer2-<stage>.conf" },
+      term: [["Terminal (bgpctl)", "observer2", "bgpctl"], ["Shell", "observer2"]],
+      hint: "bgpctl show rib detail\nbgpctl show rtr\nbgpctl show sets",
+    },
+    registry_local: {
+      role: "The simulated RIR/NIR that runs inside the lab. It issues the certificate for the allocated resources and hosts the repository. No Internet, no credentials.",
+      info: { "Mode": "local (self-contained)", "Registry panel": `http://${HOST}:8081`,
+              "Trust anchor": "generated by the lab itself", "Publication": "RRDP at https://rir.lab:3000/rrdp/" },
+      link: "Open the registry panel",
+      hint: "krillc list\nkrillc children connections --ca testbed\nkrillc pubserver publishers list",
+    },
+    registry_beta: {
+      role: "Registro.br's test system: trust anchor, parent CA for your AS, and remote publication server. Needs Internet and a beta.registro.br login.",
+      info: { "Mode": "beta (Registro.br)", "TAL": "https://rpki-test-ta.beta.registro.br/ta/ta.tal", "Panel": "https://beta.registro.br/login/" },
+      link: "Open beta.registro.br",
+    },
+  },
+};
+
+document.getElementById("a-krill").href       = KRILL_URL;
+document.getElementById("a-routinator").href  = ROUTINATOR_URL;
+document.getElementById("a-console").href     = TTYD_URL;
+document.getElementById("a-registry").href    = `http://${HOST}:8081`;
+
+let selected = null;
+let lastState = null;
+let labValuesApplied = false;
+
+function tag(v) {
+  const c = ["Valid","Invalid","Unknown","NotFound"].includes(v) ? v : "off";
+  return `<span class="tag ${c}">${v === "-" ? "—" : v}</span>`;
+}
+
+// Values that show up written into the panel and into the guide. When
+// lab.conf has different ones, they get swapped in at render time - this
+// way the Markdown guide stays readable outside the browser too, with no
+// template placeholders.
+const DEFAULTS = { ASN: "64500", V4: "10.0.0.0/24", V6: "3fff:cafe::/32",
+                 V4MAX: "24", V6MAX: "32" };
+
+function substituteDefaults(text) {
+  const g = (lastState && lastState.config) || {};
+  let r = String(text);
+  const swap = (from, to) => { if (to && to !== from) r = r.split(from).join(to); };
+  swap(DEFAULTS.V4, g.ORIGIN_V4);
+  swap(DEFAULTS.V6, g.ORIGIN_V6);
+  swap(DEFAULTS.ASN, g.ORIGIN_ASN);
+  // max length: only in the script's ROA table, so we don't swap any loose
+  // "24" that happens to appear in the text
+  if (g.ORIGIN_V4_MAXLEN && g.ORIGIN_V4_MAXLEN !== DEFAULTS.V4MAX)
+    r = r.replace(new RegExp(`(>)${DEFAULTS.V4MAX}(<\/td>)`, "g"), `$1${g.ORIGIN_V4_MAXLEN}$2`);
+  if (g.ORIGIN_V6_MAXLEN && g.ORIGIN_V6_MAXLEN !== DEFAULTS.V6MAX)
+    r = r.replace(new RegExp(`(>)${DEFAULTS.V6MAX}(<\/td>)`, "g"), `$1${g.ORIGIN_V6_MAXLEN}$2`);
+  return r;
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"]/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function openTerminal(node, mode, label) {
+  const q = mode ? `?arg=${node}&arg=${mode}` : `?arg=${node}`;
+  document.getElementById("term").src = TTYD_URL + q;
+  document.getElementById("term-title").textContent = t("terminal_title") + " — " + label;
+  document.querySelector("main").classList.add("with-term");
+}
+
+function closeTerminal() {
+  document.querySelector("main").classList.remove("with-term");
+  document.getElementById("term").src = "about:blank";
+  document.getElementById("term-title").textContent = t("terminal_title");
+}
+
+document.getElementById("term-close").onclick = closeTerminal;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeTerminal(); });
+
+function registryNode(g) {
+  const language = currentLanguage();
+  const local = (g.MODE || "local") === "local";
+  const base = local ? NODES[language].registry_local : NODES[language].registry_beta;
+  const rirName = g.RIR_NAME || "LabNIC";
+  return {
+    name: local ? `${rirName} — ${language === "en" ? "lab registry" : language === "es" ? "registro del laboratorio" : "registro do laboratório"}`
+                : "beta.registro.br",
+    role: base.role,
+    info: base.info,
+    links: [[base.link, local ? `http://${HOST}:8081` : "https://beta.registro.br/login/"]],
+    term: local ? [["Terminal (krillc do RIR)", "rir"]] : [],
+    hint: base.hint || null,
+  };
+}
+
+const LAB_COMMANDS = ["refresh", "status", "logs",
+                      "step1-clean", "step2-hijack-simple", "step3-rov-mark", "step3-rov-drop",
+                      "step4-hijack-posrov", "step5-aspa-mark", "step5-aspa-drop",
+                      "step7-leak-on", "step9-leak-off", "step9-hijack-off"];
+
+function renderLabCommandsPanel() {
+  selected = "lab";
+  document.querySelectorAll(".node").forEach(n => n.classList.remove("sel"));
+  let h = `<h2>${esc(t("lab_cmds_title"))}</h2>` +
+          `<p class="role-large">${esc(t("lab_cmds_intro"))}</p>` +
+          `<div class="actions">` +
+          `<button class="btn pri" data-term="lab" data-mode="" data-label="${esc(t("lab_cmds_btn"))}">${esc(t("lab_cmds_open_terminal"))}</button>` +
+          `</div>` +
+          `<table class="verdicts"><thead><tr><th>${esc(t("lab_cmds_col_cmd"))}</th><th>${esc(t("lab_cmds_col_desc"))}</th></tr></thead><tbody>`;
+  for (const cmd of LAB_COMMANDS) {
+    h += `<tr><td class="mono">./scripts/lab.sh ${cmd}</td><td>${t(`lab_cmd_${cmd}_desc`)}</td></tr>`;
+  }
+  h += `</tbody></table>`;
+  h += `<div class="warn-box">${t("lab_cmds_reset_warning")}</div>`;
+  const panelEl = document.getElementById("panel");
+  panelEl.innerHTML = h;
+  panelEl.querySelectorAll("[data-term]").forEach(b => {
+    b.onclick = () => openTerminal(b.dataset.term, b.dataset.mode, b.dataset.label);
+  });
+}
+
+function renderPanel(id) {
+  if (id === "lab") return renderLabCommandsPanel();
+  selected = id;
+  document.querySelectorAll(".node").forEach(n => n.classList.toggle("sel", n.dataset.id === id));
+  const language = currentLanguage();
+  const n = id === "registry" ? registryNode((lastState && lastState.config) || {}) : (NODES[language][id] || NODES.en[id]);
+  const state = lastState || {};
+  let h = `<h2>${esc(n.name)}</h2><p class="role-large">${esc(n.role)}</p><div class="actions">`;
+  for (const [label, url] of (n.links || [])) {
+    h += `<a class="btn pri" href="${url}" target="_blank" rel="noopener">${esc(label)} ↗</a>`;
+  }
+  for (const [label, node, mode] of (n.term || [])) {
+    h += `<button class="btn" data-term="${node}" data-mode="${mode || ""}" data-label="${esc(label)}">${esc(label)}</button>`;
+  }
+  h += `</div><dl class="info">`;
+  for (const [k, v] of Object.entries(n.info || {})) h += `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`;
+  h += `</dl>`;
+
+  const nodeData = (state.nodes || {})[id];
+  if (nodeData && nodeData.protocols) {
+    h += `<div class="section"><h3>${t("sessions_title")}</h3><table class="verdicts"><tbody>`;
+    for (const p of nodeData.protocols) {
+      const color = p.state === "up" ? "Valid" : "Invalid";
+      h += `<tr><td class="mono">${esc(p.name)}</td><td>${esc(p.type)}</td>` +
+           `<td>${tag(color).replace(/>Valid</, `>${t("state_up")}<`).replace(/>Invalid</, `>${t("state_down")}<`)}</td>` +
+           `<td class="mono" style="color:var(--text-weak)">${esc(p.info)}</td></tr>`;
+    }
+    h += `</tbody></table></div>`;
+  }
+  if (id === "observer1" && nodeData && nodeData.tables) {
+    const tb = nodeData.tables;
+    h += `<div class="section"><h3>${t("rtr_tables")}</h3><dl class="info">` +
+         `<dt>ROA v4</dt><dd>${tb.roa4 ?? "—"}</dd>` +
+         `<dt>ROA v6</dt><dd>${tb.roa6 ?? "—"}</dd>` +
+         `<dt>ASPA</dt><dd>${tb.aspa ?? "—"}</dd></dl></div>`;
+  }
+  if (id === "routinator" && state.routinator) {
+    h += `<div class="section"><h3>${t("validated_set")}</h3><dl class="info">` +
+         `<dt>VRPs</dt><dd>${state.routinator.vrps ?? "—"}</dd>` +
+         `<dt>ASPAs</dt><dd>${state.routinator.aspas ?? "—"}</dd></dl>`;
+    if ((state.routinator.aspa_list || []).length) {
+      h += `<pre>${esc(JSON.stringify(state.routinator.aspa_list, null, 1))}</pre>`;
+    }
+    h += `</div>`;
+  }
+  if (id === "fort" && state.fort) {
+    h += `<div class="section"><h3>${t("validated_set")}</h3><dl class="info">` +
+         `<dt>VRPs</dt><dd>${state.fort.roas ?? "—"}</dd>` +
+         `<dt>ASPAs</dt><dd>${state.fort.aspas ?? "—"}</dd></dl></div>`;
+  }
+  if (n.hint) h += `<div class="section"><h3>${t("useful_commands")}</h3><pre>${esc(n.hint)}</pre></div>`;
+
+  const panelEl = document.getElementById("panel");
+  panelEl.innerHTML = substituteDefaults(h);
+  panelEl.querySelectorAll("[data-term]").forEach(b => {
+    b.onclick = () => openTerminal(b.dataset.term, b.dataset.mode, b.dataset.label + " · " + n.name);
+  });
+}
+
+document.querySelectorAll(".node").forEach(el => {
+  el.addEventListener("click", () => renderPanel(el.dataset.id));
+  el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); renderPanel(el.dataset.id); } });
+});
+
+function pill(id, text, kind) {
+  const el = document.getElementById("p-" + id);
+  if (!el) return;
+  el.textContent = text;
+  el.setAttribute("fill", kind === "ok" ? "var(--ok)" : kind === "error" ? "var(--error)"
+                          : kind === "warn" ? "var(--warn)" : "var(--text-weak)");
+}
+
+function paint(state) {
+  lastState = state;
+  document.getElementById("clock").textContent = state.error
+    ? (t("error_prefix") + state.error) : (t("updated_prefix") + state.ts);
+
+  for (const id of ["origin", "provider-a", "provider-b", "observer1", "observer2"]) {
+    const d = (state.nodes || {})[id];
+    if (!d) { pill(id, "—", ""); continue; }
+    const bgp = (d.protocols || []).filter(p => p.type === "BGP");
+    const up = bgp.filter(p => p.state === "up").length;
+    pill(id, d.up ? `BGP ${up}/${bgp.length}` : t("pill_stopped"),
+         !d.up ? "error" : (bgp.length && up === bgp.length) ? "ok" : "warn");
+  }
+
+  // the observers' deployment stage: one badge for both, amber if they disagree
+  const stg = state.stage || {};
+  const badge = document.getElementById("stage-badge");
+  if (badge) {
+    const a = stg.observer1, b = stg.observer2;
+    badge.classList.remove("mark", "drop", "mixed");
+    if (!a || !b) {
+      badge.textContent = t("stage_unknown");
+    } else if (a !== b) {
+      badge.textContent = t("stage_mixed", { a, b });
+      badge.classList.add("mixed");
+    } else {
+      badge.textContent = t("stage_" + a.replace("-", "_"));
+      if (a.endsWith("mark")) badge.classList.add("mark");
+      else if (a.endsWith("drop")) badge.classList.add("drop");
+    }
+  }
+
+  // AS666 and peer are about behavior, not session counts
+  const atk = (state.nodes || {}).attacker || {};
+  if (!atk.up) pill("attacker", t("pill_stopped"), "error");
+  else pill("attacker", atk.announcing ? t("pill_hijacking") : t("pill_silent"), atk.announcing ? "warn" : "");
+  const peerNode = (state.nodes || {}).peer || {};
+  if (!peerNode.up) pill("peer", t("pill_stopped"), "error");
+  else pill("peer", peerNode.leaking ? t("pill_leaking") : t("pill_peering"), peerNode.leaking ? "warn" : "ok");
+
+  const r = state.routinator || {};
+  pill("routinator", r.vrps === null || r.vrps === undefined ? "—" : `${r.vrps} VRP · ${r.aspas ?? 0} ASPA`,
+       r.vrps ? "ok" : "warn");
+  // FORT has no HTTP API, so what we show is what observer2 actually got over RTR
+  const f = state.fort || {};
+  pill("fort", !f.up ? t("pill_stopped")
+               : (f.roas === null || f.roas === undefined ? "—" : `${f.roas} VRP · ${f.aspas ?? 0} ASPA`),
+       !f.up ? "error" : (f.roas ? "ok" : "warn"));
+  pill("krill", (state.krill || {}).up ? t("pill_up") : t("pill_stopped"), (state.krill || {}).up ? "ok" : "error");
+
+  const g = state.config || {};
+  const isLocalMode = (g.MODE || "local") === "local";
+  const registryLabelEl = document.getElementById("n-registry");
+  if (registryLabelEl) registryLabelEl.textContent = isLocalMode ? (g.RIR_NAME || "LabNIC") : "beta.registro.br";
+  const holderLabelEl = document.getElementById("n-holder");
+  if (holderLabelEl) holderLabelEl.textContent = g.HOLDER_NAME || "ACME Internet Ltda.";
+  if (isLocalMode) {
+    const registryUp = (state.rir || {}).up;
+    pill("registry", registryUp ? t("pill_up") : t("pill_stopped"), registryUp ? "ok" : "error");
+  } else {
+    pill("registry", t("pill_external"), "");
+  }
+
+  // verdicts - both observers share one table, so the two verdicts for the
+  // same prefix sit next to each other
+  const routesFor = o => [...(((state.nodes || {})[o] || {}).routes4 || []),
+                        ...(((state.nodes || {})[o] || {}).routes6 || [])];
+  // observer1 names its sessions provider_a_v4, observer2 provider-a-v4
+  const normalize = proto => String(proto || "").replace(/_/g, "-");
+  const rows = [];
+  for (const obs of ["observer1", "observer2"]) {
+    for (const x of routesFor(obs)) rows.push([obs, x]);
+  }
+
+  const tb = document.querySelector("#tab-verdicts tbody");
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="7" style="color:var(--text-weak)">${t("no_routes")}</td></tr>`;
+  } else {
+    tb.innerHTML = rows.map(([obs, x]) => {
+      const proto = normalize(x.proto);
+      const from = proto.startsWith("provider-a") ? t("provider_a")
+               : proto.startsWith("provider-b") ? t("provider_b")
+               : proto.startsWith("attacker") ? t("from_attacker") : x.proto;
+      return `<tr><td class="mono">${esc(obs)}</td>` +
+             `<td class="mono">${esc(x.net)}${x.best ? ` <span class="tag best">${t("best")}</span>` : ""}</td>` +
+             `<td>${esc(from)}</td><td class="mono">${esc(x.path)}</td>` +
+             `<td>${tag(x.rov)}</td><td>${tag(x.aspa)}</td>` +
+             `<td class="mono">${x.local_pref ?? x.pref ?? ""}</td></tr>`;
+    }).join("");
+  }
+
+  // each BGP link is coloured by that path's ASPA verdict at that observer
+  const verdictFor = (obs, prov) => {
+    const route = routesFor(obs).find(x => normalize(x.proto).startsWith(prov));
+    return route ? route.aspa : null;
+  };
+  for (const [linkId, obs, prov] of [["e-a-obs1", "observer1", "provider-a"],
+                                       ["e-b-obs1", "observer1", "provider-b"],
+                                       ["e-a-obs2", "observer2", "provider-a"],
+                                       ["e-b-obs2", "observer2", "provider-b"]]) {
+    const el = document.getElementById(linkId);
+    if (!el) continue;
+    const v = verdictFor(obs, prov);
+    el.classList.toggle("good", v === "Valid");
+    el.classList.toggle("bad", v === "Invalid");
+  }
+
+  // AS666's links: red when what it announces is being flagged (or is gone
+  // altogether - a dropping observer), amber when an observer is accepting it
+  for (const [linkId, obs] of [["e-atk-obs1", "observer1"], ["e-atk-obs2", "observer2"]]) {
+    const el = document.getElementById(linkId);
+    if (!el) continue;
+    const route = routesFor(obs).find(x => normalize(x.proto).startsWith("attacker"));
+    const flagged = !route || route.rov === "Invalid" || route.aspa === "Invalid";
+    el.classList.toggle("bad", !!atk.announcing && flagged);
+    el.classList.toggle("warn", !!atk.announcing && !flagged);
+  }
+
+  // peer: the peering link is healthy when its session is up; the transit
+  // link to Provider A shows the leak - amber if an observer accepted a path
+  // through the peer, red if they're all flagging it or dropping it
+  const peeringUp = (peerNode.protocols || []).some(p => p.name === "origin_v4" && p.state === "up");
+  const peeringEl = document.getElementById("e-peer-org");
+  if (peeringEl) peeringEl.classList.toggle("good", peeringUp);
+  const peerAsn = String((state.config || {}).PEER_ASN || "64999");
+  const leaked = [...routesFor("observer1"), ...routesFor("observer2")]
+    .filter(x => String(x.path).split(/\s+/).includes(peerAsn));
+  const leakAccepted = leaked.some(x => x.rov !== "Invalid" && x.aspa !== "Invalid");
+  const leakEl = document.getElementById("e-peer-a");
+  if (leakEl) {
+    leakEl.classList.toggle("bad", !!peerNode.leaking && !leakAccepted);
+    leakEl.classList.toggle("warn", !!peerNode.leaking && leakAccepted);
+  }
+
+  // RTR links: BIRD reports the session as an RPKI protocol, OpenBGPD as RTR
+  const rtr1 = (((state.nodes || {}).observer1 || {}).protocols || []).find(p => p.type === "RPKI");
+  const rtr2 = (((state.nodes || {}).observer2 || {}).protocols || []).find(p => p.type === "RTR");
+  for (const [linkId, pr] of [["e-rtr1", rtr1], ["e-rtr2", rtr2]]) {
+    const el = document.getElementById(linkId);
+    if (!el) continue;
+    el.classList.toggle("good", !!pr && pr.state === "up");
+    el.classList.toggle("bad", !!pr && pr.state !== "up");
+  }
+
+  if (selected) renderPanel(selected);
+
+  // the first time lab.conf's values arrive, redraw the guide with the
+  // lab's real values already in place (after that we stop redrawing, so
+  // we don't lose the scroll position on every refresh)
+  if (!labValuesApplied && state.config) {
+    labValuesApplied = true;
+    if (state.config.LANGUAGE) suggestDefaultLanguage(state.config.LANGUAGE);
+    if (steps.length) showStep(currentStep);
+  }
+}
+
+async function tick() {
+  try {
+    const r = await fetch("/api/status.json", { cache: "no-store" });
+    paint(await r.json());
+  } catch (e) {
+    document.getElementById("clock").textContent = t("no_collector_data");
+  }
+}
+tick();
+setInterval(tick, 5000);
+
+// ===========================================================================
+// Step-by-step script
+//
+// The content comes straight from GUIDE.<lang>.md, served by nginx, so the
+// printed script and the on-screen one never drift out of sync.
+// ===========================================================================
+
+let steps = [];
+let currentStep = 0;
+
+// ---------------------------------------------------------------------------
+// Small, dependency-free Markdown renderer (the lab needs to work with no
+// Internet access). Covers what GUIDE.*.md uses: headings, paragraphs,
+// lists with nested content, code blocks, tables, blockquotes, horizontal
+// rules.
+// ---------------------------------------------------------------------------
+
+let codeBlocks = [];
+
+function md(text) {
+  codeBlocks = [];
+  return blocks(extractCode(text));
+}
+
+// Takes the ``` code blocks out of the way, leaving a marker at the same
+// indentation, so they keep belonging to whichever list item they were in.
+function extractCode(text) {
+  const lines = text.split("\n");
+  const output = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(\s*)```/);
+    if (!m) { output.push(lines[i]); continue; }
+    const indent = m[1];
+    const body = [];
+    i++;
+    while (i < lines.length && !/^\s*```/.test(lines[i])) body.push(lines[i++]);
+    codeBlocks.push(dedent(body).join("\n"));
+    output.push(indent + "@@@BLOCK" + (codeBlocks.length - 1) + "@@@");
+  }
+  return output.join("\n");
+}
+
+function dedent(lines) {
+  const indents = lines.filter(l => l.trim()).map(l => l.match(/^\s*/)[0].length);
+  const min = indents.length ? Math.min(...indents) : 0;
+  return lines.map(l => l.slice(min));
+}
+
+const ORDERED_ITEM = /^(\d+)\.\s+(.*)$/;
+const BULLET_ITEM = /^[-*]\s+(.*)$/;
+const isListItem = l => ORDERED_ITEM.test(l) || BULLET_ITEM.test(l);
+
+function blocks(text) {
+  const lines = text.split("\n");
+  const output = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const raw = lines[i];
+    const l = raw.trim();
+
+    if (!l) { i++; continue; }
+
+    if (/^#{1,6}\s/.test(l)) {
+      const n = l.match(/^#+/)[0].length;
+      output.push(`<h${n}>${inline(l.slice(n).trim())}</h${n}>`);
+      i++; continue;
+    }
+
+    if (/^-{3,}$/.test(l) || /^\*{3,}$/.test(l)) { output.push("<hr>"); i++; continue; }
+
+    if (/^@@@BLOCK\d+@@@$/.test(l)) { output.push(l); i++; continue; }
+
+    if (l.startsWith(">")) {
+      const inner = [];
+      while (i < lines.length && lines[i].trim().startsWith(">")) {
+        inner.push(lines[i].trim().replace(/^>\s?/, ""));
+        i++;
+      }
+      output.push("<blockquote>" + blocks(inner.join("\n")) + "</blockquote>");
+      continue;
+    }
+
+    if (l.startsWith("|") && /^\|[\s:|-]+\|$/.test((lines[i + 1] || "").trim())) {
+      const head = cells(l);
+      i += 2;
+      const body = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        body.push(cells(lines[i].trim())); i++;
+      }
+      output.push("<table><thead><tr>" + head.map(c => `<th>${inline(c)}</th>`).join("") +
+                 "</tr></thead><tbody>" +
+                 body.map(r => "<tr>" + r.map(c => `<td>${inline(c)}</td>`).join("") + "</tr>").join("") +
+                 "</tbody></table>");
+      continue;
+    }
+
+    if (isListItem(l) && !/^\s/.test(raw)) {
+      // a list only ends at a non-blank, non-indented line that isn't an item
+      const rawLines = [];
+      while (i < lines.length) {
+        const b = lines[i];
+        if (!b.trim()) {
+          const next = lines.slice(i + 1).find(x => x.trim());
+          if (next === undefined) break;
+          if (!/^\s/.test(next) && !isListItem(next.trim())) break;
+          rawLines.push(""); i++; continue;
+        }
+        if (!/^\s/.test(b) && !isListItem(b.trim())) break;
+        rawLines.push(b); i++;
+      }
+      output.push(listHtml(rawLines));
+      continue;
+    }
+
+    // paragraph: joins lines up to a blank one or the start of another block
+    const parts = [];
+    while (i < lines.length) {
+      const b = lines[i], s = b.trim();
+      if (!s || /^#{1,6}\s/.test(s) || /^-{3,}$/.test(s) || s.startsWith(">") ||
+          s.startsWith("|") || /^@@@BLOCK\d+@@@$/.test(s) || isListItem(s)) break;
+      parts.push(s); i++;
+    }
+    if (parts.length) output.push(`<p>${inline(parts.join(" "))}</p>`);
+  }
+
+  return output.join("\n");
+}
+
+function listHtml(rawLines) {
+  const first = rawLines[0].trim();
+  const ordered = ORDERED_ITEM.test(first);
+  const start = ordered ? first.match(ORDERED_ITEM)[1] : null;
+
+  // splits the items: a non-indented marker line starts a new item
+  const items = [];
+  for (const b of rawLines) {
+    if (!/^\s/.test(b) && isListItem(b.trim())) {
+      const m = b.trim().match(ORDERED_ITEM) || b.trim().match(BULLET_ITEM);
+      items.push([m[2] !== undefined ? m[2] : m[1]]);
+    } else if (items.length) {
+      items[items.length - 1].push(b);
+    }
+  }
+
+  const body = items.map(itemLines => {
+    const [head, ...rest] = itemLines;
+    const inner = (head + "\n" + dedent(rest).join("\n")).trim();
+    let html = blocks(inner);
+    // single-paragraph item: drop the <p> so the list stays compact
+    const single = html.match(/^<p>([\s\S]*)<\/p>$/);
+    if (single && !single[1].includes("<p>")) html = single[1];
+    return `<li>${html}</li>`;
+  }).join("\n");
+
+  return ordered ? `<ol start="${start}">${body}</ol>` : `<ul>${body}</ul>`;
+}
+
+function cells(line) {
+  return line.replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+}
+
+function inline(s) {
+  return esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[\s(])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+             '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+
+// hands the code blocks back, now with a copy button
+function restoreCode(html) {
+  return html.replace(/(<p>)?@@@BLOCK(\d+)@@@(<\/p>)?/g, (_, a, n) => {
+    const body = codeBlocks[+n];
+    return `<div class="code-block"><pre>${esc(body)}</pre>` +
+           `<button class="btn copy-btn" data-copy-text="${esc(body)}">${t("copy")}</button></div>`;
+  });
+}
+
+function showStep(n) {
+  if (!steps.length) return;
+  currentStep = Math.max(0, Math.min(n, steps.length - 1));
+  const body = document.getElementById("guide-body");
+  body.innerHTML = substituteDefaults(restoreCode(md(steps[currentStep].text)));
+  body.scrollTop = 0;
+  document.getElementById("guide-select").value = String(currentStep);
+  document.getElementById("guide-counter").textContent = `${currentStep + 1} / ${steps.length}`;
+  document.getElementById("guide-prev").disabled = currentStep === 0;
+  document.getElementById("guide-next").disabled = currentStep === steps.length - 1;
+  body.querySelectorAll("[data-copy-text]").forEach(b => {
+    b.onclick = () => {
+      navigator.clipboard?.writeText(b.dataset.copyText.replace(/^#(?=\S)/gm, ""));
+      b.textContent = t("copied");
+      setTimeout(() => (b.textContent = t("copy")), 1200);
+    };
+  });
+  try { localStorage.setItem("lab-aspa-step", String(currentStep)); } catch (_) {}
+}
+
+async function loadGuide() {
+  const language = currentLanguage();
+  const file = `GUIDE.${language}.md`;
+  let text;
+  try {
+    const r = await fetch(file, { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    text = await r.text();
+  } catch (_) {
+    document.getElementById("guide-body").innerHTML = `<p>${t("guide_error", { file })}</p>`;
+    return;
+  }
+
+  // each "## " starts a step; whatever comes before the first one is the intro
+  const parts = text.split(/^## /m);
+  steps = [{ title: t("overview"), text: parts[0].trim() }];
+  for (const p of parts.slice(1)) {
+    steps.push({ title: p.split("\n")[0].trim(), text: "## " + p.trim() });
+  }
+
+  const selectEl = document.getElementById("guide-select");
+  selectEl.innerHTML = steps.map((e, i) =>
+    `<option value="${i}">${i + 1}. ${esc(e.title)}</option>`).join("");
+  selectEl.onchange = () => showStep(+selectEl.value);
+
+  let initial = 0;
+  try { initial = +(localStorage.getItem("lab-aspa-step") || 0); } catch (_) {}
+  showStep(Math.min(initial, steps.length - 1));
+}
+
+document.getElementById("guide-prev").onclick  = () => showStep(currentStep - 1);
+document.getElementById("guide-next").onclick = () => showStep(currentStep + 1);
+
+function setView(view) {
+  const isGuide = view === "guide";
+  document.getElementById("view-topology").classList.toggle("hidden", isGuide);
+  document.getElementById("view-guide").classList.toggle("hidden", !isGuide);
+  document.getElementById("tab-topology").classList.toggle("active", !isGuide);
+  document.getElementById("tab-guide").classList.toggle("active", isGuide);
+  try { localStorage.setItem("lab-aspa-view", view); } catch (_) {}
+}
+document.getElementById("tab-topology").onclick = () => setView("topology");
+document.getElementById("tab-guide").onclick   = () => setView("guide");
+document.getElementById("btn-lab-commands").onclick = () => { setView("topology"); renderPanel("lab"); };
+
+// arrow keys navigate the script (unless you're typing into a field)
+document.addEventListener("keydown", e => {
+  if (document.getElementById("view-guide").classList.contains("hidden")) return;
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+  if (e.key === "ArrowRight") showStep(currentStep + 1);
+  if (e.key === "ArrowLeft")  showStep(currentStep - 1);
+});
+
+// Called by language.js whenever the language changes: re-render everything
+// that has text in it.
+function onLanguageChange() {
+  translateStatic();
+  if (selected) renderPanel(selected);
+  else if (lastState) paint(lastState);
+  loadGuide();
+}
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+function paintThemeButton() {
+  const b = document.getElementById("btn-theme");
+  const light = currentTheme() === "light";
+  b.textContent = light ? "\u263E" : "\u2600";
+  b.title = b.ariaLabel = t(light ? "theme_to_dark" : "theme_to_light");
+}
+document.getElementById("btn-theme").addEventListener("click", () => {
+  const next = currentTheme() === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("lab-aspa-theme", next); } catch (_) {}
+  paintThemeButton();
+});
+
+buildLanguageSwitcher(document.getElementById("language-switcher"));
+translateStatic();
+paintThemeButton();
+loadGuide();
+try { if (localStorage.getItem("lab-aspa-view") === "guide") setView("guide"); } catch (_) {}
+</script>
+</body>
+</html>

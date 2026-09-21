@@ -1,0 +1,467 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 The lab-aspa authors
+# ==============================================================================
+# RPKI + ASPA Lab
+#
+#   start:  ./scripts/lab.sh up
+#   panel:  http://localhost:8080
+#
+# Pinned versions live here and in images/*/Dockerfile - see the "Versions"
+# section of the README before changing any of them.
+# ==============================================================================
+
+name: lab-aspa
+
+x-bird: &bird
+  image: lab-aspa/bird
+  build: ./images/bird
+  cap_add: [NET_ADMIN, SYS_ADMIN]
+  sysctls:
+    net.ipv6.conf.all.disable_ipv6: 0
+    net.ipv4.ip_forward: 1
+    net.ipv6.conf.all.forwarding: 1
+  restart: unless-stopped
+
+services:
+
+  # ---------------------------------------------------------------- RPKI ----
+  # Krill: the holder's CA. Web UI at https://localhost:3000
+  # (self-signed certificate, accept the warning).
+  krill:
+    image: nlnetlabs/krill:v0.16.0
+    container_name: lab-krill
+    hostname: krill
+    environment:
+      KRILL_ADMIN_TOKEN: "passlab"
+      KRILL_LOG_LEVEL: "info"
+      # so that "krillc" inside the container already works with no arguments
+      KRILL_CLI_SERVER: "https://localhost:3000/"
+      KRILL_CLI_TOKEN: "passlab"
+      KRILL_CLI_MY_CA: "minha_ca"
+      # trust the lab's internal CA, to talk to the simulated RIR over
+      # HTTPS (RFC 6492 and RFC 8181)
+      KRILL_HTTPS_ROOT_CERTS: "/pki/ca.pem"
+    volumes:
+      # one volume per MODE: the local-mode CA and the beta-mode CA are
+      # independent, switching modes never touches the other one's work
+      - krill-data-${MODE:-local}:/var/krill/data
+      - ./krill/krill.conf:/var/krill/data/krill.conf:ro
+      - pki:/pki:ro
+    depends_on:
+      pki-init: { condition: service_completed_successfully }
+    ports:
+      - "3000:3000"
+    networks:
+      mgmt: { ipv4_address: 172.30.0.10 }
+    restart: unless-stopped
+
+  # ------------------------------------------------- SIMULATED RIR (local) --
+  # Generates the lab's internal CA and the RIR's TLS certificate.
+  pki-init:
+    image: lab-aspa/utils
+    build: ./images/utils
+    container_name: lab-pki-init
+    environment:
+      RIR_HOSTNAME: "rir.lab"
+    volumes:
+      - pki:/pki
+      - ./:/lab:ro
+    restart: "no"
+
+  # The lab's RIR/NIR: trust anchor + registry CA + publication server.
+  rir:
+    image: nlnetlabs/krill:v0.16.0
+    container_name: lab-rir
+    hostname: rir.lab
+    profiles: [local]
+    depends_on:
+      pki-init: { condition: service_completed_successfully }
+    # install the certificate issued by the internal CA before starting Krill
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /var/krill/data/ssl
+        cp /pki/rir.crt /var/krill/data/ssl/cert.pem
+        cp /pki/rir.key /var/krill/data/ssl/key.pem
+        exec krill -c /etc/krill-rir.conf
+    environment:
+      KRILL_CLI_SERVER: "https://localhost:3000/"
+      KRILL_CLI_TOKEN: "passlab"
+      KRILL_CLI_MY_CA: "testbed"
+    volumes:
+      - rir-data:/var/krill/data
+      - ./rir/krill.conf:/etc/krill-rir.conf:ro
+      - pki:/pki:ro
+    ports:
+      - "3001:3000"
+    networks:
+      mgmt:
+        ipv4_address: 172.30.0.40
+        aliases: [rir.lab]
+    restart: unless-stopped
+
+  # The registry panel: shows the allocated resources and performs the two
+  # RFC 8183 XML exchanges (delegation and publication) against the RIR's Krill.
+  rir-web:
+    image: lab-aspa/rir-web
+    build: ./rir-web
+    container_name: lab-rir-web
+    profiles: [local]
+    depends_on: [rir]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/lab:ro
+      - pki:/pki:ro
+    ports:
+      - "8081:8081"
+    networks: [mgmt]
+    restart: unless-stopped
+
+  # Installs the right TAL into /tals, per lab.conf's MODE (runs once and exits).
+  tal-init:
+    image: lab-aspa/utils
+    build: ./images/utils
+    container_name: lab-tal-init
+    command: ["/usr/local/bin/tal-init.sh"]
+    volumes:
+      - tals:/tals
+      - pki:/pki:ro
+      - ./:/lab:ro
+    networks: [mgmt]
+    restart: "no"
+
+  # ---------------------------------------------------------- VALIDATORS ----
+  # Routinator: feeds observer1. Validates the objects and serves ROA + ASPA
+  # over RTR (port 3323).
+  # --no-rir-tals + --extra-tals-dir: validates ONLY the lab's tree, not the
+  # whole Internet. --enable-aspa: without it, Routinator simply ignores ASPA
+  # objects.
+  routinator:
+    image: nlnetlabs/routinator:v0.15.2
+    container_name: lab-routinator
+    hostname: routinator
+    depends_on:
+      pki-init: { condition: service_completed_successfully }
+      tal-init: { condition: service_completed_successfully }
+    command:
+      - "--no-rir-tals"
+      - "--extra-tals-dir=/tals"
+      - "--enable-aspa"
+      # trust the lab's internal CA, to fetch the trust anchor certificate
+      # and the simulated RIR's RRDP over HTTPS
+      - "--rrdp-root-cert=/pki/ca.pem"
+      # "rir.lab" is not a public name; without this Routinator refuses the
+      # repository with "Dubious host name"
+      - "--allow-dubious-hosts"
+      # there's no rsyncd in the lab: transport is RRDP only
+      - "--disable-rsync"
+      - "server"
+      - "--rtr=[::]:3323"
+      - "--http=[::]:8323"
+      - "--refresh=120"
+    volumes:
+      - tals:/tals:ro
+      - pki:/pki:ro
+      - routinator-cache:/home/routinator/.rpki-cache
+    ports:
+      - "3323:3323"
+      - "8323:8323"
+    networks:
+      mgmt: { ipv4_address: 172.30.0.20 }
+    restart: unless-stopped
+
+  # FORT Validator: feeds observer2. Same job as Routinator, different
+  # implementation - that's the whole point of having both.
+  #
+  # --server.max-rtr-version=2 is mandatory here: ASPA is only carried by RTR
+  # version 2, and FORT defaults this to 0 (i.e. RTR version 1, ROAs only).
+  # The lab's internal CA is installed into the system trust store by the
+  # image's entrypoint, because FORT's --http.ca-path wants a hashed
+  # directory rather than a single file.
+  fort:
+    image: lab-aspa/fort
+    build: ./images/fort
+    container_name: lab-fort
+    hostname: fort
+    depends_on:
+      pki-init: { condition: service_completed_successfully }
+      tal-init: { condition: service_completed_successfully }
+    command:
+      - "fort"
+      - "--tal=/tals"
+      - "--local-repository=/var/lib/fort"
+      - "--mode=server"
+      - "--server.address=::"
+      - "--server.port=3323"
+      - "--server.max-rtr-version=2"
+      - "--server.interval.validation=120"
+      # what FORT tells observer2 to use as its RTR refresh timer. The default
+      # is 3600, which in a classroom means a new ASPA takes an hour to show up
+      # on observer2 while observer1 already changed.
+      - "--server.interval.refresh=120"
+      # and how long it waits before retrying a failed poll - the 600s default
+      # means observer2 sits disconnected for 10 minutes after "lab.sh refresh"
+      - "--server.interval.retry=60"
+      - "--rsync.enabled=false"
+    volumes:
+      - tals:/tals:ro
+      - pki:/pki:ro
+      - fort-cache:/var/lib/fort
+    ports:
+      - "3324:3323"
+    networks:
+      mgmt: { ipv4_address: 172.30.0.50 }
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- ROUTERS -
+  origin:
+    <<: *bird
+    container_name: lab-origin
+    hostname: origin
+    volumes:
+      - ./bird/origin.conf:/etc/bird.conf:ro
+      - ./bird:/etc/bird-lab:ro
+    networks:
+      l-org-a:   { ipv4_address: 10.200.1.10, ipv6_address: "fd00:1::10" }
+      l-org-b:   { ipv4_address: 10.200.2.10, ipv6_address: "fd00:2::10" }
+      l-peer-org: { ipv4_address: 10.200.9.20, ipv6_address: "fd00:9::20" }
+
+  provider-a:
+    <<: *bird
+    container_name: lab-provider-a
+    hostname: provider-a
+    volumes:
+      - ./bird/provider-a.conf:/etc/bird.conf:ro
+      - ./bird:/etc/bird-lab:ro
+    networks:
+      l-org-a:  { ipv4_address: 10.200.1.20, ipv6_address: "fd00:1::20" }
+      l-a-obs1: { ipv4_address: 10.200.3.10, ipv6_address: "fd00:3::10" }
+      l-peer-a: { ipv4_address: 10.200.10.20, ipv6_address: "fd00:10::20" }
+      l-a-obs2: { ipv4_address: 10.200.5.10, ipv6_address: "fd00:5::10" }
+
+  provider-b:
+    <<: *bird
+    container_name: lab-provider-b
+    hostname: provider-b
+    volumes:
+      - ./bird/provider-b.conf:/etc/bird.conf:ro
+      - ./bird:/etc/bird-lab:ro
+    networks:
+      l-org-b:  { ipv4_address: 10.200.2.20, ipv6_address: "fd00:2::20" }
+      l-b-obs1: { ipv4_address: 10.200.4.10, ipv6_address: "fd00:4::10" }
+      l-b-obs2: { ipv4_address: 10.200.6.10, ipv6_address: "fd00:6::10" }
+
+  # observer1: BIRD + Routinator
+  observer1:
+    <<: *bird
+    container_name: lab-observer1
+    hostname: observer1
+    depends_on: [routinator]
+    volumes:
+      # comes up with no validation; the other stages' files are reached
+      # through the directory mount below (./scripts/lab.sh switches to them)
+      - ./bird/observer1-none.conf:/etc/bird.conf:ro
+      - ./bird:/etc/bird-lab:ro
+    networks:
+      l-a-obs1:   { ipv4_address: 10.200.3.20, ipv6_address: "fd00:3::20" }
+      l-b-obs1:   { ipv4_address: 10.200.4.20, ipv6_address: "fd00:4::20" }
+      l-666-obs1: { ipv4_address: 10.200.7.20, ipv6_address: "fd00:7::20" }
+      mgmt:       { ipv4_address: 172.30.0.30 }
+
+  # observer2: OpenBGPD + FORT Validator
+  observer2:
+    image: lab-aspa/openbgpd
+    build: ./images/openbgpd
+    container_name: lab-observer2
+    hostname: observer2
+    cap_add: [NET_ADMIN, SYS_ADMIN]
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv4.ip_forward: 1
+      net.ipv6.conf.all.forwarding: 1
+    depends_on: [fort]
+    environment:
+      # deployment stage at first start: none | rov-mark | rov-drop |
+      # aspa-mark | aspa-drop (./scripts/lab.sh switches it at runtime)
+      STAGE: "none"
+    volumes:
+      - ./openbgpd:/etc/openbgpd-lab:ro
+    networks:
+      l-a-obs2:   { ipv4_address: 10.200.5.20, ipv6_address: "fd00:5::20" }
+      l-b-obs2:   { ipv4_address: 10.200.6.20, ipv6_address: "fd00:6::20" }
+      l-666-obs2: { ipv4_address: 10.200.8.20, ipv6_address: "fd00:8::20" }
+      mgmt:       { ipv4_address: 172.30.0.35 }
+    restart: unless-stopped
+
+  # AS666: the "attacker" from the guide's route-hijack experiment. A customer
+  # of both observers - direct sessions with them, and nothing else.
+  # See bird/attacker-*.conf and ./scripts/lab.sh step1-clean /
+  # step2-hijack-simple / step4-hijack-posrov.
+  attacker:
+    <<: *bird
+    container_name: lab-attacker
+    hostname: attacker
+    volumes:
+      - ./bird/attacker-off.conf:/etc/bird.conf:ro
+      - ./bird/attacker-simple.conf:/etc/bird-simple.conf:ro
+      - ./bird/attacker-posrov.conf:/etc/bird-posrov.conf:ro
+      - ./bird:/etc/bird-lab:ro
+    networks:
+      l-666-obs1: { ipv4_address: 10.200.7.10, ipv6_address: "fd00:7::10" }
+      l-666-obs2: { ipv4_address: 10.200.8.10, ipv6_address: "fd00:8::10" }
+
+  # peer (AS64999): a legitimate peer of the origin (private peering, not
+  # transit) that also has its own transit from Provider A. See the guide's
+  # route-leak experiment and ./scripts/lab.sh step7-leak-on / step9-leak-off.
+  peer:
+    <<: *bird
+    container_name: lab-peer
+    hostname: peer
+    volumes:
+      - ./bird/peer-off.conf:/etc/bird.conf:ro
+      - ./bird/peer-leak.conf:/etc/bird-leak.conf:ro
+      - ./bird:/etc/bird-lab:ro
+    networks:
+      l-peer-org: { ipv4_address: 10.200.9.10, ipv6_address: "fd00:9::10" }
+      l-peer-a:   { ipv4_address: 10.200.10.10, ipv6_address: "fd00:10::10" }
+
+  # ----------------------------------------------------------------- PANEL --
+  # Browser terminal. Each panel node opens this ttyd instance with ?arg=<node>.
+  console:
+    image: lab-aspa/console
+    build: ./images/console
+    container_name: lab-console
+    # disableLeaveAlert: without it, the browser asks "changes may not be
+    #   saved" every time the terminal is closed.
+    # disableReconnect: when the shell exits, don't keep trying to reconnect.
+    command: ["ttyd", "-6", "-W", "-a", "-p", "7681",
+              "-t", "fontSize=15",
+              "-t", "disableLeaveAlert=true",
+              "-t", "disableReconnect=true",
+              "-t", "theme={\"background\":\"#070b16\"}",
+              "/usr/local/bin/menu.sh"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/lab:ro
+    ports:
+      - "7681:7681"
+    networks: [mgmt]
+    restart: unless-stopped
+
+  # Collects the lab's state (BGP sessions, RTR, routes and verdicts) into a
+  # JSON file that the panel reads every few seconds.
+  status:
+    image: lab-aspa/console
+    build: ./images/console
+    container_name: lab-status
+    command: ["python3", "/usr/local/bin/status.py"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # the directory, not the file: editors save by creating a new file,
+      # which would break a single-file bind mount
+      - ./:/lab:ro
+      - status:/srv/status
+    networks: [mgmt]
+    restart: unless-stopped
+
+  web:
+    image: nginx:1.29-alpine
+    container_name: lab-web
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+      - ./guide:/srv/guide:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - status:/srv/status:ro
+    ports:
+      - "8080:80"
+    networks: [mgmt]
+    restart: unless-stopped
+
+volumes:
+  krill-data-local:
+  krill-data-beta:
+  rir-data:
+  pki:
+  routinator-cache:
+  fort-cache:
+  tals:
+  status:
+
+networks:
+  mgmt:
+    name: lab-mgmt
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+        - subnet: "fd00:30::/64"
+  l-org-a:
+    name: lab-l-org-a
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.1.0/24
+        - subnet: "fd00:1::/64"
+  l-org-b:
+    name: lab-l-org-b
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.2.0/24
+        - subnet: "fd00:2::/64"
+  l-a-obs1:
+    name: lab-l-a-obs1
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.3.0/24
+        - subnet: "fd00:3::/64"
+  l-b-obs1:
+    name: lab-l-b-obs1
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.4.0/24
+        - subnet: "fd00:4::/64"
+  l-a-obs2:
+    name: lab-l-a-obs2
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.5.0/24
+        - subnet: "fd00:5::/64"
+  l-b-obs2:
+    name: lab-l-b-obs2
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.6.0/24
+        - subnet: "fd00:6::/64"
+  l-666-obs1:
+    name: lab-l-666-obs1
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.7.0/24
+        - subnet: "fd00:7::/64"
+  l-666-obs2:
+    name: lab-l-666-obs2
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.8.0/24
+        - subnet: "fd00:8::/64"
+  l-peer-org:
+    name: lab-l-peer-org
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.9.0/24
+        - subnet: "fd00:9::/64"
+  l-peer-a:
+    name: lab-l-peer-a
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.10.0/24
+        - subnet: "fd00:10::/64"
