@@ -198,23 +198,47 @@ def clean_error(output, language=DEFAULT_LANGUAGE):
 # Holder's state at the registry
 # ---------------------------------------------------------------------------
 def children():
-    """Lists the registered child CAs, with the latest Up-Down exchange."""
-    ok, output = krillc("children", "connections", "--ca", RIR_CA)
+    """Lists the registered child CAs, with the latest Up-Down exchange
+    where one exists.
+
+    The registered handles come from the parent's own resource-class
+    listing ("show"), available the instant "children add" succeeds -
+    NOT from "children connections", which only lists a child once it has
+    actually connected back using the parent response. That connection is
+    a separate, later step (the student pastes the parent response into
+    their own CA's "Add parent"), so relying on it alone made the panel
+    report "no delegation yet" - and the response the student just needed
+    to copy would vanish along with it - for as long as that step hadn't
+    happened yet.
+    """
+    ok, show_out = krillc("-f", "json", "show", "--ca", RIR_CA)
     if not ok:
         return []
-    lines = [l for l in output.splitlines() if l.strip()]
-    result = []
-    for line in lines[1:]:                        # first line is the header
-        parts = line.split(",")
-        if len(parts) >= 5:
-            result.append({
-                "handle": parts[0],
-                "agent": parts[1],
-                "last_exchange": parts[2],
-                "result": parts[3],
-                "state": parts[4],
-            })
-    return result
+    try:
+        handles = json.loads(show_out).get("children", [])
+    except (json.JSONDecodeError, AttributeError):
+        return []
+    if not handles:
+        return []
+
+    exchanges = {}
+    ok2, conn_out = krillc("children", "connections", "--ca", RIR_CA)
+    if ok2:
+        for line in conn_out.splitlines()[1:]:     # first line is the header
+            parts = line.split(",")
+            if len(parts) >= 5:
+                exchanges[parts[0]] = {
+                    "agent": parts[1], "last_exchange": parts[2],
+                    "result": parts[3], "state": parts[4],
+                }
+
+    return [{
+        "handle": handle,
+        "agent": exchanges.get(handle, {}).get("agent", ""),
+        "last_exchange": exchanges.get(handle, {}).get("last_exchange", ""),
+        "result": exchanges.get(handle, {}).get("result", ""),
+        "state": exchanges.get(handle, {}).get("state", ""),
+    } for handle in handles]
 
 
 def publishers():
