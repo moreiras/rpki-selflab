@@ -177,8 +177,13 @@ the observers are in.
 ## The story's commands
 
 `./scripts/lab.sh` switches AS666 and the peer between behaviors; the names
-carry the number of the guide's step they belong to. All of them are safe to
-repeat.
+carry the number of the guide's step they belong to. Each one sets its
+step's *entire* state - attacker, peer, ROAs, ASPA object, and the
+observers' deployment stage - not just what changed since the step before
+it, so they're safe to run in any order, from anywhere in the story. From
+`step3-rov-mark` on, each command also checks that the Preparation (the
+Krill CA, its parent, and its resources) actually finished before touching
+anything, and says what's missing if it didn't.
 
 | Command | What it does |
 |---|---|
@@ -187,6 +192,7 @@ repeat.
 | `step3-rov-mark` | deploy ROV on both observers, only marking |
 | `step4-hijack-posrov` | AS666 forges the path so it ends in the real origin |
 | `step5-aspa-mark` | deploy ASPA verification too, also only marking |
+| `step6-add-provider-b` | add Provider B to the ASPA object |
 | `step7-leak-on` | peer starts leaking the origin's routes to Provider A |
 | `step8-drop` | ROV and ASPA both start dropping invalid routes (what real routers do) |
 | `step9-leak-off` | peer stops leaking |

@@ -270,15 +270,24 @@ def openbgpd_routes(family, stage=None):
 
 
 def fort_summary():
-    """What observer2 actually received from FORT over RTR."""
-    out = {"up": running("lab-fort"), "roas": None, "aspas": None}
-    data = bgpctl_json("show sets")
-    for s in (data or {}).get("sets", []) or []:
-        kind = str(s.get("type", "")).upper()
-        if kind == "ROA":
-            out["roas"] = (s.get("num_IPv4", 0) or 0) + (s.get("num_IPv6", 0) or 0)
-        elif kind == "ASPA":
-            out["aspas"] = s.get("num_ASnum", 0)
+    """FORT's own validated set, read directly from the files it rewrites
+    after every validation cycle (--output.roa/--output.aspa in
+    docker-compose.yml) - not what observer2 happens to have over RTR, which
+    depends on the deployment stage and can lag or be empty on its own."""
+    out = {"up": running("lab-fort"), "roas": None, "aspas": None, "aspa_list": []}
+    raw = sh(["docker", "exec", "lab-fort", "cat", "/var/lib/fort/vrps.json"])
+    try:
+        out["roas"] = len(json.loads(raw).get("roas", []))
+    except Exception:                                         # noqa: BLE001
+        pass
+    raw = sh(["docker", "exec", "lab-fort", "cat", "/var/lib/fort/aspas.json"])
+    try:
+        aspas = json.loads(raw).get("aspa", {}) or {}
+        # FORT's aspa output keys the object by customer ASN
+        out["aspa_list"] = [{"customer": k, "providers": v} for k, v in aspas.items()]
+        out["aspas"] = len(out["aspa_list"])
+    except Exception:                                         # noqa: BLE001
+        pass
     return out
 
 

@@ -203,6 +203,13 @@ services:
       # means observer2 sits disconnected for 10 minutes after "lab.sh refresh"
       - "--server.interval.retry=60"
       - "--rsync.enabled=false"
+      # FORT has no HTTP API of its own, but --output.* is honored in server
+      # mode too: it rewrites these files after every validation cycle, so
+      # the panel can read FORT's own validated set directly (status.py),
+      # the same way it reads Routinator's over HTTP.
+      - "--output.format=json"
+      - "--output.roa=/var/lib/fort/vrps.json"
+      - "--output.aspa=/var/lib/fort/aspas.json"
     volumes:
       - tals:/tals:ro
       - pki:/pki:ro

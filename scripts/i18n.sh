@@ -71,9 +71,13 @@ msg() {
       es:step4_hijack_posrov_ok)  echo "paso 4: AS666 anuncia con un camino falsificado (AS_PATH: 666 <origen>)." ;;
       en:step4_hijack_posrov_ok)  echo "step 4: AS666 is announcing with a forged path (AS_PATH: 666 <origin>)." ;;
 
-      pt:step5_aspa_mark_ok)      echo "passo 5: os dois observadores agora também verificam ASPA, só MARCANDO o que ela acusa (o ROV continua só marcando)." ;;
-      es:step5_aspa_mark_ok)      echo "paso 5: los dos observers ahora también verifican ASPA, solo MARCANDO lo que esta señala (ROV sigue solo marcando)." ;;
-      en:step5_aspa_mark_ok)      echo "step 5: both observers now also verify ASPA, only MARKING what it flags (ROV keeps only marking too)." ;;
+      pt:step5_aspa_mark_ok)      echo "passo 5: os dois observadores agora também verificam ASPA, só MARCANDO o que ela acusa (o ROV continua só marcando). ASPA lista só o Provedor A." ;;
+      es:step5_aspa_mark_ok)      echo "paso 5: los dos observers ahora también verifican ASPA, solo MARCANDO lo que esta señala (ROV sigue solo marcando). ASPA lista solo al Proveedor A." ;;
+      en:step5_aspa_mark_ok)      echo "step 5: both observers now also verify ASPA, only MARKING what it flags (ROV keeps only marking too). ASPA lists Provider A only." ;;
+
+      pt:step6_add_provider_b_ok) echo "passo 6: o objeto ASPA agora lista os Provedores A e B." ;;
+      es:step6_add_provider_b_ok) echo "paso 6: el objeto ASPA ahora lista a los Proveedores A y B." ;;
+      en:step6_add_provider_b_ok) echo "step 6: the ASPA object now lists Providers A and B." ;;
 
       pt:step7_leak_on_ok)        echo "passo 7: o peer agora vaza os prefixos da origem para o Provedor A." ;;
       es:step7_leak_on_ok)        echo "paso 7: el peer ahora filtra los prefijos del origen hacia el Proveedor A." ;;
@@ -133,6 +137,19 @@ msg() {
       es:vars_generated)   echo "bird/vars.conf y openbgpd/vars.conf generados:" ;;
       en:vars_generated)   echo "bird/vars.conf and openbgpd/vars.conf generated:" ;;
 
+      # -- scripts/lab.sh: krill_ca() sanity check (step3-rov-mark on) -------
+      pt:krill_no_ca)      echo "nenhuma CA encontrada no Krill - termine a Preparação (criar a CA, obter o certificado do parent, local ou beta.registro.br) antes de rodar este comando." ;;
+      es:krill_no_ca)      echo "no se encontró ninguna CA en Krill - termine la Preparación (crear la CA, obtener el certificado del parent, local o beta.registro.br) antes de ejecutar este comando." ;;
+      en:krill_no_ca)      echo "no CA found in Krill yet - finish the Preparation (create the CA, get the certificate from the parent, local or beta.registro.br) before running this command." ;;
+
+      pt:krill_multiple_ca) echo "mais de uma CA encontrada no Krill - o laboratório espera exatamente uma" ;;
+      es:krill_multiple_ca) echo "se encontró más de una CA en Krill - el laboratorio espera exactamente una" ;;
+      en:krill_multiple_ca) echo "more than one CA found in Krill - the lab expects exactly one" ;;
+
+      pt:krill_not_ready)  echo "a CA ainda não está pronta: falta um parent ativo, os recursos (ASN e prefixos) do lab.conf, ou um repositório funcionando. Rode 'krillc show --ca <nome>' no terminal do Krill e confira se a Preparação terminou." ;;
+      es:krill_not_ready)  echo "la CA todavía no está lista: falta un parent activo, los recursos (ASN y prefijos) del lab.conf, o un repositorio funcionando. Ejecute 'krillc show --ca <nombre>' en la terminal de Krill y confirme que la Preparación terminó." ;;
+      en:krill_not_ready)  echo "the CA isn't ready yet: it's missing an active parent, the ASN/prefixes from lab.conf, or a working repository. Run 'krillc show --ca <name>' in the Krill terminal and check that Preparation finished." ;;
+
       *)
         # not translated yet: use the English text, and only if there's none
         # either, print the key itself
@@ -169,6 +186,7 @@ uso: ./scripts/lab.sh <comando>
   step3-rov-mark       ROV en los dos observers, solo MARCANDO los inválidos
   step4-hijack-posrov  AS666 falsifica el camino para que termine en el origen real
   step5-aspa-mark      ROV y ASPA, los dos solo MARCANDO
+  step6-add-provider-b agrega al Proveedor B al objeto ASPA
   step7-leak-on        peer empieza a filtrar las rutas del origen al Proveedor A
   step8-drop           ROV y ASPA pasan a DESCARTAR - lo que hace un router de verdad
   step9-leak-off       peer deja de filtrar
@@ -201,6 +219,7 @@ usage: ./scripts/lab.sh <command>
   step3-rov-mark       ROV on both observers, only MARKING invalid routes
   step4-hijack-posrov  AS666 forges the path so it ends in the real origin
   step5-aspa-mark      ROV and ASPA, both only MARKING
+  step6-add-provider-b adds Provider B to the ASPA object
   step7-leak-on        peer starts leaking the origin's routes to Provider A
   step8-drop           ROV and ASPA start DROPPING - what a real router does
   step9-leak-off       peer stops leaking
@@ -233,6 +252,7 @@ uso: ./scripts/lab.sh <comando>
   step3-rov-mark       ROV nos dois observadores, só MARCANDO os inválidos
   step4-hijack-posrov  AS666 forja o caminho para terminar na origem verdadeira
   step5-aspa-mark      ROV e ASPA, os dois só MARCANDO
+  step6-add-provider-b acrescenta o Provedor B ao objeto ASPA
   step7-leak-on        peer começa a vazar as rotas da origem para o Provedor A
   step8-drop           ROV e ASPA passam a DESCARTAR - o que um roteador de verdade faz
   step9-leak-off       peer para de vazar

@@ -602,7 +602,8 @@ const I18N = {
   "lab_cmd_step2-hijack-simple_desc": { pt: "AS666 anuncia os prefixos da origem como se fossem seus (AS_PATH: 666)", es: "AS666 anuncia los prefijos del origen como propios (AS_PATH: 666)", en: "AS666 announces the origin's prefixes as its own (AS_PATH: 666)" },
   "lab_cmd_step3-rov-mark_desc":      { pt: "implanta o ROV nos dois observadores, em modo de marcação: rotas inválidas ganham uma community e uma preferência menor", es: "implanta ROV en los dos observers, en modo de marcado: las rutas inválidas reciben una community y una preferencia menor", en: "deploys ROV on both observers, in marking mode: invalid routes get a community and a lower preference" },
   "lab_cmd_step4-hijack-posrov_desc": { pt: "AS666 forja o AS_PATH para terminar na origem verdadeira (AS_PATH: 666 64500)", es: "AS666 falsifica el AS_PATH para terminar en el origen verdadero (AS_PATH: 666 64500)", en: "AS666 forges the AS_PATH so it ends in the real origin (AS_PATH: 666 64500)" },
-  "lab_cmd_step5-aspa-mark_desc":     { pt: "implanta a verificação ASPA nos dois observadores, também em modo de marcação (o ROV continua só marcando)", es: "implanta la verificación ASPA en los dos observers, también en modo de marcado (ROV sigue solo marcando)", en: "deploys ASPA verification on both observers, also in marking mode (ROV keeps only marking too)" },
+  "lab_cmd_step5-aspa-mark_desc":     { pt: "implanta a verificação ASPA nos dois observadores, também em modo de marcação (o ROV continua só marcando); ASPA lista só o Provedor A", es: "implanta la verificación ASPA en los dos observers, también en modo de marcado (ROV sigue solo marcando); ASPA lista solo al Proveedor A", en: "deploys ASPA verification on both observers, also in marking mode (ROV keeps only marking too); ASPA lists Provider A only" },
+  "lab_cmd_step6-add-provider-b_desc": { pt: "acrescenta o Provedor B ao objeto ASPA", es: "agrega al Proveedor B al objeto ASPA", en: "adds Provider B to the ASPA object" },
   "lab_cmd_step7-leak-on_desc":       { pt: "o peer começa a vazar as rotas da origem para o Provedor A", es: "el peer empieza a filtrar las rutas del origen hacia el Proveedor A", en: "peer starts leaking the origin's routes to Provider A" },
   "lab_cmd_step8-drop_desc":          { pt: "ROV e ASPA passam a descartar as rotas inválidas (o que roteadores de verdade fazem)", es: "ROV y ASPA pasan a descartar las rutas inválidas (lo que hacen los routers de verdad)", en: "ROV and ASPA both start dropping invalid routes (what real routers do)" },
   "lab_cmd_step9-leak-off_desc":      { pt: "o peer para de vazar", es: "el peer deja de filtrar", en: "peer stops leaking" },
@@ -693,7 +694,7 @@ const NODES = {
         "Flags": "--server.max-rtr-version=2 --rsync.enabled=false",
       },
       term: [["Terminal", "fort"]],
-      hint: "fort --version\nfort --tal=/tals --mode=print",
+      hint: "cat /var/lib/fort/vrps.json\ncat /var/lib/fort/aspas.json",
     },
     attacker: {
       name: "attacker — AS666",
@@ -811,7 +812,7 @@ const NODES = {
         "Flags": "--server.max-rtr-version=2 --rsync.enabled=false",
       },
       term: [["Terminal", "fort"]],
-      hint: "fort --version\nfort --tal=/tals --mode=print",
+      hint: "cat /var/lib/fort/vrps.json\ncat /var/lib/fort/aspas.json",
     },
     attacker: {
       name: "attacker — AS666",
@@ -929,7 +930,7 @@ const NODES = {
         "Flags": "--server.max-rtr-version=2 --rsync.enabled=false",
       },
       term: [["Terminal", "fort"]],
-      hint: "fort --version\nfort --tal=/tals --mode=print",
+      hint: "cat /var/lib/fort/vrps.json\ncat /var/lib/fort/aspas.json",
     },
     attacker: {
       name: "attacker — AS666",
@@ -1086,7 +1087,7 @@ function registryNode(g) {
 
 const LAB_COMMANDS = ["refresh", "status", "logs",
                       "step1-clean", "step2-hijack-simple", "step3-rov-mark",
-                      "step4-hijack-posrov", "step5-aspa-mark",
+                      "step4-hijack-posrov", "step5-aspa-mark", "step6-add-provider-b",
                       "step7-leak-on", "step8-drop", "step9-leak-off", "step9-hijack-off"];
 
 function renderLabCommandsPanel() {
@@ -1158,7 +1159,11 @@ function renderPanel(id) {
   if (id === "fort" && state.fort) {
     h += `<div class="section"><h3>${t("validated_set")}</h3><dl class="info">` +
          `<dt>VRPs</dt><dd>${state.fort.roas ?? "—"}</dd>` +
-         `<dt>ASPAs</dt><dd>${state.fort.aspas ?? "—"}</dd></dl></div>`;
+         `<dt>ASPAs</dt><dd>${state.fort.aspas ?? "—"}</dd></dl>`;
+    if ((state.fort.aspa_list || []).length) {
+      h += `<pre>${esc(JSON.stringify(state.fort.aspa_list, null, 1))}</pre>`;
+    }
+    h += `</div>`;
   }
   if (n.hint) h += `<div class="section"><h3>${t("useful_commands")}</h3><pre>${esc(n.hint)}</pre></div>`;
 
@@ -1225,7 +1230,6 @@ function paint(state) {
   const r = state.routinator || {};
   pill("routinator", r.vrps === null || r.vrps === undefined ? "—" : `${r.vrps} VRP · ${r.aspas ?? 0} ASPA`,
        r.vrps ? "ok" : "warn");
-  // FORT has no HTTP API, so what we show is what observer2 actually got over RTR
   const f = state.fort || {};
   pill("fort", !f.up ? t("pill_stopped")
                : (f.roas === null || f.roas === undefined ? "—" : `${f.roas} VRP · ${f.aspas ?? 0} ASPA`),

@@ -181,8 +181,13 @@ encabezado del panel muestra la etapa en que están los observadores.
 ## Los comandos de la historia
 
 `./scripts/lab.sh` cambia el comportamiento de AS666 y del peer; los nombres
-llevan el número del paso de la guía al que pertenecen. Todos se pueden repetir
-sin riesgo.
+llevan el número del paso de la guía al que pertenecen. Cada uno fija el
+estado *completo* de su paso - atacante, peer, ROAs, objeto ASPA y la etapa
+de los observadores - no solo lo que cambió desde el paso anterior, así que
+son seguros de ejecutar en cualquier orden, desde cualquier punto de la
+historia. Desde `step3-rov-mark` en adelante, cada comando también revisa
+que la Preparación (la CA de Krill, su parent, sus recursos) realmente haya
+terminado antes de tocar nada, y avisa qué falta si no terminó.
 
 | Comando | Qué hace |
 |---|---|
@@ -191,6 +196,7 @@ sin riesgo.
 | `step3-rov-mark` | despliega ROV en los dos observadores, solo marcando |
 | `step4-hijack-posrov` | AS666 falsifica el camino para que termine en el origen real |
 | `step5-aspa-mark` | despliega también la verificación ASPA, también solo marcando |
+| `step6-add-provider-b` | agrega al Proveedor B al objeto ASPA |
 | `step7-leak-on` | peer empieza a filtrar las rutas del origen hacia el Proveedor A |
 | `step8-drop` | ROV y ASPA empiezan a descartar las rutas inválidas (lo que hacen los routers de verdad) |
 | `step9-leak-off` | peer deja de filtrar |

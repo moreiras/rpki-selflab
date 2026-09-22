@@ -60,8 +60,8 @@ case "$node" in
       cd /lab || exec bash
       banner "$(t_console)  —  ./scripts/lab.sh" "$(t_lab_hint)"
       echo "   $(t_story)step1-clean | step2-hijack-simple | step3-rov-mark"
-      echo "                  step4-hijack-posrov | step5-aspa-mark | step7-leak-on"
-      echo "                  step8-drop | step9-leak-off | step9-hijack-off"
+      echo "                  step4-hijack-posrov | step5-aspa-mark | step6-add-provider-b"
+      echo "                  step7-leak-on | step8-drop | step9-leak-off | step9-hijack-off"
       echo
       t_lab_reset_warning
       echo

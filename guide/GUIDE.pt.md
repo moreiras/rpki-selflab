@@ -144,10 +144,17 @@ de verdade.
 Todo passo começa com uma caixa de **Estado**: em qual estágio de implantação
 os observadores estão, o que o AS666 e o peer estão fazendo, e quais objetos RPKI
 deveriam existir. Se o seu laboratório não bate, a caixa também diz como
-colocá-lo de volta - todo comando dela é seguro de repetir, então você sempre
-pode voltar aos trilhos sem começar do zero.
+colocá-lo de volta.
 
-Três coisas mudam ao longo da história:
+Essa recuperação é deliberadamente simples: **cada comando
+`./scripts/lab.sh stepN-*` define o estado *inteiro* do seu passo**, não só o
+que mudou desde o anterior. Rode `step9-leak-off`, depois `step3-rov-mark`, e
+você cai exatamente onde o Passo 3 espera - o vazamento, o estágio de
+descarte, tudo o que o Passo 9 deixou para trás desaparece, redefinido pelo
+próprio `step3-rov-mark`. Isso vale para qualquer par de passos, em qualquer
+direção: os comandos não presumem que você está indo para a frente, e não
+deixam nada para o próximo tropeçar. Três coisas se movem juntas toda vez que
+um comando `stepN-*` roda:
 
 - **O estágio de implantação dos observadores.** Eles começam sem nenhuma
   validação, e a história os leva por quatro estágios: as duas verificações
@@ -172,12 +179,25 @@ Três coisas mudam ao longo da história:
   mesmo. O observer2 reinicia toda vez que o estágio muda (o OpenBGPD negocia
   seus papéis da RFC 9234 e a sua versão do RTR quando uma sessão abre), então dê a ele dez
   ou quinze segundos para se acomodar antes de concluir qualquer coisa do que ele mostra.
-- **O AS666 e o peer.** Seis comandos (`step1-clean`, `step2-hijack-simple`,
-  `step4-hijack-posrov`, `step7-leak-on`, `step9-leak-off`,
-  `step9-hijack-off`) os alternam entre comportamentos. (`step8-drop`
-  pertence ao estágio de implantação dos observadores, acima - nada muda para
-  o AS666 ou o peer quando você o roda.)
-- **Os objetos RPKI da origem**, no Krill: as ROAs e o objeto ASPA.
+- **O AS666 e o peer.** Todo comando `stepN-*` também define o estado
+  deles - silêncio, sequestro ingênuo, caminho forjado, vazamento - conforme
+  o texto do roteiro para aquele passo descreve, mesmo os comandos cujo nome
+  não os menciona (`step6-add-provider-b` e `step8-drop`, por exemplo,
+  continuam colocando o AS666 de volta na forma de caminho forjado, já
+  que é isso que esses passos esperam).
+- **Os objetos RPKI da origem**, no Krill: as ROAs (criadas uma vez, a partir
+  do `step3-rov-mark`) e o objeto ASPA, mantido exatamente na lista que cada
+  passo espera - `krillc aspas add` substitui o objeto inteiro, então um
+  comando pode fazê-lo crescer (Passo 6) ou encolher de volta (pulando para
+  o Passo 5 depois que o Passo 6 rodou) com a mesma facilidade.
+
+  Este também é o único lugar em que um comando `stepN-*` pode falhar por
+  motivo nenhum seu: a partir do `step3-rov-mark`, cada um começa conferindo
+  se a Preparação realmente terminou - a CA existe, tem um pai ativo, tem o
+  número de AS e os prefixos do `lab.conf`, e tem um repositório funcionando.
+  Se não tiver, o comando para e avisa, em vez de criar ROAs silenciosamente
+  que o Krill não consegue de fato publicar. A Preparação é a única parte da
+  história que um comando `stepN-*` não pode fazer por você.
 
 Os nomes de todos esses comandos carregam o número do passo a que pertencem.
 
@@ -719,9 +739,9 @@ mudança por RTR. Você acabou de ver cada salto.
 > **Estado:** estágio `rov-mark` · AS666 fazendo o sequestro ingênuo (marcado
 > inválido, perdendo) · peer em silêncio · ROAs para os dois prefixos · sem ASPA.
 >
-> **Se o seu for diferente:** `./scripts/lab.sh step3-rov-mark` e
-> `./scripts/lab.sh step2-hijack-simple`; confira as ROAs com `krillc roas
-> list` no terminal do Krill (deve haver exatamente duas).
+> **Se o seu for diferente:** `./scripts/lab.sh step4-hijack-posrov` - ele
+> também garante que as ROAs existem e coloca os observadores de volta em
+> `rov-mark`.
 
 O AS666 lê a mesma documentação que você. O ROV só olha o **último** AS
 do caminho - então e se o último AS fosse o certo?
@@ -1011,6 +1031,11 @@ de outro jeito.)
    Repare como o conserto não envolveu o AS666 em nada: o objeto ASPA
    descreve as *suas* relações, e tudo o que as contradiz perde.
 
+   (`./scripts/lab.sh step6-add-provider-b` faz exatamente esse conserto -
+   é o comando para pular direto para o estado deste passo mais tarde, de
+   qualquer ponto da história, sem digitar o comando `krillc` de novo à
+   mão.)
+
 3. O BIRD pegou a mudança sozinho, sem ninguém tocar no roteador,
    porque as suas sessões são configuradas com `import table on` e `rpki reload
    on`. Para forçar a revalidação à mão:
@@ -1036,10 +1061,9 @@ painel do que está sendo mantido de fora.
 > **Estado:** estágio `aspa-mark` · AS666 forjando o caminho (marcado, perdendo) · peer
 > em silêncio · ROAs para os dois prefixos · ASPA listando os Provedores A e B.
 >
-> **Se o seu for diferente:** `./scripts/lab.sh step5-aspa-mark`,
-> `./scripts/lab.sh step9-leak-off` (peer em silêncio), e no terminal do Krill
-> `krillc aspas add --aspa "AS64500 => AS64501, AS64502"` (isso substitui o
-> objeto exatamente por essa lista), depois `./scripts/lab.sh refresh`.
+> **Se o seu for diferente:** `./scripts/lab.sh step6-add-provider-b` - ele
+> monta tudo o que este passo precisa (ASPA listando os dois provedores, peer
+> em silêncio) sem o vazamento.
 
 Este não é ataque de ninguém. O peer - uma rede legítima - tem um link de
 peering privado com a origem, então ele *aprende* os prefixos da origem. Um link de peering
@@ -1134,8 +1158,8 @@ Passo 4: um salto não autorizado, esteja onde estiver no caminho.
 > **Estado:** estágio `aspa-mark` · AS666 forjando o caminho (marcado, perdendo) · o peer
 > vazando (marcado, perdendo) · ROAs para os dois prefixos · ASPA listando os Provedores A e B.
 >
-> **Se o seu for diferente:** `./scripts/lab.sh step5-aspa-mark` e
-> `./scripts/lab.sh step7-leak-on`.
+> **Se o seu for diferente:** `./scripts/lab.sh step7-leak-on` - ele monta
+> tudo o que este passo precisa, vazamento incluído.
 
 Toda rota inválida que você viu até agora ficou na tabela, rebaixada mas
 visível - de propósito, para você poder olhar exatamente o que cada
@@ -1583,7 +1607,8 @@ aparecer de propósito, tirando objetos:
 
 | Sintoma | O que conferir |
 |---|---|
-| O que eu vejo não bate com um passo | Leia a caixa de **Estado** do passo e rode os comandos que ela lista - todos são seguros de repetir. Os comandos `step*` que movem os observadores (`step1-clean`, `step3-rov-mark`, `step5-aspa-mark`, `step8-drop`) definem um estágio *inteiro* nos dois, seja qual for o estágio em que estavam; `step1-clean` também silencia o AS666 e o peer; `krillc aspas add` substitui o objeto ASPA inteiro exatamente pela lista que você der. |
+| O que eu vejo não bate com um passo | Leia a caixa de **Estado** do passo e rode o único comando que ela lista - todo comando `stepN-*` define o seu estado inteiro (atacante, peer, ROAs, ASPA, estágio dos observadores), não só o que mudou desde o passo anterior, então é seguro rodá-lo de qualquer ponto da história. |
+| Um comando `stepN-*` para com um erro de Krill/CA | A partir do `step3-rov-mark`, todo comando `stepN-*` confere se a Preparação realmente terminou antes de mexer em qualquer coisa - veja "Como a história está organizada". A mensagem diz o que falta (nenhuma CA, mais de uma, ou uma que ainda não está totalmente configurada); resolva isso no Krill e no painel, e rode o mesmo comando de novo. |
 | A rota do AS666 não aparece | Quando um observador está *descartando* o que uma verificação sinaliza (estágio `aspa-drop`, a partir do `step8-drop`), essa rota some da tabela de propósito: olhe em `birdc show route table master4 filtered` no observer1. Antes disso, `none` não tem vereditos e `rov-mark`/`aspa-mark` só rebaixam, então a rota ainda deveria estar lá. Caso contrário, confira se você rodou o comando do passo e se a sessão está no ar: `docker exec lab-attacker birdc show protocols`. |
 | Os dois observadores discordam, ou o selo de estágio está âmbar | O selo no cabeçalho do painel mostra o estágio que cada observador está realmente rodando; âmbar significa que diferem. Rode o comando de passo do estágio que você quer (ex.: `./scripts/lab.sh step8-drop`) para colocar os dois no mesmo. Logo depois de uma troca, o observer2 também precisa de dez ou quinze segundos para se acomodar (ele reinicia), então olhe de novo antes de concluir qualquer coisa. |
 | Criei a ROA/ASPA mas nada mudou | `./scripts/lab.sh refresh` força os dois validadores a revalidar. Se ainda não mudar, o `refresh` pode ter rodado antes de o Krill terminar de publicar: confira `krillc roas list` / `krillc aspas list`, espere alguns segundos, faça o refresh de novo. |

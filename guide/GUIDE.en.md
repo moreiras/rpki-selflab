@@ -141,11 +141,16 @@ Internet.
 
 Every step begins with a **State** box: which deployment stage the observers
 are in, what AS666 and the peer are doing, and which RPKI objects should
-exist. If your lab doesn't match, the box also says how to put it back - every
-command in it is safe to repeat, so you can always get back on track without
-starting over.
+exist. If your lab doesn't match, the box also says how to put it back.
 
-Three things change as the story goes on:
+That recovery is deliberately simple: **each `./scripts/lab.sh stepN-*`
+command sets its step's *entire* state**, not just what changed since the
+previous one. Run `step9-leak-off`, then `step3-rov-mark`, and you land
+exactly where Step 3 expects - the leak, the drop stage, everything Step 9
+left behind is gone, reset by `step3-rov-mark` itself. That holds for any
+pair of steps, in either direction: the commands don't assume you're going
+forward, and don't leave anything behind for the next one to trip over. Three
+things move together every time a `stepN-*` command runs:
 
 - **The observers' deployment stage.** They start with no validation at all,
   and the story walks them through four stages: both checks are marked
@@ -169,12 +174,24 @@ Three things change as the story goes on:
   same one. observer2 restarts every time the stage changes (OpenBGPD negotiates
   its RFC 9234 roles and its RTR version when a session opens), so give it ten
   or fifteen seconds to settle before you conclude anything from what it shows.
-- **AS666 and the peer.** Six commands (`step1-clean`, `step2-hijack-simple`,
-  `step4-hijack-posrov`, `step7-leak-on`, `step9-leak-off`,
-  `step9-hijack-off`) switch them between behaviors. (`step8-drop` belongs to
-  the observers' deployment stage, above - nothing changes for AS666 or the
-  peer when you run it.)
-- **The origin's RPKI objects**, in Krill: the ROAs, and the ASPA object.
+- **AS666 and the peer.** Every `stepN-*` command also sets their state -
+  silent, naive hijack, forged path, leaking - to whatever the guide's text
+  for that step describes, even the ones whose name doesn't mention them
+  (`step6-add-provider-b` and `step8-drop`, for instance, still put
+  AS666 back in its forged-path form, since that's what those steps expect).
+- **The origin's RPKI objects**, in Krill: the ROAs (created once, from
+  `step3-rov-mark` on) and the ASPA object, kept at exactly the list each
+  step expects - `krillc aspas add` replaces the whole object, so a command
+  can grow it (Step 6) or shrink it back (jumping to Step 5 after Step 6 ran)
+  just as easily.
+
+  This is also the one place a `stepN-*` command can fail through no fault of
+  its own: from `step3-rov-mark` on, each one starts by checking that
+  Preparation actually finished - the CA exists, has an active parent, holds
+  the AS number and prefixes from `lab.conf`, and has a working repository.
+  If it hasn't, the command stops and tells you so, instead of silently
+  creating ROAs Krill can't actually publish. Preparation is the one part of
+  the story a `stepN-*` command can't do for you.
 
 The names of all these commands carry the number of the step they belong to.
 
@@ -716,9 +733,8 @@ over RTR. You just watched every hop.
 > **State:** stage `rov-mark` · AS666 doing the naive hijack (marked invalid,
 > losing) · peer silent · ROAs for both prefixes · no ASPA.
 >
-> **If yours differs:** `./scripts/lab.sh step3-rov-mark` and
-> `./scripts/lab.sh step2-hijack-simple`; check the ROAs with `krillc roas
-> list` in the Krill terminal (there should be exactly two).
+> **If yours differs:** `./scripts/lab.sh step4-hijack-posrov` - it also makes
+> sure the ROAs exist and puts the observers back in `rov-mark`.
 
 AS666 reads the same documentation you did. ROV only looks at the **last** AS
 in the path - so what if the last AS were the right one?
@@ -1009,6 +1025,10 @@ which is the same thing said differently.)
    didn't involve AS666 at all: the ASPA object describes *your*
    relationships, and anything that contradicts them loses.
 
+   (`./scripts/lab.sh step6-add-provider-b` does exactly this fix - it's the
+   command to jump straight to this step's state later, from anywhere in the
+   story, without typing the `krillc` command by hand again.)
+
 3. BIRD picked up the change on its own, with nobody touching the router,
    because its sessions are set up with `import table on` and `rpki reload
    on`. To force revalidation by hand:
@@ -1034,10 +1054,9 @@ panel of what's being kept out.
 > **State:** stage `aspa-mark` · AS666 forging the path (marked, losing) · peer
 > silent · ROAs for both prefixes · ASPA listing Providers A and B.
 >
-> **If yours differs:** `./scripts/lab.sh step5-aspa-mark`,
-> `./scripts/lab.sh step9-leak-off` (peer silent), and in the Krill terminal
-> `krillc aspas add --aspa "AS64500 => AS64501, AS64502"` (this replaces the
-> object with exactly that list), then `./scripts/lab.sh refresh`.
+> **If yours differs:** `./scripts/lab.sh step6-add-provider-b` - it sets up
+> everything this step needs (ASPA listing both providers, peer silent)
+> without the leak.
 
 This one is nobody's attack. The peer - a legitimate network - has a private
 peering link with the origin, so it *learns* the origin's prefixes. A peering
@@ -1132,8 +1151,8 @@ forgery: an unauthorized hop, wherever in the path it happens to sit.
 > **State:** stage `aspa-mark` · AS666 forging the path (marked, losing) · the peer
 > leaking (marked, losing) · ROAs for both prefixes · ASPA listing Providers A and B.
 >
-> **If yours differs:** `./scripts/lab.sh step5-aspa-mark` and
-> `./scripts/lab.sh step7-leak-on`.
+> **If yours differs:** `./scripts/lab.sh step7-leak-on` - it sets up
+> everything this step needs, leak included.
 
 Every invalid route you've seen so far has stayed on the table, demoted but
 visible - deliberately, so you could look at exactly what each check decided
@@ -1578,7 +1597,8 @@ appear on purpose, by taking objects away:
 
 | Symptom | What to check |
 |---|---|
-| What I see doesn't match a step | Read the step's **State** box and run the commands it lists - they're all safe to repeat. The `step*` commands that move the observers (`step1-clean`, `step3-rov-mark`, `step5-aspa-mark`, `step8-drop`) set a *whole* stage on both of them, whatever stage they were in; `step1-clean` also silences AS666 and the peer; `krillc aspas add` replaces the whole ASPA object with exactly the list you give it. |
+| What I see doesn't match a step | Read the step's **State** box and run the single command it lists - every `stepN-*` command sets its whole state (attacker, peer, ROAs, ASPA, observers' stage), not just what changed since the step before it, so it's safe to run from anywhere in the story. |
+| A `stepN-*` command stops with a Krill/CA error | From `step3-rov-mark` on, every `stepN-*` command checks that Preparation actually finished before touching anything - see "How the story is organized". The message says what's missing (no CA, more than one, or one that isn't fully set up yet); fix that in Krill and the panel, then re-run the same command. |
 | AS666's route doesn't show up | Once an observer is *dropping* what a check flags (stage `aspa-drop`, from `step8-drop` on), that route is gone from the table on purpose: look under `birdc show route table master4 filtered` on observer1. Before that, `none` has no verdicts and `rov-mark`/`aspa-mark` only demote, so the route should still be there. Otherwise check that you ran the step's command and that the session is up: `docker exec lab-attacker birdc show protocols`. |
 | The two observers disagree, or the stage badge is amber | The badge in the panel's header shows the stage each observer is really running; amber means they differ. Run the step command of the stage you want (e.g. `./scripts/lab.sh step8-drop`) to put both in the same one. Right after a switch, observer2 also needs ten or fifteen seconds to settle (it restarts), so look again before concluding anything. |
 | I created the ROA/ASPA but nothing changed | `./scripts/lab.sh refresh` forces both validators to revalidate. If it still doesn't change, `refresh` may have run before Krill finished publishing: check `krillc roas list` / `krillc aspas list`, wait a few seconds, refresh again. |
