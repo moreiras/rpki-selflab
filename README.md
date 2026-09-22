@@ -167,7 +167,7 @@ config file per observer:
 | `none` | `observer1-none.conf` | `observer2-none.conf` | plain BGP, no validation (how the lab starts) |
 | `rov-mark` | `observer1-rov-mark.conf` | `observer2-rov-mark.conf` | RTR session + ROV, invalid routes only marked |
 | `rov-drop` | `observer1-rov-drop.conf` | `observer2-rov-drop.conf` | ROV Invalid routes rejected |
-| `aspa-mark` | `observer1-aspa-mark.conf` | `observer2-aspa-mark.conf` | ROV dropping + ASPA verification, only marked |
+| `aspa-mark` | `observer1-aspa-mark.conf` | `observer2-aspa-mark.conf` | ROV and ASPA verification, both only marked |
 | `aspa-drop` | `observer1-aspa-drop.conf` | `observer2-aspa-drop.conf` | ROV and ASPA Invalid both rejected |
 
 Reading one file after another is the point: what changes between two stages
@@ -185,11 +185,10 @@ repeat.
 | `step1-clean` | AS666 and peer silent, and both observers back to plain BGP (no validation) |
 | `step2-hijack-simple` | AS666 announces the origin's prefixes as its own |
 | `step3-rov-mark` | deploy ROV on both observers, only marking |
-| `step3-rov-drop` | ROV starts dropping invalid routes |
 | `step4-hijack-posrov` | AS666 forges the path so it ends in the real origin |
-| `step5-aspa-mark` | deploy ASPA verification (ROV keeps dropping), only marking |
-| `step5-aspa-drop` | ASPA verification starts dropping invalid paths |
+| `step5-aspa-mark` | deploy ASPA verification too, also only marking |
 | `step7-leak-on` | peer starts leaking the origin's routes to Provider A |
+| `step8-drop` | ROV and ASPA both start dropping invalid routes (what real routers do) |
 | `step9-leak-off` | peer stops leaking |
 | `step9-hijack-off` | AS666 goes silent |
 

@@ -8,7 +8,7 @@
 <title>RPKI SelfLab</title>
 <script>
   try { const th = localStorage.getItem("rpki-selflab-theme");
-        if (th === "light" || th === "dark") document.documentElement.dataset.theme = th; } catch (_) {}
+        document.documentElement.dataset.theme = (th === "dark") ? "dark" : "light"; } catch (_) {}
 </script>
 <style>
   :root {
@@ -577,11 +577,11 @@ const I18N = {
   stage_none:      { pt: "validação: nenhuma", es: "validación: ninguna", en: "validation: none" },
   stage_rov_mark:  { pt: "ROV: marcando", es: "ROV: marcando", en: "ROV: marking" },
   stage_rov_drop:  { pt: "ROV: descartando", es: "ROV: descartando", en: "ROV: dropping" },
-  stage_aspa_mark: { pt: "ROV: descartando · ASPA: marcando", es: "ROV: descartando · ASPA: marcando", en: "ROV: dropping · ASPA: marking" },
+  stage_aspa_mark: { pt: "ROV: marcando · ASPA: marcando", es: "ROV: marcando · ASPA: marcando", en: "ROV: marking · ASPA: marking" },
   stage_aspa_drop: { pt: "ROV + ASPA: descartando", es: "ROV + ASPA: descartando", en: "ROV + ASPA: dropping" },
   stage_mixed:     { pt: "observadores diferem: observer1 {a}, observer2 {b}", es: "los observers difieren: observer1 {a}, observer2 {b}", en: "observers differ: observer1 {a}, observer2 {b}" },
   stage_unknown:   { pt: "validação —", es: "validación —", en: "validation —" },
-  stage_tip: { pt: "O que os dois observadores estão fazendo com o RPKI agora. Marcando: as rotas inválidas ganham uma community e uma preferência menor, mas continuam na tabela. Descartando: são rejeitadas (o que roteadores de verdade fazem). Troque os dois com os comandos dos passos (./scripts/lab.sh step3-rov-mark, step3-rov-drop, step5-aspa-mark, step5-aspa-drop; step1-clean remove toda a validação).", es: "Lo que los dos observers están haciendo con RPKI ahora. Marcando: las rutas inválidas reciben una community y una preferencia menor, pero siguen en la tabla. Descartando: se rechazan (lo que hacen los routers de verdad). Cambie los dos con los comandos de los pasos (./scripts/lab.sh step3-rov-mark, step3-rov-drop, step5-aspa-mark, step5-aspa-drop; step1-clean quita toda la validación).", en: "What the two observers are doing with RPKI right now. Marking: invalid routes get a community and a lower preference but stay in the table. Dropping: they are rejected (what real routers do). Switch both with the step commands (./scripts/lab.sh step3-rov-mark, step3-rov-drop, step5-aspa-mark, step5-aspa-drop; step1-clean removes all validation)." },
+  stage_tip: { pt: "O que os dois observadores estão fazendo com o RPKI agora. Marcando: as rotas inválidas ganham uma community e uma preferência menor, mas continuam na tabela. Descartando: são rejeitadas (o que roteadores de verdade fazem). Troque os dois com os comandos dos passos (./scripts/lab.sh step3-rov-mark, step5-aspa-mark, step8-drop; step1-clean remove toda a validação).", es: "Lo que los dos observers están haciendo con RPKI ahora. Marcando: las rutas inválidas reciben una community y una preferencia menor, pero siguen en la tabla. Descartando: se rechazan (lo que hacen los routers de verdad). Cambie los dos con los comandos de los pasos (./scripts/lab.sh step3-rov-mark, step5-aspa-mark, step8-drop; step1-clean quita toda la validación).", en: "What the two observers are doing with RPKI right now. Marking: invalid routes get a community and a lower preference but stay in the table. Dropping: they are rejected (what real routers do). Switch both with the step commands (./scripts/lab.sh step3-rov-mark, step5-aspa-mark, step8-drop; step1-clean removes all validation)." },
 
   // lab-wide commands panel
   theme_to_light: { pt: "Tema claro", es: "Tema claro", en: "Light theme" },
@@ -601,11 +601,10 @@ const I18N = {
   "lab_cmd_step1-clean_desc":         { pt: "AS666 e peer calam, e os observadores voltam a BGP comum, sem validação nenhuma (o ponto de partida da história)", es: "AS666 y peer callan, y los observers vuelven a BGP común, sin validación alguna (el punto de partida de la historia)", en: "AS666 and peer go silent, and the observers go back to plain BGP with no validation at all (the story's baseline)" },
   "lab_cmd_step2-hijack-simple_desc": { pt: "AS666 anuncia os prefixos da origem como se fossem seus (AS_PATH: 666)", es: "AS666 anuncia los prefijos del origen como propios (AS_PATH: 666)", en: "AS666 announces the origin's prefixes as its own (AS_PATH: 666)" },
   "lab_cmd_step3-rov-mark_desc":      { pt: "implanta o ROV nos dois observadores, em modo de marcação: rotas inválidas ganham uma community e uma preferência menor", es: "implanta ROV en los dos observers, en modo de marcado: las rutas inválidas reciben una community y una preferencia menor", en: "deploys ROV on both observers, in marking mode: invalid routes get a community and a lower preference" },
-  "lab_cmd_step3-rov-drop_desc":      { pt: "o ROV passa a descartar as rotas inválidas (o que roteadores de verdade fazem)", es: "ROV pasa a descartar las rutas inválidas (lo que hacen los routers de verdad)", en: "ROV starts dropping invalid routes (what real routers do)" },
   "lab_cmd_step4-hijack-posrov_desc": { pt: "AS666 forja o AS_PATH para terminar na origem verdadeira (AS_PATH: 666 64500)", es: "AS666 falsifica el AS_PATH para terminar en el origen verdadero (AS_PATH: 666 64500)", en: "AS666 forges the AS_PATH so it ends in the real origin (AS_PATH: 666 64500)" },
-  "lab_cmd_step5-aspa-mark_desc":     { pt: "implanta a verificação ASPA nos dois observadores, em modo de marcação (o ROV continua descartando)", es: "implanta la verificación ASPA en los dos observers, en modo de marcado (ROV sigue descartando)", en: "deploys ASPA verification on both observers, in marking mode (ROV keeps dropping)" },
-  "lab_cmd_step5-aspa-drop_desc":     { pt: "a verificação ASPA passa a descartar também os caminhos inválidos", es: "la verificación ASPA pasa a descartar también los caminos inválidos", en: "ASPA verification starts dropping invalid paths too" },
+  "lab_cmd_step5-aspa-mark_desc":     { pt: "implanta a verificação ASPA nos dois observadores, também em modo de marcação (o ROV continua só marcando)", es: "implanta la verificación ASPA en los dos observers, también en modo de marcado (ROV sigue solo marcando)", en: "deploys ASPA verification on both observers, also in marking mode (ROV keeps only marking too)" },
   "lab_cmd_step7-leak-on_desc":       { pt: "o peer começa a vazar as rotas da origem para o Provedor A", es: "el peer empieza a filtrar las rutas del origen hacia el Proveedor A", en: "peer starts leaking the origin's routes to Provider A" },
+  "lab_cmd_step8-drop_desc":          { pt: "ROV e ASPA passam a descartar as rotas inválidas (o que roteadores de verdade fazem)", es: "ROV y ASPA pasan a descartar las rutas inválidas (lo que hacen los routers de verdad)", en: "ROV and ASPA both start dropping invalid routes (what real routers do)" },
   "lab_cmd_step9-leak-off_desc":      { pt: "o peer para de vazar", es: "el peer deja de filtrar", en: "peer stops leaking" },
   "lab_cmd_step9-hijack-off_desc":    { pt: "AS666 volta a ficar calado", es: "AS666 vuelve a quedar callado", en: "AS666 goes silent" },
   lab_cmds_open_terminal: { pt: "Abrir terminal", es: "Abrir terminal", en: "Open terminal" },
@@ -1086,9 +1085,9 @@ function registryNode(g) {
 }
 
 const LAB_COMMANDS = ["refresh", "status", "logs",
-                      "step1-clean", "step2-hijack-simple", "step3-rov-mark", "step3-rov-drop",
-                      "step4-hijack-posrov", "step5-aspa-mark", "step5-aspa-drop",
-                      "step7-leak-on", "step9-leak-off", "step9-hijack-off"];
+                      "step1-clean", "step2-hijack-simple", "step3-rov-mark",
+                      "step4-hijack-posrov", "step5-aspa-mark",
+                      "step7-leak-on", "step8-drop", "step9-leak-off", "step9-hijack-off"];
 
 function renderLabCommandsPanel() {
   selected = "lab";
@@ -1613,7 +1612,7 @@ function onLanguageChange() {
 }
 
 function currentTheme() {
-  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 function paintThemeButton() {
   const b = document.getElementById("btn-theme");

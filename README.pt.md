@@ -169,7 +169,7 @@ arquivo de configuração completo por observador:
 | `none` | `observer1-none.conf` | `observer2-none.conf` | BGP comum, sem validação (como o laboratório começa) |
 | `rov-mark` | `observer1-rov-mark.conf` | `observer2-rov-mark.conf` | sessão RTR + ROV, rotas inválidas apenas marcadas |
 | `rov-drop` | `observer1-rov-drop.conf` | `observer2-rov-drop.conf` | rotas ROV Invalid rejeitadas |
-| `aspa-mark` | `observer1-aspa-mark.conf` | `observer2-aspa-mark.conf` | descarte por ROV + verificação ASPA, apenas marcação |
+| `aspa-mark` | `observer1-aspa-mark.conf` | `observer2-aspa-mark.conf` | ROV e verificação ASPA, os dois apenas marcando |
 | `aspa-drop` | `observer1-aspa-drop.conf` | `observer2-aspa-drop.conf` | ROV e ASPA Invalid ambos rejeitados |
 
 Ler um arquivo depois do outro é o ponto: o que muda entre dois estágios é o
@@ -187,11 +187,10 @@ segurança.
 | `step1-clean` | AS666 e peer em silêncio, e os dois observadores de volta ao BGP comum (sem validação) |
 | `step2-hijack-simple` | o AS666 anuncia os prefixos da origem como seus |
 | `step3-rov-mark` | implanta o ROV nos dois observadores, apenas marcando |
-| `step3-rov-drop` | o ROV passa a descartar rotas inválidas |
 | `step4-hijack-posrov` | o AS666 forja o caminho para que termine na origem verdadeira |
-| `step5-aspa-mark` | implanta a verificação ASPA (o ROV continua descartando), apenas marcando |
-| `step5-aspa-drop` | a verificação ASPA passa a descartar caminhos inválidos |
+| `step5-aspa-mark` | implanta também a verificação ASPA, também apenas marcando |
 | `step7-leak-on` | o peer começa a vazar as rotas da origem para o Provedor A |
+| `step8-drop` | ROV e ASPA passam a descartar as rotas inválidas (o que roteadores de verdade fazem) |
 | `step9-leak-off` | o peer para de vazar |
 | `step9-hijack-off` | o AS666 fica em silêncio |
 

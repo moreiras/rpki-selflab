@@ -130,21 +130,18 @@ case "${1:-help}" in
   step3-rov-mark)
       stage rov-mark
       echo "$(msg step3_rov_mark_ok)" ;;
-  step3-rov-drop)
-      stage rov-drop
-      echo "$(msg step3_rov_drop_ok)" ;;
   step4-hijack-posrov)
       docker exec lab-attacker birdc 'configure "/etc/bird-posrov.conf"'
       echo "$(msg step4_hijack_posrov_ok)" ;;
   step5-aspa-mark)
       stage aspa-mark
       echo "$(msg step5_aspa_mark_ok)" ;;
-  step5-aspa-drop)
-      stage aspa-drop
-      echo "$(msg step5_aspa_drop_ok)" ;;
   step7-leak-on)
       docker exec lab-peer birdc 'configure "/etc/bird-leak.conf"'
       echo "$(msg step7_leak_on_ok)" ;;
+  step8-drop)
+      stage aspa-drop
+      echo "$(msg step8_drop_ok)" ;;
   step9-leak-off)
       docker exec lab-peer birdc 'configure "/etc/bird.conf"'
       echo "$(msg step9_leak_off_ok)" ;;

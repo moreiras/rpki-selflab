@@ -148,16 +148,17 @@ starting over.
 Three things change as the story goes on:
 
 - **The observers' deployment stage.** They start with no validation at all,
-  and the story walks them through five stages. Each command sets a whole
-  stage on **both** observers at once, whatever stage they were in before:
+  and the story walks them through four stages: both checks are marked
+  before either one drops anything, and then both start dropping together,
+  in Step 8. Each command sets a whole stage on **both** observers at once,
+  whatever stage they were in before:
 
   | Stage | What the observers do | Command |
   |---|---|---|
   | `none` | plain BGP, no validation (how the lab starts) | `step1-clean` |
   | `rov-mark` | ROV deployed, invalid routes only *marked* | `step3-rov-mark` |
-  | `rov-drop` | ROV *dropping* invalid routes | `step3-rov-drop` |
-  | `aspa-mark` | ROV dropping, ASPA verification only *marking* | `step5-aspa-mark` |
-  | `aspa-drop` | ROV and ASPA both dropping | `step5-aspa-drop` |
+  | `aspa-mark` | ASPA verification joins in, also only *marking* | `step5-aspa-mark` |
+  | `aspa-drop` | both ROV and ASPA start *dropping* - production | `step8-drop` |
 
   Each stage is one complete config file per observer
   (`bird/observer1-<stage>.conf`, `openbgpd/observer2-<stage>.conf`), and the
@@ -170,7 +171,9 @@ Three things change as the story goes on:
   or fifteen seconds to settle before you conclude anything from what it shows.
 - **AS{{ATTACKER_ASN}} and the peer.** Six commands (`step1-clean`, `step2-hijack-simple`,
   `step4-hijack-posrov`, `step7-leak-on`, `step9-leak-off`,
-  `step9-hijack-off`) switch them between behaviors.
+  `step9-hijack-off`) switch them between behaviors. (`step8-drop` belongs to
+  the observers' deployment stage, above - nothing changes for AS{{ATTACKER_ASN}} or the
+  peer when you run it.)
 - **The origin's RPKI objects**, in Krill: the ROAs, and the ASPA object.
 
 The names of all these commands carry the number of the step they belong to.
@@ -507,7 +510,7 @@ is, and the one ROAs were invented for.
 
 ---
 
-## Step 3 — ROV enters: first it marks, then it drops
+## Step 3 — ROV enters, marking what looks wrong
 
 > **State:** stage `none` (about to change) · AS{{ATTACKER_ASN}} doing the naive hijack ·
 > peer silent · no ROAs yet (you'll create them here), no ASPA.
@@ -516,7 +519,7 @@ is, and the one ROAs were invented for.
 > `./scripts/lab.sh step2-hijack-simple`.
 
 This step has two halves, in this order: the **Origin publishes** ROAs, and
-the **Observers validate** them - first only marking, then dropping.
+the **Observers validate** them - only marking, for now.
 
 ### The Origin publishes: create the ROAs
 
@@ -565,7 +568,7 @@ Right now nothing has changed for the routers: the ROAs are published and
 validated, and **no router is listening to the validators.** Look at the
 observers again if you like - the hijack is still winning.
 
-### The Observers validate, stage 1: mark
+### The Observers validate
 
 1. Deploy ROV on both observers, in its safe first form:
 
@@ -675,6 +678,13 @@ observers again if you like - the hijack is still winning.
    legitimate got hurt. **That's the point of the marking stage** - you get to
    see what the check *would* do before you let it reject anything.
 
+   **This is where ROV stays for the rest of the story - marking, not
+   dropping.** A router that only marks still uses an invalid route whenever
+   it's the best one it has, so marking alone isn't the end of the job; it's
+   the rehearsal. You'll see what real, production dropping looks like - for
+   ROV and ASPA together, at once - in Step 8, once both checks have had
+   their turn to prove themselves this way.
+
 ### How to read the verdicts
 
 The two observers show them differently:
@@ -694,68 +704,19 @@ The two observers show them differently:
   So `V-!` is ROV Valid and ASPA Invalid. (No ASPA verification is
   deployed yet, so the second half is `?` for now.)
 
-### The Observers validate, stage 2: drop
-
-**This is what real routers do.** Marking was the rehearsal: you checked that
-the flags land where they should. A router that only marks invalid routes
-still uses them whenever they're the best it has - and an attacker's route is,
-sooner or later. In production, an invalid route is *rejected*.
-
-1. Switch both observers to dropping:
-
-   ```
-   #./scripts/lab.sh step3-rov-drop
-   ```
-
-2. Compare the stage you just left with this one - the change is one line of
-   policy in each router:
-
-   ```
-   #diff bird/observer1-rov-mark.conf bird/observer1-rov-drop.conf
-   #diff openbgpd/observer2-rov-mark.conf openbgpd/observer2-rov-drop.conf
-   ```
-
-   ```
-       if roa_check(roa4_table, net, bgp_path.last) = ROA_INVALID then
-           reject "ROV Invalid: ", net, " origin AS", bgp_path.last;   # observer1 (BIRD)
-   ```
-
-   ```
-   deny from any ovs invalid                               # observer2 (OpenBGPD)
-   ```
-
-3. Look again: the hijack has disappeared from the table. It isn't lost -
-   BIRD keeps what it rejected:
-
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 filtered {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 filtered {{ORIGIN_V4}}
-   ```
-
-   The badge now reads *ROV: dropping*. The hijack is defeated. AS{{ATTACKER_ASN}} keeps
-   announcing, and keeps failing - **and from here on, ROV keeps dropping
-   for the rest of the story.** A router that has learned to reject invalid
-   routes doesn't go back.
-
-**Along the way:**
-
-- **Marking versus dropping.** Same verdict, two policies. Marking is how you
-  roll a check out without breaking anything; dropping is what the check is
-  *for*.
-- **What "deploying ROV" is made of:** an RTR session, a test, an action.
-- **How new objects reach the routers.** Krill publishes, the validators
-  reread, the routers get the change over RTR. You just watched every hop.
+**Along the way:** what "deploying ROV" is made of - an RTR session, a test on
+every route, and an action on the result - and how new objects reach the
+routers: Krill publishes, the validators reread, the routers get the change
+over RTR. You just watched every hop.
 
 ---
 
 ## Step 4 — The forged path
 
-> **State:** stage `rov-drop` · AS{{ATTACKER_ASN}} doing the naive hijack (dropped) · peer
-> silent · ROAs for both prefixes · no ASPA.
+> **State:** stage `rov-mark` · AS{{ATTACKER_ASN}} doing the naive hijack (marked invalid,
+> losing) · peer silent · ROAs for both prefixes · no ASPA.
 >
-> **If yours differs:** `./scripts/lab.sh step3-rov-drop` and
+> **If yours differs:** `./scripts/lab.sh step3-rov-mark` and
 > `./scripts/lab.sh step2-hijack-simple`; check the ROAs with `krillc roas
 > list` in the Krill terminal (there should be exactly two).
 
@@ -789,8 +750,9 @@ in the path - so what if the last AS were the right one?
    filter, so the path is just `{{ATTACKER_ASN}}`), and check that neither file has a
    session with the origin: only the two observers.
 
-2. **Before you look:** the observers are dropping everything ROV flags as
-   invalid. Will this get dropped?
+2. **Before you look:** ROV is only marking right now, not dropping anything
+   - but the naive hijack still got flagged Invalid and lost the race. Will
+   this forged path get flagged the same way?
 
 3. Look:
 
@@ -808,11 +770,12 @@ in the path - so what if the last AS were the right one?
    *     V-? {{ORIGIN_V4}}          10.200.5.10       100     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   The forged route is **back**, and it's the selected one. ROV says `Valid`
-   - the path ends in {{ORIGIN_ASN}}, which is exactly what the ROA authorizes. The
-   attacker's links on the panel turn **amber** again. Three paths, all
-   "valid", one of them a lie, and *nothing you have deployed so far can tell
-   which*.
+   It isn't flagged. ROV says `Valid` - the path ends in {{ORIGIN_ASN}}, which is
+   exactly what the ROA authorizes - so it gets full `local_pref` (100) like
+   any legitimate route, and it's the selected one. The attacker's links on
+   the panel turn **amber**: no longer red, because ROV has nothing to flag.
+   Three paths, all "valid", one of them a lie, and *nothing you have
+   deployed so far can tell which*.
 
    > The forged path (`{{ATTACKER_ASN}} {{ORIGIN_ASN}}`, 2 hops) ties with Provider B's (`{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}`, also 2),
    > and the attacker wins the tie by a tie-breaker (its router ID happens to
@@ -826,17 +789,17 @@ It only ever looks at the last AS.
 
 ---
 
-## Step 5 — ASPA enters: first it marks, then it drops
+## Step 5 — ASPA enters, also marking first
 
-> **State:** stage `rov-drop` · AS{{ATTACKER_ASN}} forging the path · peer silent · ROAs for
+> **State:** stage `rov-mark` · AS{{ATTACKER_ASN}} forging the path · peer silent · ROAs for
 > both prefixes · no ASPA yet (you'll create it here).
 >
-> **If yours differs:** `./scripts/lab.sh step3-rov-drop` and
+> **If yours differs:** `./scripts/lab.sh step3-rov-mark` and
 > `./scripts/lab.sh step4-hijack-posrov`; if an ASPA object already exists,
 > `krillc aspas remove --customer AS{{ORIGIN_ASN}}` in the Krill terminal.
 
 Same shape as Step 3: the **Origin publishes** an ASPA object, then the
-**Observers validate** it - first marking, then dropping.
+**Observers validate** it - in the same safe, marking-only form ROV used.
 
 ### The Origin publishes: create the ASPA object
 
@@ -884,19 +847,19 @@ command line (the UI is on its way in the next release).
 As with ROAs, nothing changes for the routers yet: the object is published,
 and no router is verifying paths.
 
-### The Observers validate, stage 1: mark
+### The Observers validate
 
-1. Deploy ASPA verification on both observers - ROV keeps dropping:
+1. Deploy ASPA verification on both observers - ROV keeps only marking:
 
    ```
    #./scripts/lab.sh step5-aspa-mark
    ```
 
-2. **Compare with the stage you just left** (`rov-drop`):
+2. **Compare with the stage you just left** (`rov-mark`):
 
    ```
-   #diff bird/observer1-rov-drop.conf bird/observer1-aspa-mark.conf
-   #diff openbgpd/observer2-rov-drop.conf openbgpd/observer2-aspa-mark.conf
+   #diff bird/observer1-rov-mark.conf bird/observer1-aspa-mark.conf
+   #diff openbgpd/observer2-rov-mark.conf openbgpd/observer2-aspa-mark.conf
    ```
 
    The same three ideas, this time for paths:
@@ -977,56 +940,44 @@ and no router is verifying paths.
    The forged path is now **ASPA Invalid** - the hop `{{ORIGIN_ASN}} → {{ATTACKER_ASN}}` isn't
    authorized, since only {{PROVIDER_A_ASN}} is listed. It's still visible, but with a
    `local_pref` of 20 it loses to Provider A's path (`V-V`, 200). The
-   attacker's links turn **red** again, and the badge reads *ROV: dropping ·
+   attacker's links turn **red** again, and the badge reads *ROV: marking ·
    ASPA: marking*.
 
-   Two routes carry `V-!`, though - not one. And look at what got selected:
-   Provider A's path, the *backup* with the prepends, not Provider B's. Hold
-   that thought.
-
-### The Observers validate, stage 2: drop
-
-```
-#./scripts/lab.sh step5-aspa-drop
-```
-
-The change from the previous stage is, once more, one line of policy per
-router (`reject` in BIRD's `ASPA_INVALID` branch, `deny from any avs invalid`
-in OpenBGPD):
-
-```
-#diff bird/observer1-aspa-mark.conf bird/observer1-aspa-drop.conf
-#diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-aspa-drop.conf
-```
-
-Look at `show rib` again. **Two** routes disappeared, not one. One is AS{{ATTACKER_ASN}}'s
-forged path. Which is the other, and is that what you wanted? What did the
-observers end up selecting?
+   Two routes carry `V-!`, though - not one. Look closely at the second one:
+   it's **Provider B**, the origin's own preferred way in from Step 1's
+   traffic engineering. The ASPA object you just created only lists Provider
+   A, so ASPA calls Provider B's path invalid too - and what got selected
+   instead is Provider A's path, the *backup*, the one the origin deliberately
+   made longer with its prepends. Because nothing is dropped yet, you get to
+   see this mistake before it costs anything: hold that thought into the next
+   step.
 
 **Along the way:** the ASPA verdict that ROV could never give - the path
-itself is what's wrong, even though the origin is right. And the same
-marking/dropping progression as in Step 3, this time for ASPA.
+itself is what's wrong, even though the origin is right - and a reminder of
+why marking runs before dropping: it let you catch a mistake in your own
+ASPA object before it took anything down.
 
 ---
 
 ## Step 6 — You forgot a provider
 
-> **State:** stage `aspa-drop` · AS{{ATTACKER_ASN}} forging the path · peer silent · ROAs for
+> **State:** stage `aspa-mark` · AS{{ATTACKER_ASN}} forging the path · peer silent · ROAs for
 > both prefixes · ASPA listing Provider A only.
 >
-> **If yours differs:** `./scripts/lab.sh step5-aspa-drop`, and in the Krill
+> **If yours differs:** `./scripts/lab.sh step5-aspa-mark`, and in the Krill
 > terminal `krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}"` (this replaces the
 > object with exactly that list), then `./scripts/lab.sh refresh`.
 
-The second route that vanished in the last step is Provider B's - a
-*legitimate* path, **the very one the origin prefers**, and you're now
-dropping it, because the ASPA object only lists Provider A. The observers
-are left with the backup path, the one the origin deliberately made longer
-with its prepends: the origin's traffic engineering, undone by an incomplete
-object. In production this is the day the traffic that used to arrive
-through that interface stops arriving, and someone starts asking why.
-(This lab has no data plane, so you can't watch traffic stop; you can watch the
-route disappear, which is the same thing said differently.)
+The route you noticed at the end of the last step - Provider B's, marked
+ASPA Invalid alongside the forged one - is a *legitimate* path, **the very
+one the origin prefers**, demoted for no better reason than an incomplete
+object. The observers are left using the backup path, the one the origin
+deliberately made longer with its prepends: the origin's traffic engineering,
+undone by an incomplete ASPA. Once this stage drops instead of marks (Step
+8), this is the day the traffic that used to arrive through that interface
+stops arriving, and someone starts asking why. (This lab has no data plane, so
+you can't watch traffic stop; you can watch the route's preference collapse,
+which is the same thing said differently.)
 
 1. Fix the object:
 
@@ -1048,13 +999,15 @@ route disappear, which is the same thing said differently.)
    ```
    *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     V-V {{ORIGIN_V4}}          10.200.5.10       200     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
+   *     V-! {{ORIGIN_V4}}          10.200.8.10        20     0 {{ATTACKER_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   Both legitimate paths are back (`V-V`), and Provider B - the origin's
-   preferred way in - is selected again. The forged one stays dropped, and
-   AS{{ATTACKER_ASN}} - still announcing - stays defeated. Notice how the fix didn't
-   involve AS{{ATTACKER_ASN}} at all: the ASPA object describes *your* relationships, and
-   anything that contradicts them is out.
+   Both legitimate paths are back at `V-V` and `local_pref` 200, and Provider
+   B - the origin's preferred way in - is reselected: once they're tied on
+   preference, its shorter path wins. The forged one stays demoted (`V-!`,
+   20), and AS{{ATTACKER_ASN}} - still announcing - stays defeated. Notice how the fix
+   didn't involve AS{{ATTACKER_ASN}} at all: the ASPA object describes *your*
+   relationships, and anything that contradicts them loses.
 
 3. BIRD picked up the change on its own, with nobody touching the router,
    because its sessions are set up with `import table on` and `rpki reload
@@ -1076,12 +1029,12 @@ panel of what's being kept out.
 
 ---
 
-## Step 7 — The peer leaks
+## Step 7 — The peer leaks (and ASPA catches what ROV can't)
 
-> **State:** stage `aspa-drop` · AS{{ATTACKER_ASN}} forging the path (defeated) · peer silent
-> · ROAs for both prefixes · ASPA listing Providers A and B.
+> **State:** stage `aspa-mark` · AS{{ATTACKER_ASN}} forging the path (marked, losing) · peer
+> silent · ROAs for both prefixes · ASPA listing Providers A and B.
 >
-> **If yours differs:** `./scripts/lab.sh step5-aspa-drop`,
+> **If yours differs:** `./scripts/lab.sh step5-aspa-mark`,
 > `./scripts/lab.sh step9-leak-off` (peer silent), and in the Krill terminal
 > `krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}, AS{{PROVIDER_B_ASN}}"` (this replaces the
 > object with exactly that list), then `./scripts/lab.sh refresh`.
@@ -1103,8 +1056,8 @@ Then somebody edits a configuration...
 
 2. **Before you look:** Provider A now has two routes for the origin's
    prefix - the origin's own, and the peer's. Which one does Provider A pass
-   on to the observers? What do you expect the observers to show, now that
-   they drop ASPA-invalid paths?
+   on to the observers? And once it arrives, still only *marking* what looks
+   invalid, will you be able to see it?
 
 3. Look at Provider A first:
 
@@ -1143,51 +1096,16 @@ Then somebody edits a configuration...
 
    ```
    *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
-   ```
-
-   **Provider A's path is gone.** Provider A is now advertising the leaked
-   route *instead of* its own - and the observers, dropping ASPA-invalid
-   paths, rejected it. The peer's link on the panel turns **red**. Why did
-   they drop it?
-
-   Notice what didn't happen: the observers didn't switch to the leaked
-   path, because Provider B's 2-hop path still beats its 3 hops. The damage
-   here is that the origin has lost its *backup* - and Provider A's other
-   customers are now sending their traffic to the origin through the peer.
-
----
-
-## Step 8 — ROV can't see it; ASPA can
-
-> **State:** stage `aspa-drop` · AS{{ATTACKER_ASN}} forging the path (defeated) · the peer
-> leaking · ROAs for both prefixes · ASPA listing Providers A and B.
->
-> **If yours differs:** `./scripts/lab.sh step5-aspa-drop` and
-> `./scripts/lab.sh step7-leak-on`.
-
-1. To see the verdicts, put ASPA verification back in its marking stage - a
-   dropped route is gone before you can look at it. (Only ASPA goes back: ROV
-   keeps dropping in `aspa-mark`, as it has since Step 3.)
-
-   ```
-   #./scripts/lab.sh step5-aspa-mark
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
-   #docker exec lab-observer1 birdc show route table master4 all {{ORIGIN_V4}}
-   ```
-
-   ```
-   *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.8.10        20     0 {{ATTACKER_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.5.10        20     0 {{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   Look at the last route. It's the path the peer leaked, arriving through
-   Provider A: `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}`. Two things to notice:
+   **Provider A's own path is already gone** - it stopped advertising it the
+   moment it picked the peer's shorter one as best, and that has nothing to
+   do with what the observers do with what they receive. What arrives from
+   Provider A instead is the leaked path, `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}` - and
+   because marking never removes anything from the table, you get to look
+   straight at it. Two things to notice:
 
    - **ROV Valid.** Of course - the origin really is {{ORIGIN_ASN}}. Nothing is
      forged. *A leak can never be caught by ROV*: it doesn't lie about who
@@ -1195,19 +1113,106 @@ Then somebody edits a configuration...
    - **ASPA Invalid.** The hop `{{ORIGIN_ASN}} → {{PEER_ASN}}` was never authorized: the
      origin's ASPA object lists Providers A and B, and the peer is neither.
 
-2. Switch back to dropping:
+   The peer's link on the panel turns **red**. Provider B's path is still
+   what's selected (`V-V`, 200) - it doesn't need any help from ASPA to win,
+   since it's also the shorter one - but the damage is real: the origin has
+   lost its *backup*, and Provider A's other customers are now sending their
+   traffic to the origin through the peer.
+
+**Along the way:** a route leak is nobody forging anything - it's a route
+crossing a boundary it was never supposed to cross - and it's a verdict ROV
+structurally cannot give, because the origin at the end of the path is
+telling the truth. ASPA catches it for the same reason it caught Step 4's
+forgery: an unauthorized hop, wherever in the path it happens to sit.
+
+---
+
+## Step 8 — Deploying for real: drop
+
+> **State:** stage `aspa-mark` · AS{{ATTACKER_ASN}} forging the path (marked, losing) · the peer
+> leaking (marked, losing) · ROAs for both prefixes · ASPA listing Providers A and B.
+>
+> **If yours differs:** `./scripts/lab.sh step5-aspa-mark` and
+> `./scripts/lab.sh step7-leak-on`.
+
+Every invalid route you've seen so far has stayed on the table, demoted but
+visible - deliberately, so you could look at exactly what each check decided
+before trusting it with anything. **A real router doesn't stop there.**
+Marking a route invalid and still using it whenever nothing better shows up
+is not what ROV or ASPA are for; both only protect anything once an invalid
+route is actually rejected. This is the step where that happens - for both
+checks, together, the way you'd configure a production router from the
+start.
+
+1. Switch both observers to dropping:
 
    ```
-   #./scripts/lab.sh step5-aspa-drop
+   #./scripts/lab.sh step8-drop
    ```
 
-   The leaked path is dropped on both observers, and look at what's left:
-   only Provider B's path. **Provider A's legitimate path is gone too** -
-   Provider A decided to pass on the leaked route *instead* of its own, so
-   there's nothing legitimate left on that link. ASPA protected the observers
-   from *using* the leak; it couldn't make Provider A stop propagating it.
-   That takes the peer fixing its export policy, and Provider A filtering
-   what its customers send it.
+2. Compare the stage you just left with this one - the change is one line of
+   policy per check, on each router:
+
+   ```
+   #diff bird/observer1-aspa-mark.conf bird/observer1-aspa-drop.conf
+   #diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-aspa-drop.conf
+   ```
+
+   ```
+       if roa_check(roa4_table, net, bgp_path.last) = ROA_INVALID then
+           reject "ROV Invalid: ", net, " origin AS", bgp_path.last;   # observer1 (BIRD)
+       ...
+       ASPA_INVALID: reject "ASPA Invalid: ", net, " AS_PATH ", bgp_path;
+   ```
+
+   ```
+   deny from any ovs invalid                               # observer2 (OpenBGPD)
+   deny from any avs invalid
+   ```
+
+3. Look at the routes again:
+
+   ```
+   # Panel: click the observer2 box, then Shell:
+   #bgpctl show rib {{ORIGIN_V4}}
+   # Or, from your computer's terminal:
+   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+   ```
+
+   ```
+   *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
+   ```
+
+   **Two routes disappeared, not one.** AS{{ATTACKER_ASN}}'s forged path is gone, as
+   expected. So is the entry that used to sit under Provider A - the leaked
+   path you just inspected. It isn't lost; BIRD keeps what it rejected:
+
+   ```
+   # Panel: click the observer1 box, then Shell:
+   #birdc show route table master4 filtered {{ORIGIN_V4}}
+   # Or, from your computer's terminal:
+   #docker exec lab-observer1 birdc show route table master4 filtered {{ORIGIN_V4}}
+   ```
+
+   The badge now reads *ROV + ASPA: dropping*. Notice what dropping did
+   **not** fix: Provider A's own, legitimate path is still nowhere to be
+   seen, because Provider A itself is still advertising the leaked route
+   *instead of* its own - and no policy on the observers can make Provider A
+   propagate something it isn't sending. ASPA protects the observers from
+   *using* the leak; only the peer fixing its export policy stops the leak at
+   the source. That's next.
+
+**Along the way:**
+
+- **Marking versus dropping.** Same verdicts as Steps 3, 5 and 7 - the policy
+  is what changed. Marking is how you roll a check out without breaking
+  anything; dropping is what the check is *for*, and it's what turns a
+  diagnostic into a defense.
+- **Dropping doesn't repair upstream damage.** It only controls what the
+  observers themselves accept. Provider A propagating the leak is a separate
+  problem, fixed at the source, not at the observers.
+- **From here on, both checks keep dropping.** A router that has learned to
+  reject invalid routes doesn't go back.
 
 ---
 
@@ -1258,17 +1263,21 @@ exercise at a time:
   result - the same three pieces for ROV (Step 3) and ASPA (Step 5), on any
   vendor's router.
 - **Why mark first and drop later - and why drop at all?** Marking lets you
-  see what a check would do before you trust it; dropping is what real
-  routers do, and what makes the check protect anything (Steps 3 and 5).
+  see what a check would do before you trust it, and it's what caught your
+  own incomplete ASPA object in Step 6 before it broke anything; dropping is
+  what real routers do, and what makes the check protect anything - Step 8
+  turns both checks on at once, the way a production router is configured
+  from the start.
 - **Can ROV tell two paths for the same prefix apart?** No (Step 4).
 - **What does a hijack with the wrong origin ASN look like?** Step 2, and how
-  ROV stops it in Step 3.
+  ROV flags it in Step 3.
 - **What happens when an ASPA forgets a real provider?** Step 6.
 - **Does a fix propagate on its own?** BIRD revalidates by itself; the objects
   take a republish and a revalidation to arrive (Steps 3, 5 and 6).
 - **Do the two independent stacks agree?** Every step shows both, and they
   agree everywhere the story looks - Extra exercise A shows where they don't.
-- **What's a route leak, and why can't ROV see it?** Steps 7 and 8.
+- **What's a route leak, and why can't ROV see it?** Step 7 shows it; Step 8
+  shows what dropping does, and doesn't, fix about it.
 
 Four topics didn't fit in the story, and live in the extras below: how the
 upstream and downstream algorithms differ (and the `role` that selects one),
@@ -1430,8 +1439,9 @@ Provider A uses its own prepending filter, which you didn't touch) with
 `bgp_path: {{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` - a
 perfectly legitimate path through an authorized provider - but **ROV
 Invalid**: the ROA for `{{ORIGIN_V4}}` only authorizes announcements up to
-`/24`, and `/25` is more specific than that. (Run `step3-rov-drop` and it
-disappears, like the hijack did.)
+`/24`, and `/25` is more specific than that. In `rov-mark` it stays visible,
+demoted, exactly like the hijack in Step 3. Run `step8-drop` and it
+disappears the same way the hijack later did.
 
 Undo both changes (remove the extra `route` line, restore the original
 `only_mine_v4` filter) and reload `lab-origin` when you're done.
@@ -1568,16 +1578,16 @@ appear on purpose, by taking objects away:
 
 | Symptom | What to check |
 |---|---|
-| What I see doesn't match a step | Read the step's **State** box and run the commands it lists - they're all safe to repeat. The `step*` commands that move the observers (`step1-clean`, `step3-rov-mark`, `step3-rov-drop`, `step5-aspa-mark`, `step5-aspa-drop`) set a *whole* stage on both of them, whatever stage they were in; `step1-clean` also silences AS{{ATTACKER_ASN}} and the peer; `krillc aspas add` replaces the whole ASPA object with exactly the list you give it. |
-| AS{{ATTACKER_ASN}}'s route doesn't show up | Once an observer is *dropping* what a check flags (`rov-drop`, `aspa-drop`), that route is gone from the table on purpose: look under `birdc show route table master4 filtered` on observer1. In `none` there are no verdicts, but the route should be there. Otherwise check that you ran the step's command and that the session is up: `docker exec lab-attacker birdc show protocols`. |
-| The two observers disagree, or the stage badge is amber | The badge in the panel's header shows the stage each observer is really running; amber means they differ. Run the step command of the stage you want (e.g. `./scripts/lab.sh step5-aspa-drop`) to put both in the same one. Right after a switch, observer2 also needs ten or fifteen seconds to settle (it restarts), so look again before concluding anything. |
+| What I see doesn't match a step | Read the step's **State** box and run the commands it lists - they're all safe to repeat. The `step*` commands that move the observers (`step1-clean`, `step3-rov-mark`, `step5-aspa-mark`, `step8-drop`) set a *whole* stage on both of them, whatever stage they were in; `step1-clean` also silences AS{{ATTACKER_ASN}} and the peer; `krillc aspas add` replaces the whole ASPA object with exactly the list you give it. |
+| AS{{ATTACKER_ASN}}'s route doesn't show up | Once an observer is *dropping* what a check flags (stage `aspa-drop`, from `step8-drop` on), that route is gone from the table on purpose: look under `birdc show route table master4 filtered` on observer1. Before that, `none` has no verdicts and `rov-mark`/`aspa-mark` only demote, so the route should still be there. Otherwise check that you ran the step's command and that the session is up: `docker exec lab-attacker birdc show protocols`. |
+| The two observers disagree, or the stage badge is amber | The badge in the panel's header shows the stage each observer is really running; amber means they differ. Run the step command of the stage you want (e.g. `./scripts/lab.sh step8-drop`) to put both in the same one. Right after a switch, observer2 also needs ten or fifteen seconds to settle (it restarts), so look again before concluding anything. |
 | I created the ROA/ASPA but nothing changed | `./scripts/lab.sh refresh` forces both validators to revalidate. If it still doesn't change, `refresh` may have run before Krill finished publishing: check `krillc roas list` / `krillc aspas list`, wait a few seconds, refresh again. |
 | I created the ROA but it isn't showing up in Krill | The CA didn't have the parent's certificate yet. `docker exec lab-krill krillc bulk refresh`, redo the ROA, then `krillc bulk publish` |
 | Routinator shows no ASPA at all | `--enable-aspa` was missing, or the object hasn't been published/revalidated yet. `./scripts/lab.sh refresh`. |
 | BIRD's `aspa_table` table is empty | RTR negotiated version 1. Check `birdc show protocols all routinator` and whether Routinator came up with `--enable-aspa`. |
 | A BGP session won't come up | `docker compose logs origin provider-a provider-b observer1 observer2 attacker peer` |
 | observer2 shows `avs` as `unknown` everywhere | The RTR session negotiated version 1, or FORT is older than 1.7.0.experimental. Check `bgpctl show rtr` says `Version: 2`. |
-| observer2 shows `avs` as `valid` on BOTH paths | The session lost its RFC 9234 role - usually after a bare `bgpctl reload`. Re-run the stage's step command (`./scripts/lab.sh step5-aspa-mark` or `step5-aspa-drop`), which restarts observer2 with the stage's config. |
+| observer2 shows `avs` as `valid` on BOTH paths | The session lost its RFC 9234 role - usually after a bare `bgpctl reload`. Re-run the stage's step command (`./scripts/lab.sh step5-aspa-mark` or `step8-drop`), which restarts observer2 with the stage's config. |
 | FORT won't start or fetches nothing | `docker logs lab-fort`. It should end with "First validation cycle successfully ended". If TLS fails, the lab CA didn't reach its trust store: check that the `pki` volume is mounted. |
 | Krill can't talk to Registro.br | The container needs outbound Internet access: `docker exec lab-krill ping -c1 beta.registro.br` |
 | I want to start over | `./scripts/lab.sh reset` (deletes Krill's CA, {{RIR_NAME}}'s own registry state, and both validators' caches), then `up`. Don't run a bare `docker compose down -v`: {{RIR_NAME}} and the registry panel only come up under the `local` compose profile, and a bare `docker compose down` silently leaves them running - `lab.sh` sets that up for you. Also run it from your own computer's terminal, not from the panel's in-browser console: `reset` tears down the whole lab, including that console itself, which kills the command halfway through. |

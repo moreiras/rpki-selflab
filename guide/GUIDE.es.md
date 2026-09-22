@@ -150,16 +150,17 @@ empezar de nuevo.
 Tres cosas cambian a medida que avanza la historia:
 
 - **La etapa de despliegue de los observadores.** Empiezan sin ninguna validación,
-  y la historia los lleva por cinco etapas. Cada comando fija una etapa completa
+  y la historia los lleva por cuatro etapas: las dos verificaciones se marcan
+  antes de que ninguna descarte nada, y después las dos empiezan a descartar
+  juntas, en el Paso 8. Cada comando fija una etapa completa
   en **los dos** observadores a la vez, sin importar en qué etapa estuvieran antes:
 
   | Etapa | Qué hacen los observadores | Comando |
   |---|---|---|
   | `none` | BGP común, sin validación (así empieza el laboratorio) | `step1-clean` |
   | `rov-mark` | ROV desplegado, rutas inválidas solo *marcadas* | `step3-rov-mark` |
-  | `rov-drop` | ROV *descartando* las rutas inválidas | `step3-rov-drop` |
-  | `aspa-mark` | ROV descartando, verificación ASPA solo *marcando* | `step5-aspa-mark` |
-  | `aspa-drop` | ROV y ASPA los dos descartando | `step5-aspa-drop` |
+  | `aspa-mark` | se suma la verificación ASPA, también solo *marcando* | `step5-aspa-mark` |
+  | `aspa-drop` | el ROV y el ASPA los dos empiezan a *descartar* - producción | `step8-drop` |
 
   Cada etapa es un archivo de configuración completo por observador
   (`bird/observer1-<stage>.conf`, `openbgpd/observer2-<stage>.conf`), y la
@@ -172,7 +173,9 @@ Tres cosas cambian a medida que avanza la historia:
   o quince segundos para estabilizarse antes de sacar conclusiones de lo que muestra.
 - **El AS666 y el peer.** Seis comandos (`step1-clean`, `step2-hijack-simple`,
   `step4-hijack-posrov`, `step7-leak-on`, `step9-leak-off`,
-  `step9-hijack-off`) los cambian entre comportamientos.
+  `step9-hijack-off`) los cambian entre comportamientos. (`step8-drop`
+  pertenece a la etapa de despliegue de los observadores, arriba - nada
+  cambia para el AS666 ni para el peer cuando lo ejecuta.)
 - **Los objetos RPKI del origen**, en Krill: las ROAs y el objeto ASPA.
 
 Los nombres de todos estos comandos llevan el número del paso al que pertenecen.
@@ -509,7 +512,7 @@ viejo que existe, y para el que se inventaron las ROAs.
 
 ---
 
-## Paso 3 — Entra el ROV: primero marca, después descarta
+## Paso 3 — Entra el ROV, marcando lo que parece mal
 
 > **Estado:** etapa `none` (a punto de cambiar) · AS666 haciendo el secuestro ingenuo ·
 > peer en silencio · todavía sin ROAs (las va a crear aquí), sin ASPA.
@@ -518,7 +521,7 @@ viejo que existe, y para el que se inventaron las ROAs.
 > `./scripts/lab.sh step2-hijack-simple`.
 
 Este paso tiene dos mitades, en este orden: el **Origen publica** las ROAs, y
-los **Observadores validan** - primero solo marcando, después descartando.
+los **Observadores** la **validan** - por ahora, solo marcando.
 
 ### El Origen publica: crear las ROAs
 
@@ -567,7 +570,7 @@ Por ahora nada cambió para los routers: las ROAs están publicadas y
 validadas, y **ningún router está escuchando a los validadores.** Mire los
 observadores de nuevo si quiere - el secuestro sigue ganando.
 
-### Los Observadores validan, etapa 1: marcar
+### Los Observadores validan
 
 1. Despliegue el ROV en los dos observadores, en su primera forma segura:
 
@@ -677,6 +680,13 @@ observadores de nuevo si quiere - el secuestro sigue ganando.
    legítimo salió perjudicado. **Ese es el sentido de la etapa de marcado** - puede
    ver qué *haría* la verificación antes de dejar que rechace algo.
 
+   **Aquí es donde el ROV se queda por el resto de la historia - marcando, no
+   descartando.** Un router que solo marca igual usa una ruta inválida cuando
+   es lo mejor que tiene, así que marcar solo no es el final del trabajo: es el
+   ensayo. Va a ver cómo es descartar de verdad, en producción - para el ROV y
+   el ASPA juntos, a la vez - en el Paso 8, una vez que las dos verificaciones
+   hayan tenido su turno para demostrar lo que hacen de esta forma.
+
 ### Cómo leer los veredictos
 
 Los dos observadores los muestran de forma distinta:
@@ -696,68 +706,19 @@ Los dos observadores los muestran de forma distinta:
   Así, `V-!` es ROV Valid y ASPA Invalid. (Todavía no hay verificación ASPA
   desplegada, así que la segunda mitad es `?` por ahora.)
 
-### Los Observadores validan, etapa 2: descartar
-
-**Esto es lo que hacen los routers reales.** Marcar fue el ensayo: verificó que
-las marcas caen donde deben. Un router que solo marca las rutas inválidas
-igual las usa cuando son lo mejor que tiene - y la ruta de un atacante lo es,
-tarde o temprano. En producción, una ruta inválida se *rechaza*.
-
-1. Cambie los dos observadores a descartar:
-
-   ```
-   #./scripts/lab.sh step3-rov-drop
-   ```
-
-2. Compare la etapa que acaba de dejar con esta - el cambio es una línea de
-   política en cada router:
-
-   ```
-   #diff bird/observer1-rov-mark.conf bird/observer1-rov-drop.conf
-   #diff openbgpd/observer2-rov-mark.conf openbgpd/observer2-rov-drop.conf
-   ```
-
-   ```
-       if roa_check(roa4_table, net, bgp_path.last) = ROA_INVALID then
-           reject "ROV Invalid: ", net, " origin AS", bgp_path.last;   # observer1 (BIRD)
-   ```
-
-   ```
-   deny from any ovs invalid                               # observer2 (OpenBGPD)
-   ```
-
-3. Mire de nuevo: el secuestro desapareció de la tabla. No se perdió -
-   BIRD guarda lo que rechazó:
-
-   ```
-   # Panel: haga clic en el recuadro observador 1, luego en Shell:
-   #birdc show route table master4 filtered 10.0.0.0/24
-   # O, desde la terminal de su computadora:
-   #docker exec lab-observer1 birdc show route table master4 filtered 10.0.0.0/24
-   ```
-
-   La insignia ahora dice *ROV: descartando*. El secuestro fue derrotado. El AS666 sigue
-   anunciando, y sigue fallando - **y de aquí en adelante, el ROV sigue descartando
-   durante el resto de la historia.** Un router que aprendió a rechazar rutas
-   inválidas no vuelve atrás.
-
-**En el camino:**
-
-- **Marcar versus descartar.** El mismo veredicto, dos políticas. Marcar es cómo
-  se despliega una verificación sin romper nada; descartar es *para qué*
-  sirve la verificación.
-- **De qué está hecho "desplegar ROV":** una sesión RTR, una prueba, una acción.
-- **Cómo llegan los objetos nuevos a los routers.** Krill publica, los validadores
-  releen, los routers reciben el cambio por RTR. Acaba de ver cada salto.
+**En el camino:** de qué está hecho "desplegar ROV" - una sesión RTR, una
+prueba en cada ruta, y una acción sobre el resultado - y cómo llegan los
+objetos nuevos a los routers: Krill publica, los validadores releen, los
+routers reciben el cambio por RTR. Acaba de ver cada salto.
 
 ---
 
 ## Paso 4 — El camino falsificado
 
-> **Estado:** etapa `rov-drop` · AS666 haciendo el secuestro ingenuo (descartado) · peer
-> en silencio · ROAs para los dos prefijos · sin ASPA.
+> **Estado:** etapa `rov-mark` · AS666 haciendo el secuestro ingenuo (marcado,
+> perdiendo) · peer en silencio · ROAs para los dos prefijos · sin ASPA.
 >
-> **Si el suyo difiere:** `./scripts/lab.sh step3-rov-drop` y
+> **Si el suyo difiere:** `./scripts/lab.sh step3-rov-mark` y
 > `./scripts/lab.sh step2-hijack-simple`; verifique las ROAs con `krillc roas
 > list` en la terminal de Krill (deben ser exactamente dos).
 
@@ -791,8 +752,9 @@ del camino - entonces, ¿y si el último AS fuera el correcto?
    filtro, así que el camino es solo `666`), y verifique que ninguno de los dos archivos tiene una
    sesión con el origen: solo los dos observadores.
 
-2. **Antes de mirar:** los observadores están descartando todo lo que el ROV marca
-   como inválido. ¿Se va a descartar esto?
+2. **Antes de mirar:** el ROV por ahora solo marca, no descarta nada - pero el
+   secuestro ingenuo igual quedó marcado Invalid y perdió la carrera. ¿Este
+   camino falsificado va a quedar marcado de la misma forma?
 
 3. Mire:
 
@@ -810,11 +772,12 @@ del camino - entonces, ¿y si el último AS fuera el correcto?
    *     V-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
-   La ruta falsificada **volvió**, y es la seleccionada. El ROV dice `Valid`
-   - el camino termina en 64500, que es exactamente lo que autoriza la ROA. Los
-   enlaces del atacante en el panel se ponen **ámbar** otra vez. Tres caminos, todos
-   "válidos", uno de ellos una mentira, y *nada de lo que desplegó hasta ahora puede decir
-   cuál*.
+   No quedó marcado. El ROV dice `Valid` - el camino termina en 64500,
+   que es exactamente lo que autoriza la ROA - así que recibe el `local_pref`
+   completo (100) igual que cualquier ruta legítima, y es la seleccionada. Los
+   enlaces del atacante en el panel se ponen **ámbar**: ya no rojos, porque el
+   ROV no tiene nada que marcar. Tres caminos, todos "válidos", uno de ellos
+   una mentira, y *nada de lo que desplegó hasta ahora puede decir cuál*.
 
    > El camino falsificado (`666 64500`, 2 saltos) empata con el del Proveedor B (`64502 64500`, también 2),
    > y el atacante gana el empate por un criterio de desempate (su router ID resulta
@@ -828,17 +791,18 @@ Solo mira el último AS.
 
 ---
 
-## Paso 5 — Entra el ASPA: primero marca, después descarta
+## Paso 5 — Entra el ASPA, también marcando primero
 
-> **Estado:** etapa `rov-drop` · AS666 falsificando el camino · peer en silencio · ROAs para
+> **Estado:** etapa `rov-mark` · AS666 falsificando el camino · peer en silencio · ROAs para
 > los dos prefijos · todavía sin ASPA (lo va a crear aquí).
 >
-> **Si el suyo difiere:** `./scripts/lab.sh step3-rov-drop` y
+> **Si el suyo difiere:** `./scripts/lab.sh step3-rov-mark` y
 > `./scripts/lab.sh step4-hijack-posrov`; si ya existe un objeto ASPA,
 > `krillc aspas remove --customer AS64500` en la terminal de Krill.
 
 La misma forma que el Paso 3: el **Origen publica** un objeto ASPA, y luego los
-**Observadores lo validan** - primero marcando, después descartando.
+**Observadores lo validan** - con la misma forma segura y de solo marcado que
+usó el ROV.
 
 ### El Origen publica: crear el objeto ASPA
 
@@ -886,19 +850,19 @@ línea de comandos (la interfaz está en camino en la próxima versión).
 Igual que con las ROAs, todavía no cambia nada para los routers: el objeto está publicado,
 y ningún router está verificando caminos.
 
-### Los Observadores validan, etapa 1: marcar
+### Los Observadores validan
 
-1. Despliegue la verificación ASPA en los dos observadores - el ROV sigue descartando:
+1. Despliegue la verificación ASPA en los dos observadores - el ROV sigue solo marcando:
 
    ```
    #./scripts/lab.sh step5-aspa-mark
    ```
 
-2. **Compare con la etapa que acaba de dejar** (`rov-drop`):
+2. **Compare con la etapa que acaba de dejar** (`rov-mark`):
 
    ```
-   #diff bird/observer1-rov-drop.conf bird/observer1-aspa-mark.conf
-   #diff openbgpd/observer2-rov-drop.conf openbgpd/observer2-aspa-mark.conf
+   #diff bird/observer1-rov-mark.conf bird/observer1-aspa-mark.conf
+   #diff openbgpd/observer2-rov-mark.conf openbgpd/observer2-aspa-mark.conf
    ```
 
    Las mismas tres ideas, esta vez para caminos:
@@ -979,56 +943,45 @@ y ningún router está verificando caminos.
    El camino falsificado ahora es **ASPA Invalid** - el salto `64500 → 666` no está
    autorizado, ya que solo 64501 figura en la lista. Sigue visible, pero con un
    `local_pref` de 20 pierde contra el camino del Proveedor A (`V-V`, 200). Los
-   enlaces del atacante se ponen **rojos** otra vez, y la insignia dice *ROV: descartando ·
+   enlaces del atacante se ponen **rojos** otra vez, y la insignia dice *ROV: marcando ·
    ASPA: marcando*.
 
-   Pero dos rutas llevan `V-!` - no una. Y mire lo que quedó seleccionado:
-   el camino del Proveedor A, el *respaldo* con los prepends, no el del Proveedor B. Guarde
-   ese pensamiento.
-
-### Los Observadores validan, etapa 2: descartar
-
-```
-#./scripts/lab.sh step5-aspa-drop
-```
-
-El cambio respecto de la etapa anterior es, otra vez, una línea de política por
-router (`reject` en la rama `ASPA_INVALID` de BIRD, `deny from any avs invalid`
-en OpenBGPD):
-
-```
-#diff bird/observer1-aspa-mark.conf bird/observer1-aspa-drop.conf
-#diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-aspa-drop.conf
-```
-
-Mire `show rib` de nuevo. Desaparecieron **dos** rutas, no una. Una es el camino
-falsificado del AS666. ¿Cuál es la otra, y es eso lo que quería? ¿Qué
-terminaron seleccionando los observadores?
+   Pero dos rutas llevan `V-!` - no una. Mire de cerca la segunda: es la del
+   **Proveedor B**, la entrada preferida del propio origen, la de la
+   ingeniería de tráfico del Paso 1. El objeto ASPA que acaba de crear solo
+   lista al Proveedor A, así que el ASPA también llama inválido al camino del
+   Proveedor B - y lo que quedó seleccionado en su lugar es el camino del
+   Proveedor A, el *respaldo*, el que el origen alargó a propósito con sus
+   prepends. Como todavía no se descarta nada, puede ver este error antes de
+   que le cueste algo: guarde ese pensamiento para el próximo paso.
 
 **En el camino:** el veredicto ASPA que el ROV nunca podría dar - el camino
-mismo es lo que está mal, aunque el origen sea correcto. Y la misma progresión
-de marcado/descarte que en el Paso 3, esta vez para ASPA.
+mismo es lo que está mal, aunque el origen sea correcto - y un recordatorio
+de por qué marcar corre antes que descartar: le permitió detectar un error en
+su propio objeto ASPA antes de que tirara nada abajo.
 
 ---
 
 ## Paso 6 — Se olvidó de un proveedor
 
-> **Estado:** etapa `aspa-drop` · AS666 falsificando el camino · peer en silencio · ROAs para
+> **Estado:** etapa `aspa-mark` · AS666 falsificando el camino · peer en silencio · ROAs para
 > los dos prefijos · ASPA listando solo al Proveedor A.
 >
-> **Si el suyo difiere:** `./scripts/lab.sh step5-aspa-drop`, y en la terminal
+> **Si el suyo difiere:** `./scripts/lab.sh step5-aspa-mark`, y en la terminal
 > de Krill `krillc aspas add --aspa "AS64500 => AS64501"` (esto reemplaza el
 > objeto por exactamente esa lista), luego `./scripts/lab.sh refresh`.
 
-La segunda ruta que desapareció en el paso anterior es la del Proveedor B - un
-camino *legítimo*, **justamente el que el origen prefiere**, y ahora lo está
-descartando, porque el objeto ASPA solo lista al Proveedor A. Los observadores
-se quedan con el camino de respaldo, el que el origen alargó a propósito
-con sus prepends: la ingeniería de tráfico del origen, deshecha por un
-objeto incompleto. En producción este es el día en que el tráfico que solía llegar
-por esa interfaz deja de llegar, y alguien empieza a preguntar por qué.
-(Este laboratorio no tiene plano de datos, así que no puede ver cómo se detiene el tráfico; puede ver cómo
-desaparece la ruta, que es lo mismo dicho de otra forma.)
+La ruta que notó al final del paso anterior - la del Proveedor B, marcada
+ASPA Invalid junto con la falsificada - es un camino *legítimo*, **justamente
+el que el origen prefiere**, degradado sin mejor razón que un objeto
+incompleto. Los observadores se quedan usando el camino de respaldo, el que
+el origen alargó a propósito con sus prepends: la ingeniería de tráfico del
+origen, deshecha por un ASPA incompleto. Una vez que esta etapa descarte en
+lugar de marcar (Paso 8), este va a ser el día en que el tráfico que solía
+llegar por esa interfaz deja de llegar, y alguien empieza a preguntar por qué.
+(Este laboratorio no tiene plano de datos, así que no puede ver cómo se
+detiene el tráfico; puede ver cómo se desploma la preferencia de la ruta,
+que es lo mismo dicho de otra forma.)
 
 1. Arregle el objeto:
 
@@ -1050,13 +1003,16 @@ desaparece la ruta, que es lo mismo dicho de otra forma.)
    ```
    *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
    *     V-V 10.0.0.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
+   *     V-! 10.0.0.0/24          10.200.8.10        20     0 666 64500 i
    ```
 
-   Los dos caminos legítimos volvieron (`V-V`), y el Proveedor B - la entrada
-   preferida del origen - es la seleccionada otra vez. El falsificado sigue descartado, y
-   el AS666 - que sigue anunciando - sigue derrotado. Note que el arreglo no
-   involucró al AS666 en absoluto: el objeto ASPA describe *sus* relaciones, y
-   todo lo que las contradiga queda afuera.
+   Los dos caminos legítimos volvieron a `V-V` y `local_pref` 200, y el
+   Proveedor B - la entrada preferida del origen - vuelve a ser el
+   seleccionado: una vez empatados en preferencia, gana su camino más corto.
+   El falsificado sigue degradado (`V-!`, 20), y el AS666 - que sigue
+   anunciando - sigue derrotado. Note que el arreglo no involucró al
+   AS666 en absoluto: el objeto ASPA describe *sus* relaciones, y todo
+   lo que las contradiga queda afuera.
 
 3. BIRD recogió el cambio por sí solo, sin que nadie tocara el router,
    porque sus sesiones están configuradas con `import table on` y `rpki reload
@@ -1078,12 +1034,13 @@ panel de lo que se está manteniendo afuera.
 
 ---
 
-## Paso 7 — El peer filtra
+## Paso 7 — El peer filtra (y el ASPA detecta lo que el ROV no puede)
 
-> **Estado:** etapa `aspa-drop` · AS666 falsificando el camino (derrotado) · peer en silencio
-> · ROAs para los dos prefijos · ASPA listando a los Proveedores A y B.
+> **Estado:** etapa `aspa-mark` · AS666 falsificando el camino (marcado,
+> perdiendo) · peer en silencio · ROAs para los dos prefijos · ASPA listando
+> a los Proveedores A y B.
 >
-> **Si el suyo difiere:** `./scripts/lab.sh step5-aspa-drop`,
+> **Si el suyo difiere:** `./scripts/lab.sh step5-aspa-mark`,
 > `./scripts/lab.sh step9-leak-off` (peer en silencio), y en la terminal de Krill
 > `krillc aspas add --aspa "AS64500 => AS64501, AS64502"` (esto reemplaza el
 > objeto por exactamente esa lista), luego `./scripts/lab.sh refresh`.
@@ -1105,8 +1062,8 @@ Entonces alguien edita una configuración...
 
 2. **Antes de mirar:** el Proveedor A ahora tiene dos rutas para el prefijo
    del origen - la del propio origen, y la del peer. ¿Cuál le pasa el Proveedor A
-   a los observadores? ¿Qué espera que muestren los observadores, ahora que
-   descartan los caminos ASPA inválidos?
+   a los observadores? Y una vez que llegue, si todavía solo se está *marcando*
+   lo que parece inválido, ¿va a poder verla?
 
 3. Mire primero el Proveedor A:
 
@@ -1145,51 +1102,16 @@ Entonces alguien edita una configuración...
 
    ```
    *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
-   ```
-
-   **El camino del Proveedor A desapareció.** El Proveedor A ahora anuncia la
-   ruta filtrada *en lugar de* la suya - y los observadores, que descartan los
-   caminos ASPA inválidos, la rechazaron. El enlace del peer en el panel se pone **rojo**. ¿Por qué
-   la descartaron?
-
-   Note lo que no pasó: los observadores no cambiaron al camino
-   filtrado, porque el camino de 2 saltos del Proveedor B todavía le gana a sus 3 saltos. El daño
-   aquí es que el origen perdió su *respaldo* - y los demás clientes del Proveedor A
-   ahora están enviando su tráfico al origen a través del peer.
-
----
-
-## Paso 8 — El ROV no lo ve; el ASPA sí
-
-> **Estado:** etapa `aspa-drop` · AS666 falsificando el camino (derrotado) · el peer
-> filtrando · ROAs para los dos prefijos · ASPA listando a los Proveedores A y B.
->
-> **Si el suyo difiere:** `./scripts/lab.sh step5-aspa-drop` y
-> `./scripts/lab.sh step7-leak-on`.
-
-1. Para ver los veredictos, vuelva a poner la verificación ASPA en su etapa de marcado - una
-   ruta descartada desaparece antes de que pueda mirarla. (Solo vuelve el ASPA: el ROV
-   sigue descartando en `aspa-mark`, como desde el Paso 3.)
-
-   ```
-   #./scripts/lab.sh step5-aspa-mark
-   # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
-   # Panel: haga clic en el recuadro observador 1, luego en Shell:
-   #birdc show route table master4 all 10.0.0.0/24
-   # O, desde la terminal de su computadora:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
-   ```
-
-   ```
-   *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
    *     V-! 10.0.0.0/24          10.200.8.10        20     0 666 64500 i
    *     V-! 10.0.0.0/24          10.200.5.10        20     0 64501 64999 64500 i
    ```
 
-   Mire la última ruta. Es el camino que filtró el peer, llegando por el
-   Proveedor A: `64501 64999 64500`. Dos cosas para notar:
+   **El camino propio del Proveedor A ya desapareció** - dejó de anunciarlo en el
+   momento en que eligió como mejor el camino más corto del peer, y eso no tiene
+   nada que ver con lo que los observadores hacen con lo que reciben. Lo que llega
+   desde el Proveedor A en su lugar es el camino filtrado, `64501 64999 64500`
+   - y como marcar nunca saca nada de la tabla, puede mirarlo de frente. Dos cosas
+   para notar:
 
    - **ROV Valid.** Claro - el origen realmente es 64500. No hay nada
      falsificado. *Una fuga nunca puede ser detectada por el ROV*: no miente sobre quién
@@ -1197,19 +1119,108 @@ Entonces alguien edita una configuración...
    - **ASPA Invalid.** El salto `64500 → 64999` nunca fue autorizado: el
      objeto ASPA del origen lista a los Proveedores A y B, y el peer no es ninguno de los dos.
 
-2. Vuelva a descartar:
+   El enlace del peer en el panel se pone **rojo**. El camino del Proveedor B sigue
+   siendo el seleccionado (`V-V`, 200) - no necesita ninguna ayuda del ASPA para
+   ganar, porque además es el más corto - pero el daño es real: el origen perdió
+   su *respaldo*, y los demás clientes del Proveedor A ahora están enviando su
+   tráfico al origen a través del peer.
+
+**En el camino:** una fuga de ruta no es que nadie falsifique nada - es una ruta
+que cruza un límite que nunca debía cruzar - y es un veredicto que el ROV no
+puede dar por estructura, porque el origen al final del camino está diciendo la
+verdad. El ASPA la detecta por la misma razón que detectó la falsificación del
+Paso 4: un salto no autorizado, esté donde esté en el camino.
+
+---
+
+## Paso 8 — Desplegando de verdad: descartar
+
+> **Estado:** etapa `aspa-mark` · AS666 falsificando el camino (marcado,
+> perdiendo) · el peer filtrando (marcado, perdiendo) · ROAs para los dos
+> prefijos · ASPA listando a los Proveedores A y B.
+>
+> **Si el suyo difiere:** `./scripts/lab.sh step5-aspa-mark` y
+> `./scripts/lab.sh step7-leak-on`.
+
+Cada ruta inválida que vio hasta ahora se quedó en la tabla, degradada pero
+visible - a propósito, para que pudiera mirar exactamente qué decidió cada
+verificación antes de confiarle algo. **Un router real no se queda ahí.**
+Marcar una ruta como inválida y seguir usándola cuando no aparece nada mejor
+no es para lo que sirven el ROV ni el ASPA; los dos protegen algo recién
+cuando una ruta inválida se *rechaza* de verdad. Este es el paso donde eso
+pasa - para las dos verificaciones, juntas, de la misma forma en que
+configuraría un router de producción desde el principio.
+
+1. Cambie los dos observadores a descartar:
 
    ```
-   #./scripts/lab.sh step5-aspa-drop
+   #./scripts/lab.sh step8-drop
    ```
 
-   El camino filtrado se descarta en los dos observadores, y mire lo que queda:
-   solo el camino del Proveedor B. **El camino legítimo del Proveedor A también desapareció** -
-   el Proveedor A decidió pasar la ruta filtrada *en lugar de* la suya, así que
-   no queda nada legítimo en ese enlace. El ASPA protegió a los observadores
-   de *usar* la fuga; no pudo hacer que el Proveedor A dejara de propagarla.
-   Eso requiere que el peer arregle su política de exportación, y que el Proveedor A filtre
-   lo que le envían sus clientes.
+2. Compare la etapa que acaba de dejar con esta - el cambio es una línea de
+   política por verificación, en cada router:
+
+   ```
+   #diff bird/observer1-aspa-mark.conf bird/observer1-aspa-drop.conf
+   #diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-aspa-drop.conf
+   ```
+
+   ```
+       if roa_check(roa4_table, net, bgp_path.last) = ROA_INVALID then
+           reject "ROV Invalid: ", net, " origin AS", bgp_path.last;   # observer1 (BIRD)
+       ...
+       ASPA_INVALID: reject "ASPA Invalid: ", net, " AS_PATH ", bgp_path;
+   ```
+
+   ```
+   deny from any ovs invalid                               # observer2 (OpenBGPD)
+   deny from any avs invalid
+   ```
+
+3. Mire las rutas de nuevo:
+
+   ```
+   # Panel: haga clic en el recuadro observador 2, luego en Shell:
+   #bgpctl show rib 10.0.0.0/24
+   # O, desde la terminal de su computadora:
+   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   ```
+
+   ```
+   *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
+   ```
+
+   **Desaparecieron dos rutas, no una.** El camino falsificado del AS666 se
+   fue, como era de esperar. También se fue la entrada que antes estaba bajo el
+   Proveedor A - el camino filtrado que acaba de inspeccionar. No se perdió; BIRD
+   guarda lo que rechazó:
+
+   ```
+   # Panel: haga clic en el recuadro observador 1, luego en Shell:
+   #birdc show route table master4 filtered 10.0.0.0/24
+   # O, desde la terminal de su computadora:
+   #docker exec lab-observer1 birdc show route table master4 filtered 10.0.0.0/24
+   ```
+
+   La insignia ahora dice *ROV + ASPA: descartando*. Note lo que descartar **no**
+   arregló: el camino propio y legítimo del Proveedor A sigue sin aparecer por
+   ningún lado, porque el Proveedor A mismo sigue anunciando la ruta filtrada *en
+   lugar de* la suya - y ninguna política en los observadores puede hacer que el
+   Proveedor A propague algo que no está enviando. El ASPA protege a los
+   observadores de *usar* la fuga; solo que el peer arregle su política de
+   exportación detiene la fuga en la fuente. Eso viene a continuación.
+
+**En el camino:**
+
+- **Marcar versus descartar.** Los mismos veredictos de los Pasos 3, 5 y 7 - lo
+  que cambió fue la política. Marcar es cómo se despliega una verificación sin
+  romper nada; descartar es *para qué* sirve la verificación, y lo que convierte
+  un diagnóstico en una defensa.
+- **Descartar no repara el daño río arriba.** Solo controla lo que los propios
+  observadores aceptan. Que el Proveedor A propague la fuga es un problema
+  aparte, que se arregla en la fuente, no en los observadores.
+- **De aquí en adelante, las dos verificaciones siguen descartando.** Un router
+  que aprendió a rechazar rutas inválidas no vuelve atrás.
 
 ---
 
@@ -1260,8 +1271,10 @@ ejercicio a la vez:
   resultado - las mismas tres piezas para el ROV (Paso 3) y el ASPA (Paso 5), en el router
   de cualquier fabricante.
 - **¿Por qué marcar primero y descartar después - y por qué descartar, en definitiva?** Marcar le permite
-  ver qué haría una verificación antes de confiar en ella; descartar es lo que hacen los routers
-  reales, y lo que hace que la verificación proteja algo (Pasos 3 y 5).
+  ver qué haría una verificación antes de confiar en ella, y fue lo que le permitió detectar
+  su propio objeto ASPA incompleto en el Paso 6 antes de que tirara algo abajo; descartar es lo que
+  hacen los routers reales, y lo que hace que la verificación proteja algo - el Paso 8 activa las
+  dos verificaciones a la vez, de la forma en que se configura un router de producción desde el principio.
 - **¿Puede el ROV distinguir dos caminos para el mismo prefijo?** No (Paso 4).
 - **¿Cómo se ve un secuestro con el ASN de origen equivocado?** Paso 2, y cómo
   lo detiene el ROV en el Paso 3.
@@ -1270,7 +1283,8 @@ ejercicio a la vez:
   necesitan una republicación y una revalidación para llegar (Pasos 3, 5 y 6).
 - **¿Coinciden las dos pilas independientes?** Cada paso muestra las dos, y
   coinciden en todo lo que la historia mira - el Ejercicio extra A muestra dónde no coinciden.
-- **¿Qué es una fuga de ruta, y por qué el ROV no la puede ver?** Pasos 7 y 8.
+- **¿Qué es una fuga de ruta, y por qué el ROV no la puede ver?** El Paso 7 la
+  muestra; el Paso 8 muestra qué arregla descartar, y qué no.
 
 Cuatro temas no cupieron en la historia, y viven en los extras de abajo: en qué se diferencian los algoritmos
 upstream y downstream (y el `role` que selecciona uno),
@@ -1432,8 +1446,9 @@ el Proveedor A usa su propio filtro de prepend, que usted no tocó) con
 `bgp_path: 64502 64500` - un
 camino perfectamente legítimo por un proveedor autorizado - pero **ROV
 Invalid**: la ROA de `10.0.0.0/24` solo autoriza anuncios hasta
-`/24`, y `/25` es más específico que eso. (Ejecute `step3-rov-drop` y
-desaparece, como pasó con el secuestro.)
+`/24`, y `/25` es más específico que eso. En `rov-mark` se queda visible,
+degradada, exactamente como el secuestro del Paso 3. Ejecute `step8-drop`
+y desaparece de la misma forma en que después desapareció el secuestro.
 
 Deshaga los dos cambios (quite la línea `route` extra, restaure el filtro original
 `only_mine_v4`) y recargue `lab-origin` cuando termine.
@@ -1570,16 +1585,16 @@ aparezcan a propósito, sacando objetos:
 
 | Síntoma | Qué verificar |
 |---|---|
-| Lo que veo no coincide con un paso | Lea el cuadro de **Estado** del paso y ejecute los comandos que lista - todos son seguros de repetir. Los comandos `step*` que mueven a los observadores (`step1-clean`, `step3-rov-mark`, `step3-rov-drop`, `step5-aspa-mark`, `step5-aspa-drop`) fijan una etapa *completa* en los dos, sin importar en qué etapa estuvieran; `step1-clean` también silencia al AS666 y al peer; `krillc aspas add` reemplaza el objeto ASPA entero por exactamente la lista que le da. |
-| La ruta del AS666 no aparece | Cuando un observador está *descartando* lo que una verificación marca (`rov-drop`, `aspa-drop`), esa ruta desaparece de la tabla a propósito: mire en `birdc show route table master4 filtered` en observer1. En `none` no hay veredictos, pero la ruta debería estar. Si no, verifique que ejecutó el comando del paso y que la sesión está arriba: `docker exec lab-attacker birdc show protocols`. |
-| Los dos observadores no coinciden, o la insignia de etapa está ámbar | La insignia en el encabezado del panel muestra la etapa que cada observador realmente está corriendo; ámbar significa que difieren. Ejecute el comando de paso de la etapa que quiere (p. ej. `./scripts/lab.sh step5-aspa-drop`) para dejar los dos en la misma. Justo después de un cambio, observer2 también necesita diez o quince segundos para estabilizarse (se reinicia), así que mire de nuevo antes de sacar conclusiones. |
+| Lo que veo no coincide con un paso | Lea el cuadro de **Estado** del paso y ejecute los comandos que lista - todos son seguros de repetir. Los comandos `step*` que mueven a los observadores (`step1-clean`, `step3-rov-mark`, `step5-aspa-mark`, `step8-drop`) fijan una etapa *completa* en los dos, sin importar en qué etapa estuvieran; `step1-clean` también silencia al AS666 y al peer; `krillc aspas add` reemplaza el objeto ASPA entero por exactamente la lista que le da. |
+| La ruta del AS666 no aparece | Cuando un observador está *descartando* lo que una verificación marca (etapa `aspa-drop`, desde `step8-drop` en adelante), esa ruta desaparece de la tabla a propósito: mire en `birdc show route table master4 filtered` en observer1. Antes de eso, en `none` no hay veredictos, y en `rov-mark`/`aspa-mark` solo se degrada, así que la ruta debería seguir ahí. Si no, verifique que ejecutó el comando del paso y que la sesión está arriba: `docker exec lab-attacker birdc show protocols`. |
+| Los dos observadores no coinciden, o la insignia de etapa está ámbar | La insignia en el encabezado del panel muestra la etapa que cada observador realmente está corriendo; ámbar significa que difieren. Ejecute el comando de paso de la etapa que quiere (p. ej. `./scripts/lab.sh step8-drop`) para dejar los dos en la misma. Justo después de un cambio, observer2 también necesita diez o quince segundos para estabilizarse (se reinicia), así que mire de nuevo antes de sacar conclusiones. |
 | Creé la ROA/ASPA pero nada cambió | `./scripts/lab.sh refresh` obliga a los dos validadores a revalidar. Si sigue sin cambiar, puede que `refresh` haya corrido antes de que Krill terminara de publicar: verifique `krillc roas list` / `krillc aspas list`, espere unos segundos, refresque de nuevo. |
 | Creé la ROA pero no aparece en Krill | La CA todavía no tenía el certificado del padre. `docker exec lab-krill krillc bulk refresh`, rehaga la ROA, y luego `krillc bulk publish` |
 | Routinator no muestra ningún ASPA | Faltó `--enable-aspa`, o el objeto todavía no fue publicado/revalidado. `./scripts/lab.sh refresh`. |
 | La tabla `aspa_table` de BIRD está vacía | RTR negoció la versión 1. Verifique `birdc show protocols all routinator` y si Routinator levantó con `--enable-aspa`. |
 | Una sesión BGP no levanta | `docker compose logs origin provider-a provider-b observer1 observer2 attacker peer` |
 | observer2 muestra `avs` como `unknown` en todas partes | La sesión RTR negoció la versión 1, o FORT es anterior a 1.7.0.experimental. Verifique que `bgpctl show rtr` diga `Version: 2`. |
-| observer2 muestra `avs` como `valid` en LOS DOS caminos | La sesión perdió su rol RFC 9234 - normalmente después de un `bgpctl reload` a secas. Vuelva a ejecutar el comando de paso de la etapa (`./scripts/lab.sh step5-aspa-mark` o `step5-aspa-drop`), que reinicia observer2 con la configuración de la etapa. |
+| observer2 muestra `avs` como `valid` en LOS DOS caminos | La sesión perdió su rol RFC 9234 - normalmente después de un `bgpctl reload` a secas. Vuelva a ejecutar el comando de paso de la etapa (`./scripts/lab.sh step5-aspa-mark` o `step8-drop`), que reinicia observer2 con la configuración de la etapa. |
 | FORT no arranca o no obtiene nada | `docker logs lab-fort`. Debería terminar con "First validation cycle successfully ended". Si TLS falla, la CA del laboratorio no llegó a su almacén de confianza: verifique que el volumen `pki` esté montado. |
 | Krill no puede comunicarse con Registro.br | El contenedor necesita acceso saliente a Internet: `docker exec lab-krill ping -c1 beta.registro.br` |
 | Quiero empezar de nuevo | `./scripts/lab.sh reset` (borra la CA de Krill, el estado propio del registro LabNIC, y las cachés de los dos validadores), y luego `up`. No ejecute un `docker compose down -v` a secas: LabNIC y el panel del registro solo levantan bajo el perfil compose `local`, y un `docker compose down` a secas los deja corriendo sin avisar - `lab.sh` lo configura por usted. Ejecútelo además desde la terminal de su propia computadora, no desde la consola en el navegador del panel: `reset` tira abajo todo el laboratorio, incluida esa misma consola, lo que mata el comando a la mitad. |

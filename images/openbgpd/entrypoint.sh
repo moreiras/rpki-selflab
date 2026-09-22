@@ -7,7 +7,7 @@
 #   none        plain BGP, no validation deployed
 #   rov-mark    ROV deployed, marking only
 #   rov-drop    ROV dropping the invalid ones
-#   aspa-mark   ROV dropping + ASPA verification marking
+#   aspa-mark   ROV marking + ASPA verification marking
 #   aspa-drop   ROV dropping + ASPA verification dropping
 #
 # The lab switches stages at runtime (see scripts/lab.sh): it writes the stage

@@ -150,7 +150,9 @@ pode voltar aos trilhos sem começar do zero.
 Três coisas mudam ao longo da história:
 
 - **O estágio de implantação dos observadores.** Eles começam sem nenhuma
-  validação, e a história os leva por cinco estágios. Cada comando define um
+  validação, e a história os leva por quatro estágios: as duas verificações
+  ficam marcando antes de qualquer uma delas começar a descartar, e só então
+  as duas passam a descartar juntas, no Passo 8. Cada comando define um
   estágio inteiro nos **dois** observadores de uma vez, seja qual for o estágio
   em que estavam antes:
 
@@ -158,9 +160,8 @@ Três coisas mudam ao longo da história:
   |---|---|---|
   | `none` | BGP puro, sem validação (como o laboratório começa) | `step1-clean` |
   | `rov-mark` | ROV implantado, rotas inválidas apenas *marcadas* | `step3-rov-mark` |
-  | `rov-drop` | ROV *descartando* rotas inválidas | `step3-rov-drop` |
-  | `aspa-mark` | ROV descartando, verificação ASPA apenas *marcando* | `step5-aspa-mark` |
-  | `aspa-drop` | ROV e ASPA ambos descartando | `step5-aspa-drop` |
+  | `aspa-mark` | verificação ASPA entra em cena, também só *marcando* | `step5-aspa-mark` |
+  | `aspa-drop` | ROV e ASPA passam a *descartar* juntos - produção | `step8-drop` |
 
   Cada estágio é um arquivo de configuração completo por observador
   (`bird/observer1-<stage>.conf`, `openbgpd/observer2-<stage>.conf`), e o
@@ -173,7 +174,9 @@ Três coisas mudam ao longo da história:
   ou quinze segundos para se acomodar antes de concluir qualquer coisa do que ele mostra.
 - **O AS{{ATTACKER_ASN}} e o peer.** Seis comandos (`step1-clean`, `step2-hijack-simple`,
   `step4-hijack-posrov`, `step7-leak-on`, `step9-leak-off`,
-  `step9-hijack-off`) os alternam entre comportamentos.
+  `step9-hijack-off`) os alternam entre comportamentos. (`step8-drop`
+  pertence ao estágio de implantação dos observadores, acima - nada muda para
+  o AS{{ATTACKER_ASN}} ou o peer quando você o roda.)
 - **Os objetos RPKI da origem**, no Krill: as ROAs e o objeto ASPA.
 
 Os nomes de todos esses comandos carregam o número do passo a que pertencem.
@@ -510,7 +513,7 @@ que existe, e aquele para o qual as ROAs foram inventadas.
 
 ---
 
-## Passo 3 — O ROV entra: primeiro marca, depois descarta
+## Passo 3 — O ROV entra, marcando o que parece errado
 
 > **Estado:** estágio `none` (prestes a mudar) · AS{{ATTACKER_ASN}} fazendo o sequestro ingênuo ·
 > peer em silêncio · ainda sem ROAs (você vai criá-las aqui), sem ASPA.
@@ -519,7 +522,7 @@ que existe, e aquele para o qual as ROAs foram inventadas.
 > `./scripts/lab.sh step2-hijack-simple`.
 
 Este passo tem duas metades, nesta ordem: a **Origem publica** as ROAs, e
-os **Observadores validam** - primeiro só marcando, depois descartando.
+os **Observadores validam** - só marcando, por enquanto.
 
 ### A Origem publica: crie as ROAs
 
@@ -568,7 +571,7 @@ Por enquanto nada mudou para os roteadores: as ROAs estão publicadas e
 validadas, e **nenhum roteador está escutando os validadores.** Olhe os
 observadores de novo se quiser - o sequestro ainda está vencendo.
 
-### Os Observadores validam, estágio 1: marcar
+### Os Observadores validam
 
 1. Implante o ROV nos dois observadores, na sua primeira forma segura:
 
@@ -678,6 +681,13 @@ observadores de novo se quiser - o sequestro ainda está vencendo.
    legítimo foi prejudicado. **Esse é o ponto do estágio de marcação** - você vê
    o que a verificação *faria* antes de deixá-la rejeitar qualquer coisa.
 
+   **É aqui que o ROV fica pelo resto da história - marcando, não
+   descartando.** Um roteador que só marca ainda usa uma rota inválida sempre
+   que ela é o melhor que ele tem, então marcar sozinho não é o fim do
+   trabalho; é o ensaio. Você vai ver como é o descarte de verdade, de
+   produção - para o ROV e o ASPA juntos, de uma vez - no Passo 8, depois que
+   as duas verificações tiverem tido a sua vez de se provar assim.
+
 ### Como ler os vereditos
 
 Os dois observadores os mostram de formas diferentes:
@@ -697,68 +707,19 @@ Os dois observadores os mostram de formas diferentes:
   Então `V-!` é ROV Valid e ASPA Invalid. (Nenhuma verificação ASPA está
   implantada ainda, então a segunda metade é `?` por enquanto.)
 
-### Os Observadores validam, estágio 2: descartar
-
-**É isto que os roteadores de verdade fazem.** Marcar foi o ensaio: você conferiu que
-as sinalizações caem onde deveriam. Um roteador que apenas marca rotas inválidas
-ainda as usa sempre que elas são o melhor que ele tem - e a rota de um atacante é,
-mais cedo ou mais tarde. Em produção, uma rota inválida é *rejeitada*.
-
-1. Passe os dois observadores para o descarte:
-
-   ```
-   #./scripts/lab.sh step3-rov-drop
-   ```
-
-2. Compare o estágio que você acabou de deixar com este - a mudança é uma linha de
-   política em cada roteador:
-
-   ```
-   #diff bird/observer1-rov-mark.conf bird/observer1-rov-drop.conf
-   #diff openbgpd/observer2-rov-mark.conf openbgpd/observer2-rov-drop.conf
-   ```
-
-   ```
-       if roa_check(roa4_table, net, bgp_path.last) = ROA_INVALID then
-           reject "ROV Invalid: ", net, " origin AS", bgp_path.last;   # observer1 (BIRD)
-   ```
-
-   ```
-   deny from any ovs invalid                               # observer2 (OpenBGPD)
-   ```
-
-3. Olhe de novo: o sequestro sumiu da tabela. Não está perdido -
-   o BIRD guarda o que rejeitou:
-
-   ```
-   # Painel: clique na caixa observer1 e depois em Shell:
-   #birdc show route table master4 filtered {{ORIGIN_V4}}
-   # Ou, no terminal do seu computador:
-   #docker exec lab-observer1 birdc show route table master4 filtered {{ORIGIN_V4}}
-   ```
-
-   O selo agora diz *ROV: descartando*. O sequestro foi derrotado. O AS{{ATTACKER_ASN}} continua
-   anunciando, e continua falhando - **e daqui em diante o ROV continua descartando
-   pelo resto da história.** Um roteador que aprendeu a rejeitar rotas inválidas
-   não volta atrás.
-
-**No caminho:**
-
-- **Marcar versus descartar.** O mesmo veredito, duas políticas. Marcar é como você
-  implanta uma verificação sem quebrar nada; descartar é para o que a verificação
-  *serve*.
-- **Do que é feito "implantar o ROV":** uma sessão RTR, um teste, uma ação.
-- **Como novos objetos chegam aos roteadores.** O Krill publica, os validadores
-  relêem, os roteadores recebem a mudança por RTR. Você acabou de ver cada salto.
+**No caminho:** do que é feito "implantar o ROV" - uma sessão RTR, um teste em
+cada rota e uma ação sobre o resultado - e como novos objetos chegam aos
+roteadores: o Krill publica, os validadores relêem, os roteadores recebem a
+mudança por RTR. Você acabou de ver cada salto.
 
 ---
 
 ## Passo 4 — O caminho forjado
 
-> **Estado:** estágio `rov-drop` · AS{{ATTACKER_ASN}} fazendo o sequestro ingênuo (descartado) · peer
-> em silêncio · ROAs para os dois prefixos · sem ASPA.
+> **Estado:** estágio `rov-mark` · AS{{ATTACKER_ASN}} fazendo o sequestro ingênuo (marcado
+> inválido, perdendo) · peer em silêncio · ROAs para os dois prefixos · sem ASPA.
 >
-> **Se o seu for diferente:** `./scripts/lab.sh step3-rov-drop` e
+> **Se o seu for diferente:** `./scripts/lab.sh step3-rov-mark` e
 > `./scripts/lab.sh step2-hijack-simple`; confira as ROAs com `krillc roas
 > list` no terminal do Krill (deve haver exatamente duas).
 
@@ -829,17 +790,17 @@ Ela só olha o último AS.
 
 ---
 
-## Passo 5 — O ASPA entra: primeiro marca, depois descarta
+## Passo 5 — O ASPA entra, também marcando primeiro
 
-> **Estado:** estágio `rov-drop` · AS{{ATTACKER_ASN}} forjando o caminho · peer em silêncio · ROAs para
+> **Estado:** estágio `rov-mark` · AS{{ATTACKER_ASN}} forjando o caminho · peer em silêncio · ROAs para
 > os dois prefixos · ainda sem ASPA (você vai criá-lo aqui).
 >
-> **Se o seu for diferente:** `./scripts/lab.sh step3-rov-drop` e
+> **Se o seu for diferente:** `./scripts/lab.sh step3-rov-mark` e
 > `./scripts/lab.sh step4-hijack-posrov`; se um objeto ASPA já existir,
 > `krillc aspas remove --customer AS{{ORIGIN_ASN}}` no terminal do Krill.
 
 Mesmo formato do Passo 3: a **Origem publica** um objeto ASPA, depois os
-**Observadores validam** - primeiro marcando, depois descartando.
+**Observadores validam** - na mesma forma segura, só marcando, que o ROV usou.
 
 ### A Origem publica: crie o objeto ASPA
 
@@ -887,19 +848,19 @@ linha de comando (a interface está a caminho na próxima versão).
 Como com as ROAs, nada muda ainda para os roteadores: o objeto está publicado,
 e nenhum roteador está verificando caminhos.
 
-### Os Observadores validam, estágio 1: marcar
+### Os Observadores validam
 
-1. Implante a verificação ASPA nos dois observadores - o ROV continua descartando:
+1. Implante a verificação ASPA nos dois observadores - o ROV continua só marcando:
 
    ```
    #./scripts/lab.sh step5-aspa-mark
    ```
 
-2. **Compare com o estágio que você acabou de deixar** (`rov-drop`):
+2. **Compare com o estágio que você acabou de deixar** (`rov-mark`):
 
    ```
-   #diff bird/observer1-rov-drop.conf bird/observer1-aspa-mark.conf
-   #diff openbgpd/observer2-rov-drop.conf openbgpd/observer2-aspa-mark.conf
+   #diff bird/observer1-rov-mark.conf bird/observer1-aspa-mark.conf
+   #diff openbgpd/observer2-rov-mark.conf openbgpd/observer2-aspa-mark.conf
    ```
 
    As mesmas três ideias, desta vez para caminhos:
@@ -980,56 +941,45 @@ e nenhum roteador está verificando caminhos.
    O caminho forjado agora é **ASPA Invalid** - o salto `{{ORIGIN_ASN}} → {{ATTACKER_ASN}}` não está
    autorizado, já que só {{PROVIDER_A_ASN}} está listado. Ele ainda é visível, mas com
    `local_pref` 20 perde para o caminho do Provedor A (`V-V`, 200). Os
-   links do atacante ficam **vermelhos** de novo, e o selo diz *ROV: descartando ·
+   links do atacante ficam **vermelhos** de novo, e o selo diz *ROV: marcando ·
    ASPA: marcando*.
 
-   Só que duas rotas carregam `V-!` - não uma. E olhe o que foi selecionado:
-   o caminho do Provedor A, o *backup* com os prepends, não o do Provedor B. Guarde
-   esse pensamento.
-
-### Os Observadores validam, estágio 2: descartar
-
-```
-#./scripts/lab.sh step5-aspa-drop
-```
-
-A mudança em relação ao estágio anterior é, mais uma vez, uma linha de política por
-roteador (`reject` no ramo `ASPA_INVALID` do BIRD, `deny from any avs invalid`
-no OpenBGPD):
-
-```
-#diff bird/observer1-aspa-mark.conf bird/observer1-aspa-drop.conf
-#diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-aspa-drop.conf
-```
-
-Olhe o `show rib` de novo. **Duas** rotas sumiram, não uma. Uma é o caminho forjado do AS{{ATTACKER_ASN}}.
-Qual é a outra, e é isso que você queria? O que os
-observadores acabaram selecionando?
+   Duas rotas carregam `V-!`, porém - não uma. Olhe com atenção para a
+   segunda: é o **Provedor B**, o caminho de entrada preferido da própria origem,
+   fruto da engenharia de tráfego do Passo 1. O objeto ASPA que você acabou de
+   criar só lista o Provedor A, então o ASPA também chama de inválido o caminho
+   do Provedor B - e o que acabou sendo selecionado no lugar dele foi o caminho
+   do Provedor A, o *backup*, aquele que a origem deliberadamente alongou com
+   os prepends. Como nada é descartado ainda, você consegue ver esse erro antes
+   que ele custe alguma coisa: guarde esse pensamento para o próximo passo.
 
 **No caminho:** o veredito ASPA que o ROV nunca poderia dar - o caminho
-em si é o que está errado, mesmo com a origem certa. E a mesma progressão
-de marcar/descartar do Passo 3, desta vez para o ASPA.
+em si é o que está errado, mesmo com a origem certa - e um lembrete de por
+que marcar roda antes de descartar: isso deixou você pegar um erro no seu
+próprio objeto ASPA antes que ele derrubasse alguma coisa.
 
 ---
 
 ## Passo 6 — Você esqueceu um provedor
 
-> **Estado:** estágio `aspa-drop` · AS{{ATTACKER_ASN}} forjando o caminho · peer em silêncio · ROAs para
+> **Estado:** estágio `aspa-mark` · AS{{ATTACKER_ASN}} forjando o caminho · peer em silêncio · ROAs para
 > os dois prefixos · ASPA listando apenas o Provedor A.
 >
-> **Se o seu for diferente:** `./scripts/lab.sh step5-aspa-drop`, e no terminal
+> **Se o seu for diferente:** `./scripts/lab.sh step5-aspa-mark`, e no terminal
 > do Krill `krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}"` (isso substitui o
 > objeto exatamente por essa lista), depois `./scripts/lab.sh refresh`.
 
-A segunda rota que sumiu no último passo é a do Provedor B - um caminho
-*legítimo*, **justamente o que a origem prefere**, e você agora o está descartando,
-porque o objeto ASPA só lista o Provedor A. Os observadores
-ficam com o caminho de backup, aquele que a origem deliberadamente alongou
-com os prepends: a engenharia de tráfego da origem, desfeita por um objeto
-incompleto. Em produção, este é o dia em que o tráfego que costumava chegar
-por aquela interface para de chegar, e alguém começa a perguntar por quê.
-(Este laboratório não tem plano de dados, então você não vê o tráfego parar; você vê a
-rota desaparecer, que é a mesma coisa dita de outro jeito.)
+A rota que você notou no fim do último passo - a do Provedor B, marcada
+ASPA Invalid junto com a forjada - é um caminho *legítimo*, **justamente o
+que a origem prefere**, rebaixado sem motivo melhor que um objeto incompleto.
+Os observadores ficam com o caminho de backup, aquele que a origem
+deliberadamente alongou com os prepends: a engenharia de tráfego da origem,
+desfeita por um ASPA incompleto. Quando este estágio passar a descartar em vez
+de marcar (Passo 8), este é o dia em que o tráfego que costumava chegar por
+aquela interface para de chegar, e alguém começa a perguntar por quê.
+(Este laboratório não tem plano de dados, então você não pode ver o tráfego
+parar; você pode ver a preferência da rota desabar, que é a mesma coisa dita
+de outro jeito.)
 
 1. Conserte o objeto:
 
@@ -1051,13 +1001,15 @@ rota desaparecer, que é a mesma coisa dita de outro jeito.)
    ```
    *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     V-V {{ORIGIN_V4}}          10.200.5.10       200     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
+   *     V-! {{ORIGIN_V4}}          10.200.8.10        20     0 {{ATTACKER_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   Os dois caminhos legítimos voltaram (`V-V`), e o Provedor B - a entrada
-   preferida da origem - é selecionado de novo. O forjado continua descartado, e
-   o AS{{ATTACKER_ASN}} - ainda anunciando - continua derrotado. Repare como o conserto não
-   envolveu o AS{{ATTACKER_ASN}} em nada: o objeto ASPA descreve as *suas* relações, e
-   tudo o que as contradiz está fora.
+   Os dois caminhos legítimos voltaram para `V-V` e `local_pref` 200, e o
+   Provedor B - a entrada preferida da origem - é reselecionado: uma vez
+   empatados na preferência, o seu caminho mais curto vence. O forjado continua
+   rebaixado (`V-!`, 20), e o AS{{ATTACKER_ASN}} - ainda anunciando - continua derrotado.
+   Repare como o conserto não envolveu o AS{{ATTACKER_ASN}} em nada: o objeto ASPA
+   descreve as *suas* relações, e tudo o que as contradiz perde.
 
 3. O BIRD pegou a mudança sozinho, sem ninguém tocar no roteador,
    porque as suas sessões são configuradas com `import table on` e `rpki reload
@@ -1079,12 +1031,12 @@ painel do que está sendo mantido de fora.
 
 ---
 
-## Passo 7 — O peer vaza
+## Passo 7 — O peer vaza (e o ASPA pega o que o ROV não pega)
 
-> **Estado:** estágio `aspa-drop` · AS{{ATTACKER_ASN}} forjando o caminho (derrotado) · peer em silêncio
-> · ROAs para os dois prefixos · ASPA listando os Provedores A e B.
+> **Estado:** estágio `aspa-mark` · AS{{ATTACKER_ASN}} forjando o caminho (marcado, perdendo) · peer
+> em silêncio · ROAs para os dois prefixos · ASPA listando os Provedores A e B.
 >
-> **Se o seu for diferente:** `./scripts/lab.sh step5-aspa-drop`,
+> **Se o seu for diferente:** `./scripts/lab.sh step5-aspa-mark`,
 > `./scripts/lab.sh step9-leak-off` (peer em silêncio), e no terminal do Krill
 > `krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}, AS{{PROVIDER_B_ASN}}"` (isso substitui o
 > objeto exatamente por essa lista), depois `./scripts/lab.sh refresh`.
@@ -1106,8 +1058,8 @@ Então alguém edita uma configuração...
 
 2. **Antes de olhar:** o Provedor A agora tem duas rotas para o prefixo da
    origem - a da própria origem e a do peer. Qual delas o Provedor A repassa
-   aos observadores? O que você espera que os observadores mostrem, agora que
-   eles descartam caminhos ASPA-inválidos?
+   aos observadores? E, uma vez que ela chega, marcando apenas o que parece
+   inválido, você vai conseguir vê-la?
 
 3. Olhe primeiro o Provedor A:
 
@@ -1146,51 +1098,16 @@ Então alguém edita uma configuração...
 
    ```
    *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
-   ```
-
-   **O caminho do Provedor A sumiu.** O Provedor A agora está anunciando a rota
-   vazada *no lugar da* sua própria - e os observadores, descartando caminhos
-   ASPA-inválidos, a rejeitaram. O link do peer no painel fica **vermelho**. Por que
-   eles a descartaram?
-
-   Repare no que não aconteceu: os observadores não trocaram para o caminho
-   vazado, porque o caminho de 2 saltos do Provedor B ainda vence os seus 3 saltos. O estrago
-   aqui é que a origem perdeu o seu *backup* - e os outros clientes do Provedor A
-   agora estão mandando o tráfego deles para a origem através do peer.
-
----
-
-## Passo 8 — O ROV não enxerga; o ASPA enxerga
-
-> **Estado:** estágio `aspa-drop` · AS{{ATTACKER_ASN}} forjando o caminho (derrotado) · o peer
-> vazando · ROAs para os dois prefixos · ASPA listando os Provedores A e B.
->
-> **Se o seu for diferente:** `./scripts/lab.sh step5-aspa-drop` e
-> `./scripts/lab.sh step7-leak-on`.
-
-1. Para ver os vereditos, ponha a verificação ASPA de volta no estágio de marcação - uma
-   rota descartada some antes que você consiga olhá-la. (Só o ASPA volta: o ROV
-   continua descartando em `aspa-mark`, como desde o Passo 3.)
-
-   ```
-   #./scripts/lab.sh step5-aspa-mark
-   # Painel: clique na caixa observer2 e depois em Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Painel: clique na caixa observer1 e depois em Shell:
-   #birdc show route table master4 all {{ORIGIN_V4}}
-   # Ou, no terminal do seu computador:
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
-   #docker exec lab-observer1 birdc show route table master4 all {{ORIGIN_V4}}
-   ```
-
-   ```
-   *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.8.10        20     0 {{ATTACKER_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.5.10        20     0 {{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   Olhe a última rota. É o caminho que o peer vazou, chegando pelo
-   Provedor A: `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}`. Duas coisas a notar:
+   **O caminho próprio do Provedor A já sumiu** - ele parou de anunciá-lo no
+   momento em que escolheu o caminho mais curto do peer como melhor, e isso não
+   tem nada a ver com o que os observadores fazem com o que recebem. O que chega
+   do Provedor A em vez disso é o caminho vazado, `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}` -
+   e como marcar nunca remove nada da tabela, você consegue olhar direto para ele.
+   Duas coisas a notar:
 
    - **ROV Valid.** Claro - a origem realmente é {{ORIGIN_ASN}}. Nada é
      forjado. *Um vazamento nunca pode ser pego pelo ROV*: ele não mente sobre quem
@@ -1198,19 +1115,107 @@ Então alguém edita uma configuração...
    - **ASPA Invalid.** O salto `{{ORIGIN_ASN}} → {{PEER_ASN}}` nunca foi autorizado: o
      objeto ASPA da origem lista os Provedores A e B, e o peer não é nenhum dos dois.
 
-2. Volte para o descarte:
+   O link do peer no painel fica **vermelho**. O caminho do Provedor B continua
+   sendo o selecionado (`V-V`, 200) - ele não precisa de nenhuma ajuda do ASPA
+   para vencer, já que também é o mais curto - mas o estrago é real: a origem
+   perdeu o seu *backup*, e os outros clientes do Provedor A agora estão
+   mandando o tráfego deles para a origem através do peer.
+
+**No caminho:** um vazamento de rota não é ninguém forjando nada - é uma rota
+cruzando uma fronteira que ela nunca deveria cruzar - e é um veredito que o
+ROV estruturalmente não consegue dar, porque a origem no fim do caminho está
+dizendo a verdade. O ASPA o pega pelo mesmo motivo que pegou a forjadura do
+Passo 4: um salto não autorizado, esteja onde estiver no caminho.
+
+---
+
+## Passo 8 — Implantando de verdade: descartar
+
+> **Estado:** estágio `aspa-mark` · AS{{ATTACKER_ASN}} forjando o caminho (marcado, perdendo) · o peer
+> vazando (marcado, perdendo) · ROAs para os dois prefixos · ASPA listando os Provedores A e B.
+>
+> **Se o seu for diferente:** `./scripts/lab.sh step5-aspa-mark` e
+> `./scripts/lab.sh step7-leak-on`.
+
+Toda rota inválida que você viu até agora ficou na tabela, rebaixada mas
+visível - de propósito, para você poder olhar exatamente o que cada
+verificação decidiu antes de confiar nela com alguma coisa. **Um roteador de
+verdade não para por aí.** Marcar uma rota como inválida e continuar usando-a
+sempre que nada melhor aparece não é para o que o ROV ou o ASPA servem; os
+dois só protegem alguma coisa quando uma rota inválida é de fato rejeitada.
+Este é o passo em que isso acontece - para as duas verificações, juntas, do
+jeito que você configuraria um roteador de produção desde o início.
+
+1. Passe os dois observadores para o descarte:
 
    ```
-   #./scripts/lab.sh step5-aspa-drop
+   #./scripts/lab.sh step8-drop
    ```
 
-   O caminho vazado é descartado nos dois observadores, e olhe o que sobra:
-   só o caminho do Provedor B. **O caminho legítimo do Provedor A também sumiu** -
-   o Provedor A decidiu repassar a rota vazada *no lugar da* sua própria, então
-   não sobrou nada legítimo naquele link. O ASPA protegeu os observadores
-   de *usar* o vazamento; não conseguiu fazer o Provedor A parar de propagá-lo.
-   Isso exige que o peer conserte a sua política de exportação, e que o Provedor A filtre
-   o que os seus clientes lhe enviam.
+2. Compare o estágio que você acabou de deixar com este - a mudança é uma linha
+   de política por verificação, em cada roteador:
+
+   ```
+   #diff bird/observer1-aspa-mark.conf bird/observer1-aspa-drop.conf
+   #diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-aspa-drop.conf
+   ```
+
+   ```
+       if roa_check(roa4_table, net, bgp_path.last) = ROA_INVALID then
+           reject "ROV Invalid: ", net, " origin AS", bgp_path.last;   # observer1 (BIRD)
+       ...
+       ASPA_INVALID: reject "ASPA Invalid: ", net, " AS_PATH ", bgp_path;
+   ```
+
+   ```
+   deny from any ovs invalid                               # observer2 (OpenBGPD)
+   deny from any avs invalid
+   ```
+
+3. Olhe as rotas de novo:
+
+   ```
+   # Painel: clique na caixa observer2 e depois em Shell:
+   #bgpctl show rib {{ORIGIN_V4}}
+   # Ou, no terminal do seu computador:
+   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+   ```
+
+   ```
+   *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
+   ```
+
+   **Duas rotas desapareceram, não uma.** O caminho forjado do AS{{ATTACKER_ASN}} sumiu,
+   como esperado. O mesmo aconteceu com a entrada que costumava estar sob o
+   Provedor A - o caminho vazado que você acabou de inspecionar. Ele não está
+   perdido; o BIRD guarda o que rejeitou:
+
+   ```
+   # Painel: clique na caixa observer1 e depois em Shell:
+   #birdc show route table master4 filtered {{ORIGIN_V4}}
+   # Ou, no terminal do seu computador:
+   #docker exec lab-observer1 birdc show route table master4 filtered {{ORIGIN_V4}}
+   ```
+
+   O selo agora diz *ROV + ASPA: descartando*. Repare no que o descarte **não**
+   consertou: o caminho próprio e legítimo do Provedor A continua não aparecendo
+   em lugar nenhum, porque o próprio Provedor A continua anunciando a rota
+   vazada *no lugar da* sua - e nenhuma política nos observadores consegue fazer
+   o Provedor A propagar algo que ele não está mandando. O ASPA protege os
+   observadores de *usar* o vazamento; só o peer consertar a sua política de
+   exportação estanca o vazamento na origem. É o próximo passo.
+
+**No caminho:**
+
+- **Marcar versus descartar.** Os mesmos vereditos dos Passos 3, 5 e 7 - a
+  política é o que mudou. Marcar é como você implanta uma verificação sem
+  quebrar nada; descartar é para o que a verificação *serve*, e é o que
+  transforma um diagnóstico numa defesa.
+- **Descartar não conserta o estrago upstream.** Ele só controla o que os
+  próprios observadores aceitam. O Provedor A propagando o vazamento é um
+  problema separado, consertado na origem, não nos observadores.
+- **Daqui em diante, as duas verificações continuam descartando.** Um
+  roteador que aprendeu a rejeitar rotas inválidas não volta atrás.
 
 ---
 
@@ -1260,9 +1265,13 @@ costumava fazer um exercício de cada vez:
   sessão com um validador, um teste em cada rota ou caminho, e uma ação sobre o
   resultado - as mesmas três peças para o ROV (Passo 3) e o ASPA (Passo 5), no roteador de
   qualquer fabricante.
-- **Por que marcar primeiro e descartar depois - e por que descartar, afinal?** Marcar deixa você
-  ver o que uma verificação faria antes de confiar nela; descartar é o que os roteadores
-  de verdade fazem, e o que faz a verificação proteger alguma coisa (Passos 3 e 5).
+- **Por que marcar primeiro e descartar depois - e por que descartar, afinal?**
+  Marcar deixa você ver o que uma verificação faria antes de confiar nela, e
+  foi o que pegou o seu próprio objeto ASPA incompleto no Passo 6 antes que
+  ele quebrasse alguma coisa; descartar é o que os roteadores de verdade fazem,
+  e o que faz a verificação proteger alguma coisa - o Passo 8 liga as duas
+  verificações de uma vez, do jeito que um roteador de produção é configurado
+  desde o início.
 - **O ROV consegue distinguir dois caminhos para o mesmo prefixo?** Não (Passo 4).
 - **Como é um sequestro com o ASN de origem errado?** Passo 2, e como
   o ROV o barra no Passo 3.
@@ -1271,7 +1280,9 @@ costumava fazer um exercício de cada vez:
   levam uma republicação e uma revalidação para chegar (Passos 3, 5 e 6).
 - **As duas pilhas independentes concordam?** Todo passo mostra as duas, e elas
   concordam em tudo o que a história olha - o Exercício extra A mostra onde não concordam.
-- **O que é um vazamento de rota, e por que o ROV não o enxerga?** Passos 7 e 8.
+- **O que é um vazamento de rota, e por que o ROV não o enxerga?** O Passo 7
+  mostra; o Passo 8 mostra o que o descarte conserta, e o que não conserta,
+  a respeito dele.
 
 Quatro tópicos não couberam na história, e vivem nos extras abaixo: como os
 algoritmos upstream e downstream diferem (e o `role` que seleciona um),
@@ -1433,8 +1444,9 @@ Provedor A usa o seu próprio filtro de prepend, que você não tocou) com
 `bgp_path: {{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` - um caminho
 perfeitamente legítimo por um provedor autorizado - mas **ROV
 Invalid**: a ROA de `{{ORIGIN_V4}}` só autoriza anúncios até
-`/24`, e `/25` é mais específico que isso. (Rode `step3-rov-drop` e ele
-some, como o sequestro sumiu.)
+`/24`, e `/25` é mais específico que isso. Em `rov-mark` ela continua visível,
+rebaixada, exatamente como o sequestro no Passo 3. Rode `step8-drop` e ela
+some do mesmo jeito que o sequestro sumiu depois.
 
 Desfaça as duas mudanças (remova a linha `route` extra, restaure o filtro
 `only_mine_v4` original) e recarregue o `lab-origin` quando terminar.
@@ -1571,16 +1583,16 @@ aparecer de propósito, tirando objetos:
 
 | Sintoma | O que conferir |
 |---|---|
-| O que eu vejo não bate com um passo | Leia a caixa de **Estado** do passo e rode os comandos que ela lista - todos são seguros de repetir. Os comandos `step*` que movem os observadores (`step1-clean`, `step3-rov-mark`, `step3-rov-drop`, `step5-aspa-mark`, `step5-aspa-drop`) definem um estágio *inteiro* nos dois, seja qual for o estágio em que estavam; `step1-clean` também silencia o AS{{ATTACKER_ASN}} e o peer; `krillc aspas add` substitui o objeto ASPA inteiro exatamente pela lista que você der. |
-| A rota do AS{{ATTACKER_ASN}} não aparece | Quando um observador está *descartando* o que uma verificação sinaliza (`rov-drop`, `aspa-drop`), essa rota some da tabela de propósito: olhe em `birdc show route table master4 filtered` no observer1. Em `none` não há vereditos, mas a rota deve estar lá. Caso contrário, confira se você rodou o comando do passo e se a sessão está no ar: `docker exec lab-attacker birdc show protocols`. |
-| Os dois observadores discordam, ou o selo de estágio está âmbar | O selo no cabeçalho do painel mostra o estágio que cada observador está realmente rodando; âmbar significa que diferem. Rode o comando de passo do estágio que você quer (ex.: `./scripts/lab.sh step5-aspa-drop`) para colocar os dois no mesmo. Logo depois de uma troca, o observer2 também precisa de dez ou quinze segundos para se acomodar (ele reinicia), então olhe de novo antes de concluir qualquer coisa. |
+| O que eu vejo não bate com um passo | Leia a caixa de **Estado** do passo e rode os comandos que ela lista - todos são seguros de repetir. Os comandos `step*` que movem os observadores (`step1-clean`, `step3-rov-mark`, `step5-aspa-mark`, `step8-drop`) definem um estágio *inteiro* nos dois, seja qual for o estágio em que estavam; `step1-clean` também silencia o AS{{ATTACKER_ASN}} e o peer; `krillc aspas add` substitui o objeto ASPA inteiro exatamente pela lista que você der. |
+| A rota do AS{{ATTACKER_ASN}} não aparece | Quando um observador está *descartando* o que uma verificação sinaliza (estágio `aspa-drop`, a partir do `step8-drop`), essa rota some da tabela de propósito: olhe em `birdc show route table master4 filtered` no observer1. Antes disso, `none` não tem vereditos e `rov-mark`/`aspa-mark` só rebaixam, então a rota ainda deveria estar lá. Caso contrário, confira se você rodou o comando do passo e se a sessão está no ar: `docker exec lab-attacker birdc show protocols`. |
+| Os dois observadores discordam, ou o selo de estágio está âmbar | O selo no cabeçalho do painel mostra o estágio que cada observador está realmente rodando; âmbar significa que diferem. Rode o comando de passo do estágio que você quer (ex.: `./scripts/lab.sh step8-drop`) para colocar os dois no mesmo. Logo depois de uma troca, o observer2 também precisa de dez ou quinze segundos para se acomodar (ele reinicia), então olhe de novo antes de concluir qualquer coisa. |
 | Criei a ROA/ASPA mas nada mudou | `./scripts/lab.sh refresh` força os dois validadores a revalidar. Se ainda não mudar, o `refresh` pode ter rodado antes de o Krill terminar de publicar: confira `krillc roas list` / `krillc aspas list`, espere alguns segundos, faça o refresh de novo. |
 | Criei a ROA mas ela não aparece no Krill | A CA ainda não tinha o certificado do pai. `docker exec lab-krill krillc bulk refresh`, refaça a ROA, depois `krillc bulk publish` |
 | O Routinator não mostra nenhum ASPA | Faltou o `--enable-aspa`, ou o objeto ainda não foi publicado/revalidado. `./scripts/lab.sh refresh`. |
 | A tabela `aspa_table` do BIRD está vazia | O RTR negociou a versão 1. Confira `birdc show protocols all routinator` e se o Routinator subiu com `--enable-aspa`. |
 | Uma sessão BGP não sobe | `docker compose logs origin provider-a provider-b observer1 observer2 attacker peer` |
 | O observer2 mostra `avs` como `unknown` em todo lugar | A sessão RTR negociou a versão 1, ou o FORT é anterior à 1.7.0.experimental. Confira se `bgpctl show rtr` diz `Version: 2`. |
-| O observer2 mostra `avs` como `valid` nos DOIS caminhos | A sessão perdeu o seu role da RFC 9234 - geralmente depois de um `bgpctl reload` avulso. Rode de novo o comando de passo do estágio (`./scripts/lab.sh step5-aspa-mark` ou `step5-aspa-drop`), que reinicia o observer2 com a configuração do estágio. |
+| O observer2 mostra `avs` como `valid` nos DOIS caminhos | A sessão perdeu o seu role da RFC 9234 - geralmente depois de um `bgpctl reload` avulso. Rode de novo o comando de passo do estágio (`./scripts/lab.sh step5-aspa-mark` ou `step8-drop`), que reinicia o observer2 com a configuração do estágio. |
 | O FORT não sobe ou não busca nada | `docker logs lab-fort`. Deve terminar com "First validation cycle successfully ended". Se o TLS falhar, a CA do laboratório não chegou ao seu repositório de confiança: confira se o volume `pki` está montado. |
 | O Krill não consegue falar com o Registro.br | O contêiner precisa de acesso de saída à Internet: `docker exec lab-krill ping -c1 beta.registro.br` |
 | Quero recomeçar do zero | `./scripts/lab.sh reset` (apaga a CA do Krill, o estado do registro do próprio {{RIR_NAME}} e o cache dos dois validadores), depois `up`. Não rode um `docker compose down -v` avulso: o {{RIR_NAME}} e o painel do registro só sobem sob o perfil `local` do compose, e um `docker compose down` avulso os deixa rodando silenciosamente - o `lab.sh` configura isso para você. Rode também do terminal do seu próprio computador, não do console dentro do navegador do painel: o `reset` derruba o laboratório inteiro, inclusive esse console, o que mata o comando pela metade. |

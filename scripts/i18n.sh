@@ -67,25 +67,21 @@ msg() {
       es:step3_rov_mark_ok)       echo "paso 3: los dos observers ahora ejecutan ROV y solo MARCAN las rutas inválidas (community + local-pref)." ;;
       en:step3_rov_mark_ok)       echo "step 3: both observers now run ROV and only MARK invalid routes (community + local-pref)." ;;
 
-      pt:step3_rov_drop_ok)       echo "passo 3: os dois observadores agora DESCARTAM as rotas inválidas pelo ROV." ;;
-      es:step3_rov_drop_ok)       echo "paso 3: los dos observers ahora DESCARTAN las rutas inválidas según ROV." ;;
-      en:step3_rov_drop_ok)       echo "step 3: both observers now DROP ROV-invalid routes." ;;
-
       pt:step4_hijack_posrov_ok)  echo "passo 4: AS666 anuncia com um caminho forjado (AS_PATH: 666 <origem>)." ;;
       es:step4_hijack_posrov_ok)  echo "paso 4: AS666 anuncia con un camino falsificado (AS_PATH: 666 <origen>)." ;;
       en:step4_hijack_posrov_ok)  echo "step 4: AS666 is announcing with a forged path (AS_PATH: 666 <origin>)." ;;
 
-      pt:step5_aspa_mark_ok)      echo "passo 5: os dois observadores descartam o que o ROV marca como inválido e agora também verificam ASPA, só MARCANDO o que ela acusa." ;;
-      es:step5_aspa_mark_ok)      echo "paso 5: los dos observers descartan lo inválido según ROV y ahora también verifican ASPA, solo MARCANDO lo que esta señala." ;;
-      en:step5_aspa_mark_ok)      echo "step 5: both observers drop ROV-invalid routes and now also verify ASPA, only MARKING what it flags." ;;
-
-      pt:step5_aspa_drop_ok)      echo "passo 5: os dois observadores agora descartam rotas inválidas pelo ROV E pelo ASPA." ;;
-      es:step5_aspa_drop_ok)      echo "paso 5: los dos observers ahora descartan rutas inválidas según ROV Y según ASPA." ;;
-      en:step5_aspa_drop_ok)      echo "step 5: both observers now drop ROV-invalid AND ASPA-invalid routes." ;;
+      pt:step5_aspa_mark_ok)      echo "passo 5: os dois observadores agora também verificam ASPA, só MARCANDO o que ela acusa (o ROV continua só marcando)." ;;
+      es:step5_aspa_mark_ok)      echo "paso 5: los dos observers ahora también verifican ASPA, solo MARCANDO lo que esta señala (ROV sigue solo marcando)." ;;
+      en:step5_aspa_mark_ok)      echo "step 5: both observers now also verify ASPA, only MARKING what it flags (ROV keeps only marking too)." ;;
 
       pt:step7_leak_on_ok)        echo "passo 7: o peer agora vaza os prefixos da origem para o Provedor A." ;;
       es:step7_leak_on_ok)        echo "paso 7: el peer ahora filtra los prefijos del origen hacia el Proveedor A." ;;
       en:step7_leak_on_ok)        echo "step 7: peer is now leaking the origin's prefixes to Provider A." ;;
+
+      pt:step8_drop_ok)           echo "passo 8: os dois observadores agora DESCARTAM rotas inválidas pelo ROV E pelo ASPA - o que um roteador de verdade faz." ;;
+      es:step8_drop_ok)           echo "paso 8: los dos observers ahora DESCARTAN rutas inválidas según ROV Y según ASPA - lo que hace un router de verdad." ;;
+      en:step8_drop_ok)           echo "step 8: both observers now DROP ROV-invalid AND ASPA-invalid routes - what a real router does." ;;
 
       pt:step9_leak_off_ok)       echo "passo 9: o peer parou de vazar." ;;
       es:step9_leak_off_ok)       echo "paso 9: el peer dejó de filtrar." ;;
@@ -171,11 +167,10 @@ uso: ./scripts/lab.sh <comando>
   step1-clean          AS666 y peer callados; observers sin validación alguna
   step2-hijack-simple  AS666 anuncia los prefijos del origen como propios
   step3-rov-mark       ROV en los dos observers, solo MARCANDO los inválidos
-  step3-rov-drop       ROV DESCARTANDO los inválidos
   step4-hijack-posrov  AS666 falsifica el camino para que termine en el origen real
-  step5-aspa-mark      ROV descartando + ASPA solo MARCANDO
-  step5-aspa-drop      ROV y ASPA descartando
+  step5-aspa-mark      ROV y ASPA, los dos solo MARCANDO
   step7-leak-on        peer empieza a filtrar las rutas del origen al Proveedor A
+  step8-drop           ROV y ASPA pasan a DESCARTAR - lo que hace un router de verdad
   step9-leak-off       peer deja de filtrar
   step9-hijack-off     AS666 vuelve a callar
 
@@ -204,11 +199,10 @@ usage: ./scripts/lab.sh <command>
   step1-clean          AS666 and peer silent; observers with no validation at all
   step2-hijack-simple  AS666 announces the origin's prefixes as its own
   step3-rov-mark       ROV on both observers, only MARKING invalid routes
-  step3-rov-drop       ROV DROPPING invalid routes
   step4-hijack-posrov  AS666 forges the path so it ends in the real origin
-  step5-aspa-mark      ROV dropping + ASPA verification only MARKING
-  step5-aspa-drop      ROV and ASPA both dropping
+  step5-aspa-mark      ROV and ASPA, both only MARKING
   step7-leak-on        peer starts leaking the origin's routes to Provider A
+  step8-drop           ROV and ASPA start DROPPING - what a real router does
   step9-leak-off       peer stops leaking
   step9-hijack-off     AS666 goes silent again
 
@@ -237,11 +231,10 @@ uso: ./scripts/lab.sh <comando>
   step1-clean          AS666 e peer calados; observadores sem validação nenhuma
   step2-hijack-simple  AS666 anuncia os prefixos da origem como se fossem seus
   step3-rov-mark       ROV nos dois observadores, só MARCANDO os inválidos
-  step3-rov-drop       ROV DESCARTANDO os inválidos
   step4-hijack-posrov  AS666 forja o caminho para terminar na origem verdadeira
-  step5-aspa-mark      ROV descartando + ASPA só MARCANDO
-  step5-aspa-drop      ROV e ASPA descartando
+  step5-aspa-mark      ROV e ASPA, os dois só MARCANDO
   step7-leak-on        peer começa a vazar as rotas da origem para o Provedor A
+  step8-drop           ROV e ASPA passam a DESCARTAR - o que um roteador de verdade faz
   step9-leak-off       peer para de vazar
   step9-hijack-off     AS666 volta a ficar calado
 
