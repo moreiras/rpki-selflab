@@ -5,7 +5,7 @@
 *[English](README.md) · [Español](README.es.md) · [Português](README.pt.md)*
 
 A lab for RPKI (ROAs, ROV and ASPA) in containers, meant to run on any
-computer with Docker (Mac, Windows, or Linux - tested with OrbStack and
+computer with Docker (Mac, Windows, or Linux, tested with OrbStack and
 Docker Desktop). It publishes ROAs and an ASPA object, then shows what
 **two different validators and two different routers** make of exactly the
 same objects, while a hijacker (AS666) and a leaky peer try to get in the
@@ -49,7 +49,7 @@ open http://localhost:8080
 Everything is reachable through one port, 8080: the panel at `localhost`,
 and each of the other web apps under its own `<name>.localhost` (browsers
 resolve `*.localhost` to your machine, and nginx routes by name). The
-services' own ports (3000, 3001, 7681, 8081, 8323) stay published too - handy
+services' own ports (3000, 3001, 7681, 8081, 8323) stay published too, handy
 for the virtual machine, where 8080 is the only port that needs forwarding.
 
 ## As a virtual machine
@@ -100,7 +100,7 @@ on the topology, silent until the guide's story switches them on:
   origin (`step4-hijack-posrov`).
 - **peer** is a legitimate network that peers privately with the origin and
   buys transit from Provider A. It leaks the origin's routes to Provider A
-  when the guide says so (`step7-leak-on`) - a route leak, which ROV can
+  when the guide says so (`step7-leak-on`), a route leak, which ROV can
   never catch and ASPA can.
 
 | Docker network | IPv4 | IPv6 | between |
@@ -130,7 +130,7 @@ The lab deliberately runs the same experiment twice, on two independent stacks:
 | Inspect with | `birdc show route table master4 all` | `bgpctl show rib detail` |
 
 BIRD has no per-route validation attribute, so the `bird/observer1-*.conf`
-files record each verdict in a large community — `(64510,1,x)` for ROV,
+files record each verdict in a large community: `(64510,1,x)` for ROV,
 `(64510,2,x)` for ASPA. OpenBGPD computes both natively and `bgpctl -j` hands
 them over as JSON. That's why the two configurations look so different while
 testing the exact same thing.
@@ -139,7 +139,7 @@ testing the exact same thing.
 
 OpenBGPD only runs ASPA verification on a session that carries an RFC 9234
 role, and **the role decides which ASPA algorithm runs**. The observers sit
-above the providers - announcements flow up from the origin - so each
+above the providers (announcements flow up from the origin), so each
 observer is the providers' upstream, and routes arrive from a customer. That
 selects the *upstream* algorithm, the same one `bird/observer1-*.conf` asks
 for with `aspa_check_upstream()`.
@@ -151,7 +151,7 @@ lab, and it isn't a bug in either implementation.
 
 One consequence: switching stages on observer2 has to restart it. The role
 is negotiated when a session opens, and an RTR session that's already up
-keeps whatever version it negotiated - after a bare `bgpctl reload` every
+keeps whatever version it negotiated; after a bare `bgpctl reload` every
 `avs` falls back to `unknown`. The `step*` commands that switch stages
 already handle the restart for you (the stage name is kept in
 `/etc/lab-stage` inside the container, so a later restart comes back in the
@@ -181,8 +181,8 @@ the stage the observers are actually in.
 
 `./scripts/lab.sh` switches AS666 and the peer between behaviors; the names
 carry the number of the guide's step they belong to. Each one sets its
-step's *entire* state - attacker, peer, ROAs, ASPA object, and the
-observers' deployment stage - not just what changed since the step before,
+step's *entire* state (attacker, peer, ROAs, ASPA object, and the
+observers' deployment stage), not just what changed since the step before,
 so they're safe to run in any order, from anywhere in the story. From
 `step3-rov-mark` on, each command also checks that the Preparation (the
 Krill CA, its parent, its resources) actually finished before touching
@@ -246,8 +246,8 @@ scripts/
 ## Versions
 
 Every version is **pinned on purpose**. The lab parses the output of these
-tools - `status.py` and `validate.sh` read `birdc`, `bgpctl` and Routinator
-output - so an unattended upgrade in the middle of a course can break the
+tools (`status.py` and `validate.sh` read `birdc`, `bgpctl` and Routinator
+output), so an unattended upgrade in the middle of a course can break the
 panel without a single line of this repo changing.
 
 | Component | Version | Pinned in | If you change it |
@@ -262,7 +262,7 @@ panel without a single line of this repo changing.
 Two of those pins are **indirect** and worth knowing about. BIRD and OpenBGPD
 are Alpine packages, so their versions are frozen by `alpine:3.22` rather
 than chosen here. Alpine only backports security fixes within a release
-branch, so `3.22` keeps giving you BIRD 3.1.4 and OpenBGPD 8.8 - but
+branch, so `3.22` keeps giving you BIRD 3.1.4 and OpenBGPD 8.8, but
 changing that line to `alpine:3.23` silently changes both routers at once.
 
 FORT is built from source (`images/fort/Dockerfile`) rather than pulled from
@@ -277,7 +277,7 @@ observers still produce verdicts rather than `?`.
 
 ### The internal PKI (MODE=local)
 
-Every RPKI URI is HTTPS, and the validators and Krill validate TLS properly -
+Every RPKI URI is HTTPS, and the validators and Krill validate TLS properly:
 they don't have the browser's "proceed anyway" button. So the lab generates
 its own certificate authority (the `pki-init` container), which signs
 `rir.lab`'s certificate. That CA's certificate gets handed to whoever needs
@@ -300,7 +300,7 @@ RRDP.
 
 All images in use (Alpine, Debian, nginx, Krill, Routinator) are
 multi-architecture (amd64/arm64), and FORT and OpenBGPD are built or
-packaged natively, so nothing runs under emulation - not on Apple Silicon,
+packaged natively, so nothing runs under emulation, not on Apple Silicon,
 not on Intel/AMD, not on Windows.
 
 ## Language
@@ -312,7 +312,7 @@ switch with the selector at the top of each panel, without affecting anyone
 else.
 
 Protocol vocabulary (BGP, ROA, ASPA, RFC numbers, the Valid/Invalid/Unknown
-states, command names) stays in English across all three languages - that's
+states, command names) stays in English across all three languages. That's
 the vocabulary Krill, Routinator, BIRD and OpenBGPD already use in their own
 command-line output, and mixing languages there would only get in the way of
 cross-checking against the tools.
@@ -342,10 +342,10 @@ Edit it and run `./scripts/lab.sh up`. That calls
 on every cycle, and `up` also compiles the guide from `guide/templates/`
 with your values.
 
-The providers' and observers' ASNs - 64501, 64502, 64510, 64511 - are there
+The providers' and observers' ASNs (64501, 64502, 64510, 64511) are there
 too, but don't need to change: they're documentation ASNs (RFC 5398) and
 work with any origin ASN. `PEER_ASN` (64499) is cut from the same cloth, part
-of the same reserved block. `ATTACKER_ASN` (666) is the odd one out - it
+of the same reserved block. `ATTACKER_ASN` (666) is the odd one out: it
 isn't reserved for documentation or for anything else; it's just easy to
 remember. None of this ever touches the real Internet.
 

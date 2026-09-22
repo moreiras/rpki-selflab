@@ -148,7 +148,7 @@ cliente. Eso selecciona el algoritmo *upstream*, el mismo que
 Ponga `role customer` en cambio y corre el algoritmo *downstream*: el camino por el
 Proveedor B vuelve como **Valid**. Mismos objetos, mismo AS_PATH, veredicto
 distinto. Es probablemente lo más sorprendente de este laboratorio, y no es un bug de ninguna
-de las dos implementaciones - las dos están leyendo el draft correctamente, solo que desde ángulos distintos.
+de las dos implementaciones: las dos están leyendo el draft correctamente, solo que desde ángulos distintos.
 
 Una consecuencia de esto: cambiar de etapa en observer2 tiene que reiniciarlo, porque
 el rol se negocia al abrir la sesión, y una sesión RTR ya establecida
@@ -348,8 +348,8 @@ también están ahí, pero no hace falta tocarlos: son ASN de documentación (RF
 5398) y funcionan con cualquier ASN de origen. Lo mismo vale para `PEER_ASN`
 (64499), que también cae dentro de ese mismo bloque de documentación. El único que
 queda afuera es `ATTACKER_ASN` (666): pertenece a la historia de la guía igual
-que los demás, pero no está en ningún rango reservado - ninguno de estos ASN
-toca jamás la Internet real de todos modos.
+que los demás, pero no está en ningún rango reservado. De todos modos, ninguno de estos ASN
+toca jamás la Internet real.
 
 ## Licencia
 

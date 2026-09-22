@@ -5,7 +5,7 @@
 *[English](README.md) · [Español](README.es.md) · [Português](README.pt.md)*
 
 Laboratório de RPKI (ROA, ROV e ASPA) em contêineres. Roda em qualquer
-computador com Docker (Mac, Windows ou Linux - testado com OrbStack e Docker
+computador com Docker (Mac, Windows ou Linux, testado com OrbStack e Docker
 Desktop). Ele publica ROAs e um objeto ASPA, e depois mostra o que **dois
 validadores diferentes e dois roteadores diferentes** fazem com exatamente os
 mesmos objetos, enquanto um sequestrador (AS666) e um peer que vaza rotas
@@ -101,7 +101,7 @@ ligá-los:
   verdadeira (`step4-hijack-posrov`).
 - **peer** é uma rede legítima, com peering privado com a origem, que também
   compra trânsito do Provedor A. Quando o guia manda (`step7-leak-on`), ela
-  vaza as rotas da origem para o Provedor A - um vazamento de rota, que o ROV
+  vaza as rotas da origem para o Provedor A: um vazamento de rota, que o ROV
   não tem como enxergar e o ASPA pega.
 
 | Rede Docker | IPv4 | IPv6 | entre |
@@ -153,7 +153,7 @@ laboratório, e não é bug de nenhuma das duas implementações.
 
 Uma consequência prática disso: trocar de estágio no observer2 exige
 reiniciá-lo. O papel é negociado na abertura da sessão, e uma sessão RTR já
-estabelecida mantém a versão que negociou - depois de um `bgpctl reload`
+estabelecida mantém a versão que negociou; depois de um `bgpctl reload`
 puro, todo `avs` volta para `unknown`. Os comandos `step*` que trocam de
 estágio já cuidam do reinício para você (o nome do estágio fica guardado em
 `/etc/lab-stage` dentro do contêiner, então um reinício posterior volta no
@@ -184,7 +184,7 @@ do painel mostra o estágio em que os observadores estão.
 O `./scripts/lab.sh` alterna o AS666 e o peer entre comportamentos. Os nomes
 levam o número do passo do guia a que pertencem. Cada um define o estado
 *inteiro* do seu passo (atacante, peer, ROAs, objeto ASPA e o estágio dos
-observadores), não só o que mudou em relação ao passo anterior - por isso são
+observadores), não só o que mudou em relação ao passo anterior; por isso são
 seguros de rodar em qualquer ordem, a partir de qualquer ponto da história. A
 partir do `step3-rov-mark`, cada comando também confere se a Preparação (a CA
 do Krill, o parent dela, os recursos) realmente terminou antes de mexer em
@@ -281,7 +281,7 @@ que os dois observadores continuam produzindo vereditos, e não `?`.
 
 ### A PKI interna (MODE=local)
 
-Toda URI de RPKI é HTTPS, e os validadores e o Krill validam TLS de verdade -
+Toda URI de RPKI é HTTPS, e os validadores e o Krill validam TLS de verdade:
 não têm o botão "prosseguir assim mesmo" do navegador. Por isso o laboratório
 gera a sua própria autoridade certificadora (o contêiner `pki-init`), que
 assina o certificado do `rir.lab`. O certificado dessa CA é entregue a quem
@@ -347,7 +347,7 @@ guia a partir de `guide/templates/` com os seus valores.
 
 Os ASNs dos provedores e dos observadores (64501/64502/64510/64511) também
 estão lá, mas não precisam mudar: são ASNs de documentação (RFC 5398) e
-funcionam com qualquer ASN de origem. O `PEER_ASN` (64499) é o mesmo caso -
+funcionam com qualquer ASN de origem. O `PEER_ASN` (64499) é o mesmo caso:
 está dentro do mesmo bloco reservado, 64496-64511, e pertence à história do
 guia como todo o resto do laboratório. Só o `ATTACKER_ASN` (666) fica de fora
 dessa faixa: foi escolhido por ser fácil de lembrar, não por estar reservado
