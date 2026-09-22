@@ -293,7 +293,7 @@ acontece entre um provedor e o seu RIR.
 
 2. Entre com o token **`passlab`**.
 
-3. Crie a sua CA chamada **`minha_ca`**.
+3. Crie a sua CA chamada **`acme_ca`**.
    Se quiser, troque o idioma para inglês no canto superior direito.
 
 ### O lado do registro: o painel do LabNIC
@@ -353,7 +353,7 @@ a história começa.
 > login no beta.registro.br.
 
 1. Abra o Krill em **http://krill.localhost:8080**, entre com o token
-   **`passlab`** e crie a CA **`minha_ca`**.
+   **`passlab`** e crie a CA **`acme_ca`**.
 
 2. Em outra aba, entre em **https://beta.registro.br/login/**. No
    Painel, vá em *Holdership*, selecione o AS e role até a seção **RPKI**
@@ -1596,17 +1596,17 @@ aparecer de propósito, tirando objetos:
 
    ```
    # Painel: clique na caixa krill e depois em Shell:
-   #krillc roas update --ca minha_ca --remove "203.0.113.0/24-24 => 64500"
-   #krillc aspas remove --ca minha_ca --customer AS64500
+   #krillc roas update --ca acme_ca --remove "203.0.113.0/24-24 => 64500"
+   #krillc aspas remove --ca acme_ca --customer AS64500
    #krillc bulk publish
    # Ou, no terminal do seu computador:
-   #docker exec lab-krill krillc roas update --ca minha_ca --remove "203.0.113.0/24-24 => 64500"
-   #docker exec lab-krill krillc aspas remove --ca minha_ca --customer AS64500
+   #docker exec lab-krill krillc roas update --ca acme_ca --remove "203.0.113.0/24-24 => 64500"
+   #docker exec lab-krill krillc aspas remove --ca acme_ca --customer AS64500
    #docker exec lab-krill krillc bulk publish
    ```
 
 2. Confirme que realmente sumiram antes de seguir (`krillc roas list --ca
-   minha_ca` e `krillc aspas list --ca minha_ca` devem voltar ambos
+   acme_ca` e `krillc aspas list --ca acme_ca` devem voltar ambos
    sem eles), depois faça o refresh:
 
    ```
@@ -1626,12 +1626,12 @@ aparecer de propósito, tirando objetos:
 
    ```
    # Painel: clique na caixa krill e depois em Shell:
-   #krillc roas update --ca minha_ca --add "203.0.113.0/24-24 => 64500"
-   #krillc aspas add --ca minha_ca --aspa "AS64500 => AS64501, AS64502"
+   #krillc roas update --ca acme_ca --add "203.0.113.0/24-24 => 64500"
+   #krillc aspas add --ca acme_ca --aspa "AS64500 => AS64501, AS64502"
    #krillc bulk publish
    # Ou, no terminal do seu computador:
-   #docker exec lab-krill krillc roas update --ca minha_ca --add "203.0.113.0/24-24 => 64500"
-   #docker exec lab-krill krillc aspas add --ca minha_ca --aspa "AS64500 => AS64501, AS64502"
+   #docker exec lab-krill krillc roas update --ca acme_ca --add "203.0.113.0/24-24 => 64500"
+   #docker exec lab-krill krillc aspas add --ca acme_ca --aspa "AS64500 => AS64501, AS64502"
    #docker exec lab-krill krillc bulk publish
    #./scripts/lab.sh refresh
    ```
@@ -1662,7 +1662,7 @@ aparecer de propósito, tirando objetos:
 | O Krill não consegue falar com o Registro.br | O contêiner precisa de acesso de saída à Internet: `docker exec lab-krill ping -c1 beta.registro.br` |
 | Quero recomeçar do zero | `./scripts/lab.sh reset` (apaga a CA do Krill, o estado do registro do próprio LabNIC e o cache dos dois validadores), depois `up`. Não rode um `docker compose down -v` avulso: o LabNIC e o painel do registro só sobem sob o perfil `local` do compose, e um `docker compose down` avulso os deixa rodando silenciosamente - o `lab.sh` configura isso para você. Rode também do terminal do seu próprio computador, não do console dentro do navegador do painel: o `reset` derruba o laboratório inteiro, inclusive esse console, o que mata o comando pela metade. |
 | Os validadores mostram ROAs/ASPA mas a CA do Krill parece completamente vazia | Você está olhando duas CAs diferentes: a sua própria (recém-criada) no Krill, e objetos antigos ainda publicados sob uma CA velha de mesmo nome no registro, sobras de um reset que não limpou tudo. `./scripts/lab.sh reset` (não um `docker compose down -v` avulso) limpa os dois lados juntos. |
-| Mudei o `lab.conf` e nada mudou | `./scripts/lab.sh up` regenera o `bird/vars.conf` e recria os roteadores |
+| Mudei o `lab.conf` e nada mudou | `./scripts/lab.sh up` regenera o `bird/vars.conf`, recria os roteadores, e agora também devolve a história ao estado limpo (estágio `none`, AS666 e o peer calados). Se você mudou o ASN ou os prefixos e já tem uma CA, o certificado dela ainda tem os recursos *antigos* - refaça a delegação da Preparação 2 (no modo local, "Add parent" no Krill contra o mesmo parent atualiza os direitos; `docker exec lab-krill krillc bulk refresh` força a CA a buscá-los) antes que `step3-rov-mark` em diante volte a funcionar. |
 | O painel do registro não abre | Ele só existe em `MODE=local`. Confira o `lab.conf` e rode `./scripts/lab.sh up` |
 | O Krill não consegue falar com o LabNIC | O Krill precisa confiar na CA interna do laboratório: `docker logs lab-krill` mostra um erro de TLS se `/pki/ca.pem` não estiver montado |
 | Troquei o MODE e a CA sumiu | É de propósito: cada modo tem o seu próprio volume, para um não atropelar o trabalho do outro |

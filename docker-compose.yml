@@ -37,7 +37,7 @@ services:
       # so that "krillc" inside the container already works with no arguments
       KRILL_CLI_SERVER: "https://localhost:3000/"
       KRILL_CLI_TOKEN: "passlab"
-      KRILL_CLI_MY_CA: "minha_ca"
+      KRILL_CLI_MY_CA: "acme_ca"
       # trust the lab's internal CA, to talk to the simulated RIR over
       # HTTPS (RFC 6492 and RFC 8181)
       KRILL_HTTPS_ROOT_CERTS: "/pki/ca.pem"

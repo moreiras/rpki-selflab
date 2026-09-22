@@ -292,9 +292,19 @@ def issue_certificate(xml, language=DEFAULT_LANGUAGE):
         args += ["--ipv6", v6]
     ok, output = krillc(*args, xml=xml, language=language)
     if not ok:
-        # already exists? hand back the response that's actually in effect,
-        # instead of a plain error
+        # already exists? this child re-requesting a certificate is also how
+        # a lab.conf edit (a different ASN or prefix) reaches an already-
+        # delegated CA - update its entitlements to match what's configured
+        # now, instead of just handing back the stale response.
         if "already" in output or "duplicate" in output:
+            update_args = ["children", "update", "--ca", RIR_CA, "--child", handle]
+            if asn:
+                update_args += ["--asn", asn]
+            if v4:
+                update_args += ["--ipv4", v4]
+            if v6:
+                update_args += ["--ipv6", v6]
+            krillc(*update_args, language=language)
             ok2, resp = krillc("children", "response", "--ca", RIR_CA,
                                "--child", handle, language=language)
             if ok2:

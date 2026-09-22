@@ -161,6 +161,13 @@ case "${1:-help}" in
       else
           docker compose up -d --build
       fi
+      # A container that was already running (or whose image didn't change)
+      # is left alone by "compose up" - so without this, AS666, the peer,
+      # and the observers' stage could all still be wherever a previous
+      # session left them. "up" always lands on the same clean baseline as
+      # step1-clean, the same way the panel and the guide describe it.
+      attacker_off; peer_off
+      stage none
       echo
       echo "MODE=$MODE  LANGUAGE=$LANGUAGE"
       if [ "$MODE" = "local" ]; then
