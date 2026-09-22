@@ -373,6 +373,7 @@ const I18N = {
   copy:            { pt: "Copiar", es: "Copiar", en: "Copy" },
   copied:          { pt: "Copiado", es: "Copiado", en: "Copied" },
   download_xml:    { pt: "Baixar XML", es: "Descargar XML", en: "Download XML" },
+  close_response:  { pt: "Fechar", es: "Cerrar", en: "Close" },
 };
 
 function t(key, subst) {
@@ -392,7 +393,7 @@ function esc(s) {
     c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
-function responseBlock(title, xml, fileName) {
+function responseBlock(title, xml, fileName, closable) {
   const id = "r" + Math.random().toString(36).slice(2, 8);
   return `<div class="result">
     <h4>${esc(title)}</h4>
@@ -400,11 +401,20 @@ function responseBlock(title, xml, fileName) {
     <div class="actions">
       <button class="secondary" data-copy="${id}">${t("copy")}</button>
       <a class="btn secondary" data-download="${id}" download="${fileName}">${t("download_xml")}</a>
+      ${closable ? `<button class="secondary" data-close="1">${t("close_response")}</button>` : ""}
     </div>
   </div>`;
 }
 
-function wireButtons(root) {
+// Periodic refresh (load(), every 15s, and once more shortly after a
+// submit) must never blow away a response the user is mid-copy on -
+// that's what used to make a successful submission look like it had
+// failed. responseOpen tracks which sections currently have one showing,
+// and load() skips rebuilding those until the user explicitly closes it
+// (the "Close" button here, or toggling "View response again" off).
+const responseOpen = { d: false, p: false };
+
+function wireButtons(root, onClose) {
   root.querySelectorAll("[data-copy]").forEach(b => {
     b.onclick = () => {
       const target = $(b.dataset.copy);
@@ -418,6 +428,9 @@ function wireButtons(root) {
     const target = $(a.dataset.download);
     a.href = URL.createObjectURL(new Blob([target.value], { type: "application/xml" }));
   });
+  if (onClose) {
+    root.querySelectorAll("[data-close]").forEach(b => { b.onclick = onClose; });
+  }
 }
 
 // appends the chosen language, so the backend answers with matching messages
@@ -458,40 +471,45 @@ async function load() {
   const d = e.delegation;
   if (d) {
     $("d-form").style.display = "none";
-    $("d-state").innerHTML =
-      `<dl class="fields">
-         <dt>${t("delegated_ca")}</dt><dd style="font-family:var(--mono)">${esc(d.handle)}</dd>
-         <dt>${t("last_exchange")}</dt><dd>${esc(d.last_exchange || "—")} · ${esc(d.result || "")}</dd>
-         <dt>${t("status_label")}</dt><dd><span class="badge ok">${esc(d.state || t("active"))}</span></dd>
-       </dl>
-       <div class="actions">
-         <button class="secondary" id="d-view">${t("view_parent_response")}</button>
-         <button class="danger" id="d-revoke">${t("revoke_delegation")}</button>
-       </div>
-       <div id="d-xml"></div>`;
-    $("d-revoke").onclick = () => revoke("delegation", t("confirm_revoke_delegation"));
-    $("d-view").onclick = () => viewResponse("delegation", "d-xml", t("parent_response_title"), "parent-response.xml");
+    if (!responseOpen.d) {
+      $("d-state").innerHTML =
+        `<dl class="fields">
+           <dt>${t("delegated_ca")}</dt><dd style="font-family:var(--mono)">${esc(d.handle)}</dd>
+           <dt>${t("last_exchange")}</dt><dd>${esc(d.last_exchange || "—")} · ${esc(d.result || "")}</dd>
+           <dt>${t("status_label")}</dt><dd><span class="badge ok">${esc(d.state || t("active"))}</span></dd>
+         </dl>
+         <div class="actions">
+           <button class="secondary" id="d-view">${t("view_parent_response")}</button>
+           <button class="danger" id="d-revoke">${t("revoke_delegation")}</button>
+         </div>
+         <div id="d-xml"></div>`;
+      $("d-revoke").onclick = () => revoke("delegation", t("confirm_revoke_delegation"));
+      $("d-view").onclick = () => viewResponse("d", "delegation", "d-xml", t("parent_response_title"), "parent-response.xml");
+    }
   } else {
     $("d-form").style.display = "";
     $("d-state").innerHTML = "";
+    responseOpen.d = false;
   }
 
   // ---- step 2
   const p = e.publication;
   if (p) {
     $("p-form").style.display = "none";
-    $("p-state").innerHTML =
-      `<dl class="fields">
-         <dt>${t("publisher")}</dt><dd style="font-family:var(--mono)">${esc(p.handle)}</dd>
-         <dt>${t("repo_object_count")}</dt><dd>${p.objects ?? 0}</dd>
-       </dl>
-       <div class="actions">
-         <button class="secondary" id="p-view">${t("view_repo_response")}</button>
-         <button class="danger" id="p-revoke">${t("revoke_publication")}</button>
-       </div>
-       <div id="p-xml"></div>`;
-    $("p-view").onclick = () => viewResponse("publication", "p-xml", t("repo_response_title"), "repository-response.xml");
-    $("p-revoke").onclick = () => revoke("publication", t("confirm_revoke_publication"));
+    if (!responseOpen.p) {
+      $("p-state").innerHTML =
+        `<dl class="fields">
+           <dt>${t("publisher")}</dt><dd style="font-family:var(--mono)">${esc(p.handle)}</dd>
+           <dt>${t("repo_object_count")}</dt><dd>${p.objects ?? 0}</dd>
+         </dl>
+         <div class="actions">
+           <button class="secondary" id="p-view">${t("view_repo_response")}</button>
+           <button class="danger" id="p-revoke">${t("revoke_publication")}</button>
+         </div>
+         <div id="p-xml"></div>`;
+      $("p-view").onclick = () => viewResponse("p", "publication", "p-xml", t("repo_response_title"), "repository-response.xml");
+      $("p-revoke").onclick = () => revoke("publication", t("confirm_revoke_publication"));
+    }
     $("e-objects").textContent = `${p.objects ?? 0} ${t("objects_from", { handle: p.handle })}`;
     if (p.list && p.list.length) {
       $("e-list").innerHTML = "<table class='objects'>" + p.list.map(o =>
@@ -500,6 +518,7 @@ async function load() {
   } else {
     $("p-form").style.display = "";
     $("p-state").innerHTML = "";
+    responseOpen.p = false;
     $("e-objects").textContent = t("repo_none");
     $("e-list").innerHTML = "";
   }
@@ -526,8 +545,9 @@ async function submit(prefix, route, titleKey, fileName) {
     if (j.ok) {
       $(prefix + "-form").style.display = "none";
       target.innerHTML = `<div class="notice ok">${t("done_take_xml")}</div>`
-                     + responseBlock(t(titleKey), j.response, fileName);
-      wireButtons(target);
+                     + responseBlock(t(titleKey), j.response, fileName, true);
+      responseOpen[prefix] = true;
+      wireButtons(target, () => { responseOpen[prefix] = false; load(); });
       setTimeout(load, 2500);
     } else {
       target.innerHTML = `<div class="notice error">${esc(j.error)}</div>`;
@@ -540,11 +560,12 @@ async function submit(prefix, route, titleKey, fileName) {
   }
 }
 
-async function viewResponse(route, targetId, title, fileName) {
+async function viewResponse(prefix, route, targetId, title, fileName) {
   const target = $(targetId);
-  if (target.innerHTML) { target.innerHTML = ""; return; }
+  if (target.innerHTML) { target.innerHTML = ""; responseOpen[prefix] = false; return; }
   const j = await (await fetch(apiUrl("/api/" + route + "/response"))).json();
   if (!j.ok) { target.innerHTML = `<div class="notice error">${esc(j.error)}</div>`; return; }
+  responseOpen[prefix] = true;
   target.innerHTML = responseBlock(title, j.response, fileName);
   wireButtons(target);
 }
