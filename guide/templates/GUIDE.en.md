@@ -1362,15 +1362,20 @@ The path through Provider B now reads Invalid on both observers.
    only one word in a config file will. Do you expect the path through
    Provider B to still read Invalid, or to flip?
 
-2. On observer2, edit `openbgpd/observer2-aspa-mark.conf`: change `role
-   provider` to `role customer` on the Provider B neighbors (10.200.6.10 and
-   fd00:6::10), then apply it:
+2. `openbgpd/observer2-extra-a-role-customer.conf` is
+   `openbgpd/observer2-aspa-mark.conf` with exactly that one word changed:
+   `role provider` to `role customer` on the Provider B neighbors
+   (10.200.6.10 and fd00:6::10). Open it and compare (`diff
+   openbgpd/observer2-aspa-mark.conf openbgpd/observer2-extra-a-role-customer.conf`),
+   then apply it by hand - not through `lab.sh`, since this state only exists
+   for this exercise:
 
    ```
-   #./scripts/lab.sh step5-aspa-mark
    # Panel: click the observer2 box, then Shell:
+   #cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload
    #bgpctl show rib {{ORIGIN_V4}}
    # Or, from your computer's terminal:
+   #docker exec lab-observer2 sh -c "cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload"
    #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
    ```
 
@@ -1379,12 +1384,16 @@ The path through Provider B now reads Invalid on both observers.
    the clearest demonstration in this lab that "is this path ASPA-valid?"
    cannot be answered without also saying *from whom* you received it.
 
-3. Now do the equivalent on BIRD: swap `aspa_check_upstream` for
-   `aspa_check_downstream` in `bird/observer1-aspa-mark.conf` and apply it the
-   same way:
+3. Now do the equivalent on BIRD: `bird/observer1-extra-a-downstream.conf` is
+   `bird/observer1-aspa-mark.conf` with `aspa_check_upstream` swapped for
+   `aspa_check_downstream` in both filters - open it and compare the same
+   way, then apply it by hand:
 
    ```
-   #./scripts/lab.sh step5-aspa-mark
+   # Panel: click the observer1 box, then Shell:
+   #birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
+   # Or, from your computer's terminal:
+   #docker exec lab-observer1 birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
    ```
 
    **Before you look:** do you expect observer1's new verdict to match
@@ -1428,23 +1437,66 @@ The path through Provider B now reads Invalid on both observers.
 
 Step 2 was a hijack with the wrong origin ASN. This is the opposite mistake:
 the origin is completely legitimate, but the prefix exceeds what the ROA
-authorized. Edit `bird/origin.conf` - add a second static route and
-temporarily broaden the export filter to also match it:
+authorized. An IPv4 example would mean deaggregating {{ORIGIN_V4}} down to a
+`/25` - something that gets filtered network-wide on the real Internet and
+would feel contrived here. Announcing an IPv6 block more specific than a
+`/32` (a `/36` or `/40`, say) is completely ordinary operational practice, so
+that's what this exercise uses instead - and to make the point that it isn't
+about either provider, it uses **two** sub-blocks of {{ORIGIN_V6}}, one
+announced only to Provider A and the other only to Provider B.
+
+`bird/origin-extra-b.conf` is `bird/origin.conf` plus exactly that: two
+static routes for `3fff:cafe:1000::/40` and `3fff:cafe:2000::/40` (both
+inside {{ORIGIN_V6}}, both more specific than {{ORIGIN_V6_MAXLEN}} authorizes),
+and each provider's export filter extended to also carry its own sub-block.
+Open it and compare with `bird/origin.conf` (`diff bird/origin.conf
+bird/origin-extra-b.conf`) before applying it by hand:
 
 ```
-protocol static origin4 {
-    ipv4;
-    route ORIGIN_V4 unreachable;
-    route 10.0.0.0/25 unreachable;
-}
+# Panel: click the origin box, then Shell:
+#birdc configure "/etc/bird-lab/origin-extra-b.conf"
+# Or, from your computer's terminal:
+#docker exec lab-origin birdc configure "/etc/bird-lab/origin-extra-b.conf"
+```
+
+Look at what each provider actually received:
+
+```
+# Panel: click the provider-a box, then Shell:
+#birdc show route
+# Panel: click the provider-b box, then Shell:
+#birdc show route
+```
+
+Provider A has `3fff:cafe:1000::/40`; Provider B has `3fff:cafe:2000::/40` -
+each only the one meant for it. Now the observers:
+
+```
+# Panel: click the observer2 box, then Shell:
+#bgpctl show rib 3fff:cafe:1000::/40
+#bgpctl show rib 3fff:cafe:2000::/40
+# Or, from your computer's terminal:
+#docker exec lab-observer2 bgpctl show rib 3fff:cafe:1000::/40
+#docker exec lab-observer2 bgpctl show rib 3fff:cafe:2000::/40
 ```
 
 ```
-filter only_mine_v4 {
-    if (net = ORIGIN_V4 || net = 10.0.0.0/25) && source = RTS_STATIC then accept;
-    reject;
-}
+*>    !-? 3fff:cafe:1000::/40  fd00:5::10         10     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
 ```
+
+```
+*>    !-? 3fff:cafe:2000::/40  fd00:6::10         10     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
+```
+
+Both paths are **ROV Invalid** - each a perfectly legitimate announcement
+through an authorized provider, rejected for the same reason on both sides:
+the ROA for {{ORIGIN_V6}} only authorizes announcements up to
+`/{{ORIGIN_V6_MAXLEN}}`, and both sub-blocks are more specific than that. It
+isn't about Provider A or Provider B - it's the prefix. In `rov-mark` both
+stay visible, demoted, exactly like the hijack in Step 3. Run `step8-drop`
+and they disappear the same way the hijack later did.
+
+Undo when you're done:
 
 ```
 # Panel: click the origin box, then Shell:
@@ -1452,18 +1504,6 @@ filter only_mine_v4 {
 # Or, from your computer's terminal:
 #docker exec lab-origin birdc configure
 ```
-
-`10.0.0.0/25` arrives at the observers through Provider B (the session with
-Provider A uses its own prepending filter, which you didn't touch) with
-`bgp_path: {{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` - a
-perfectly legitimate path through an authorized provider - but **ROV
-Invalid**: the ROA for `{{ORIGIN_V4}}` only authorizes announcements up to
-`/24`, and `/25` is more specific than that. In `rov-mark` it stays visible,
-demoted, exactly like the hijack in Step 3. Run `step8-drop` and it
-disappears the same way the hijack later did.
-
-Undo both changes (remove the extra `route` line, restore the original
-`only_mine_v4` filter) and reload `lab-origin` when you're done.
 
 > **The pattern:** ROV checks *what is being announced and by whom*. ASPA
 > checks *whether the path that carried it here is one the origin

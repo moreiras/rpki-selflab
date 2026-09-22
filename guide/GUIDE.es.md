@@ -91,7 +91,7 @@ cómodo con ellos.
                           \          /
                            \        /
                     origen AS64500   +   Krill (la CA del titular)
-                    10.0.0.0/24 , 3fff:cafe::/32
+                    203.0.113.0/24 , 3fff:cafe::/32
 ```
 
 El AS64500 es multihomed, y tiene una preferencia: **el Proveedor B es la entrada, el Proveedor A
@@ -328,7 +328,7 @@ entre un proveedor y su RIR.
 ### Verificando
 
 12. En Krill, la CA debe mostrar los recursos recibidos del padre: el
-    ASN 64500 y los prefijos 10.0.0.0/24 y 3fff:cafe::/32.
+    ASN 64500 y los prefijos 203.0.113.0/24 y 3fff:cafe::/32.
 
 13. En el panel de LabNIC, la sección *RPKI delegado* pasa a mostrar **activo**,
     con la fecha del último intercambio Up-Down y el conteo de objetos en
@@ -405,16 +405,16 @@ validadores cada vez que un paso le pida crear uno.)
 
    ```
    # Panel: haga clic en el recuadro observador 1, luego en Shell:
-   #birdc show route table master4 all 10.0.0.0/24
+   #birdc show route table master4 all 203.0.113.0/24
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   10.0.0.0/24  unicast [provider_b_v4 ...] * (100) [AS64500i]
+   203.0.113.0/24  unicast [provider_b_v4 ...] * (100) [AS64500i]
         bgp_path: 64502 64500
         bgp_local_pref: 100
 
@@ -425,8 +425,8 @@ validadores cada vez que un paso le pida crear uno.)
 
    ```
    flags  vs destination          gateway          lpref   med aspath origin
-   *>    N-? 10.0.0.0/24          10.200.6.10       100     0 64502 64500 i
-   *     N-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
+   *>    N-? 203.0.113.0/24          10.200.6.10       100     0 64502 64500 i
+   *     N-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
    Dos caminos en cada observador: `64502 64500` (seleccionado: la entrada preferida del origen, 2
@@ -499,24 +499,24 @@ El AS666 anuncia el prefijo del origen como si fuera suyo.
 
    ```
    # Panel: haga clic en el recuadro observador 1, luego en Shell:
-   #birdc show route table master4 all 10.0.0.0/24
+   #birdc show route table master4 all 203.0.113.0/24
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   10.0.0.0/24  unicast [attacker_v4 ...] * (100) [AS666i]
+   203.0.113.0/24  unicast [attacker_v4 ...] * (100) [AS666i]
         bgp_path: 666
         bgp_local_pref: 100
    ```
 
    ```
-   *>    N-? 10.0.0.0/24          10.200.8.10       100     0 666 i
-   *     N-? 10.0.0.0/24          10.200.6.10       100     0 64502 64500 i
-   *     N-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
+   *>    N-? 203.0.113.0/24          10.200.8.10       100     0 666 i
+   *     N-? 203.0.113.0/24          10.200.6.10       100     0 64502 64500 i
+   *     N-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
    El secuestro **ganó**: es la ruta seleccionada (`*`, `*>`) en los dos observadores -
@@ -557,7 +557,7 @@ los **Observadores** la **validan** - por ahora, solo marcando.
    | campo | valor |
    |---|---|
    | ASN | 64500 |
-   | Prefijo | 10.0.0.0/24 |
+   | Prefijo | 203.0.113.0/24 |
    | Longitud máxima | 24 |
 
 3. Cree la ROA de IPv6:
@@ -569,7 +569,7 @@ los **Observadores** la **validan** - por ahora, solo marcando.
    | Longitud máxima | 32 |
 
    (¿Prefiere la línea de comandos? En la terminal del recuadro de Krill:
-   `krillc roas update --add "10.0.0.0/24-24 => 64500"`, y lo mismo con
+   `krillc roas update --add "203.0.113.0/24-24 => 64500"`, y lo mismo con
    `"3fff:cafe::/32-32 => 64500"`. Si Krill dice que una ROA es un *duplicado*,
    ya está ahí.)
 
@@ -669,25 +669,25 @@ observadores de nuevo si quiere - el secuestro sigue ganando.
 
    ```
    # Panel: haga clic en el recuadro observador 1, luego en Shell:
-   #birdc show route table master4 all 10.0.0.0/24
+   #birdc show route table master4 all 203.0.113.0/24
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   10.0.0.0/24  unicast [attacker_v4 ...] (100) [AS666i]
+   203.0.113.0/24  unicast [attacker_v4 ...] (100) [AS666i]
         bgp_path: 666
         bgp_local_pref: 10
         bgp_large_community: (64510, 1, 0)                   <- ROV Invalid
    ```
 
    ```
-   *>    V-? 10.0.0.0/24          10.200.6.10       100     0 64502 64500 i
-   *     V-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
-   *     !-? 10.0.0.0/24          10.200.8.10        10     0 666 i
+   *>    V-? 203.0.113.0/24          10.200.6.10       100     0 64502 64500 i
+   *     V-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
+   *     !-? 203.0.113.0/24          10.200.8.10        10     0 666 i
    ```
 
    El secuestro sigue en la tabla - visible, no desaparecido - pero ahora lleva
@@ -779,16 +779,16 @@ del camino - entonces, ¿y si el último AS fuera el correcto?
 
    ```
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
    flags  vs destination          gateway          lpref   med aspath origin
-   *>    V-? 10.0.0.0/24          10.200.8.10       100     0 666 64500 i
-   *m    V-? 10.0.0.0/24          10.200.6.10       100     0 64502 64500 i
-   *     V-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
+   *>    V-? 203.0.113.0/24          10.200.8.10       100     0 666 64500 i
+   *m    V-? 203.0.113.0/24          10.200.6.10       100     0 64502 64500 i
+   *     V-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
    No quedó marcado. El ROV dice `Valid` - el camino termina en 64500,
@@ -948,15 +948,15 @@ y ningún router está verificando caminos.
 
    ```
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   *>    V-V 10.0.0.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
-   *     V-! 10.0.0.0/24          10.200.8.10        20     0 666 64500 i
-   *     V-! 10.0.0.0/24          10.200.6.10        20     0 64502 64500 i
+   *>    V-V 203.0.113.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
+   *     V-! 203.0.113.0/24          10.200.8.10        20     0 666 64500 i
+   *     V-! 203.0.113.0/24          10.200.6.10        20     0 64502 64500 i
    ```
 
    El camino falsificado ahora es **ASPA Invalid** - el salto `64500 → 666` no está
@@ -1014,15 +1014,15 @@ que es lo mismo dicho de otra forma.)
 
    ```
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
-   *     V-V 10.0.0.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
-   *     V-! 10.0.0.0/24          10.200.8.10        20     0 666 64500 i
+   *>    V-V 203.0.113.0/24          10.200.6.10       200     0 64502 64500 i
+   *     V-V 203.0.113.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
+   *     V-! 203.0.113.0/24          10.200.8.10        20     0 666 64500 i
    ```
 
    Los dos caminos legítimos volvieron a `V-V` y `local_pref` 200, y el
@@ -1092,13 +1092,13 @@ Entonces alguien edita una configuración...
 
    ```
    # Panel: haga clic en el recuadro Proveedor A, luego en Shell:
-   #birdc show route 10.0.0.0/24 all
+   #birdc show route 203.0.113.0/24 all
    # O, desde la terminal de su computadora:
-   #docker exec lab-provider-a birdc show route 10.0.0.0/24 all
+   #docker exec lab-provider-a birdc show route 203.0.113.0/24 all
    ```
 
    ```
-   10.0.0.0/24  unicast [customer_peer_v4 ...] * (100) [AS64500i]
+   203.0.113.0/24  unicast [customer_peer_v4 ...] * (100) [AS64500i]
         bgp_path: 64999 64500
         bgp_local_pref: 100
                 unicast [customer_v4 ...] (100) [AS64500i]
@@ -1118,15 +1118,15 @@ Entonces alguien edita una configuración...
 
    ```
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
-   *     V-! 10.0.0.0/24          10.200.8.10        20     0 666 64500 i
-   *     V-! 10.0.0.0/24          10.200.5.10        20     0 64501 64999 64500 i
+   *>    V-V 203.0.113.0/24          10.200.6.10       200     0 64502 64500 i
+   *     V-! 203.0.113.0/24          10.200.8.10        20     0 666 64500 i
+   *     V-! 203.0.113.0/24          10.200.5.10        20     0 64501 64999 64500 i
    ```
 
    **El camino propio del Proveedor A ya desapareció** - dejó de anunciarlo en el
@@ -1204,13 +1204,13 @@ configuraría un router de producción desde el principio.
 
    ```
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
+   *>    V-V 203.0.113.0/24          10.200.6.10       200     0 64502 64500 i
    ```
 
    **Desaparecieron dos rutas, no una.** El camino falsificado del AS666 se
@@ -1220,9 +1220,9 @@ configuraría un router de producción desde el principio.
 
    ```
    # Panel: haga clic en el recuadro observador 1, luego en Shell:
-   #birdc show route table master4 filtered 10.0.0.0/24
+   #birdc show route table master4 filtered 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer1 birdc show route table master4 filtered 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 filtered 203.0.113.0/24
    ```
 
    La insignia ahora dice *ROV + ASPA: descartando*. Note lo que descartar **no**
@@ -1373,16 +1373,21 @@ El camino por el Proveedor B ahora figura como Invalid en los dos observadores.
    solo una palabra en un archivo de configuración. ¿Espera que el camino por
    el Proveedor B siga figurando como Invalid, o que cambie?
 
-2. En observer2, edite `openbgpd/observer2-aspa-mark.conf`: cambie `role
-   provider` por `role customer` en los vecinos del Proveedor B (10.200.6.10 y
-   fd00:6::10), y luego aplíquelo:
+2. `openbgpd/observer2-extra-a-role-customer.conf` es
+   `openbgpd/observer2-aspa-mark.conf` con exactamente esa palabra cambiada:
+   `role provider` por `role customer` en los vecinos del Proveedor B
+   (10.200.6.10 y fd00:6::10). Ábralo y compare (`diff
+   openbgpd/observer2-aspa-mark.conf openbgpd/observer2-extra-a-role-customer.conf`),
+   y luego aplíquelo a mano - no mediante `lab.sh`, ya que este estado solo
+   existe para este ejercicio:
 
    ```
-   #./scripts/lab.sh step5-aspa-mark
    # Panel: haga clic en el recuadro observador 2, luego en Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload
+   #bgpctl show rib 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 sh -c "cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload"
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    El camino por el Proveedor B vuelve como **Valid**. Los mismos objetos, el mismo
@@ -1390,12 +1395,16 @@ El camino por el Proveedor B ahora figura como Invalid en los dos observadores.
    la demostración más clara de este laboratorio de que "¿es este camino ASPA-válido?"
    no se puede responder sin decir también *de quién* lo recibió.
 
-3. Ahora haga el equivalente en BIRD: cambie `aspa_check_upstream` por
-   `aspa_check_downstream` en `bird/observer1-aspa-mark.conf` y aplíquelo de la
-   misma manera:
+3. Ahora haga el equivalente en BIRD: `bird/observer1-extra-a-downstream.conf`
+   es `bird/observer1-aspa-mark.conf` con `aspa_check_upstream` cambiado por
+   `aspa_check_downstream` en los dos filtros - ábralo y compare de la misma
+   manera, y luego aplíquelo a mano:
 
    ```
-   #./scripts/lab.sh step5-aspa-mark
+   # Panel: haga clic en el recuadro observador 1, luego en Shell:
+   #birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
+   # O, desde la terminal de su computadora:
+   #docker exec lab-observer1 birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
    ```
 
    **Antes de mirar:** ¿espera que el nuevo veredicto de observer1 coincida con el resultado de
@@ -1404,9 +1413,9 @@ El camino por el Proveedor B ahora figura como Invalid en los dos observadores.
 
    ```
    # Panel: haga clic en el recuadro observador 1, luego en Shell:
-   #birdc show route table master4 all 10.0.0.0/24
+   #birdc show route table master4 all 203.0.113.0/24
    # O, desde la terminal de su computadora:
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
    ```
 
    Ninguno de los dos, exactamente: BIRD informa el camino del Proveedor B como **ASPA Unknown**
@@ -1439,23 +1448,70 @@ El camino por el Proveedor B ahora figura como Invalid en los dos observadores.
 
 El Paso 2 fue un secuestro con el ASN de origen equivocado. Este es el error opuesto:
 el origen es completamente legítimo, pero el prefijo excede lo que la ROA
-autorizó. Edite `bird/origin.conf` - agregue una segunda ruta estática y
-amplíe temporalmente el filtro de exportación para que también la incluya:
+autorizó. Un ejemplo en IPv4 significaría desagregar 203.0.113.0/24 hasta un
+`/25` - algo que en la Internet real se filtra en toda la red y que aquí
+resultaría artificial. Anunciar un bloque IPv6 más específico que un
+`/32` (un `/36` o un `/40`, por ejemplo) es una práctica operativa
+completamente normal, así que este ejercicio usa eso en su lugar - y para
+dejar en claro que no se trata de uno u otro proveedor, usa **dos**
+sub-bloques de 3fff:cafe::/32, uno anunciado solo al Proveedor A y el otro
+solo al Proveedor B.
+
+`bird/origin-extra-b.conf` es `bird/origin.conf` más exactamente eso: dos
+rutas estáticas para `3fff:cafe:1000::/40` y `3fff:cafe:2000::/40` (ambas
+dentro de 3fff:cafe::/32, ambas más específicas de lo que autoriza
+32), y el filtro de exportación de cada proveedor
+ampliado para llevar también su propio sub-bloque. Ábralo y compárelo con
+`bird/origin.conf` (`diff bird/origin.conf bird/origin-extra-b.conf`) antes
+de aplicarlo a mano:
 
 ```
-protocol static origin4 {
-    ipv4;
-    route ORIGIN_V4 unreachable;
-    route 10.0.0.0/25 unreachable;
-}
+# Panel: haga clic en el recuadro origen, luego en Shell:
+#birdc configure "/etc/bird-lab/origin-extra-b.conf"
+# O, desde la terminal de su computadora:
+#docker exec lab-origin birdc configure "/etc/bird-lab/origin-extra-b.conf"
+```
+
+Vea qué recibió realmente cada proveedor:
+
+```
+# Panel: haga clic en el recuadro Proveedor A, luego en Shell:
+#birdc show route
+# Panel: haga clic en el recuadro Proveedor B, luego en Shell:
+#birdc show route
+```
+
+El Proveedor A tiene `3fff:cafe:1000::/40`; el Proveedor B tiene
+`3fff:cafe:2000::/40` - cada uno solo el que le correspondía. Ahora los
+observadores:
+
+```
+# Panel: haga clic en el recuadro observador 2, luego en Shell:
+#bgpctl show rib 3fff:cafe:1000::/40
+#bgpctl show rib 3fff:cafe:2000::/40
+# O, desde la terminal de su computadora:
+#docker exec lab-observer2 bgpctl show rib 3fff:cafe:1000::/40
+#docker exec lab-observer2 bgpctl show rib 3fff:cafe:2000::/40
 ```
 
 ```
-filter only_mine_v4 {
-    if (net = ORIGIN_V4 || net = 10.0.0.0/25) && source = RTS_STATIC then accept;
-    reject;
-}
+*>    !-? 3fff:cafe:1000::/40  fd00:5::10         10     0 64501 64500 64500 64500 i
 ```
+
+```
+*>    !-? 3fff:cafe:2000::/40  fd00:6::10         10     0 64502 64500 i
+```
+
+Los dos caminos son **ROV Invalid** - cada uno un anuncio perfectamente
+legítimo a través de un proveedor autorizado, rechazado por la misma razón
+en ambos lados: la ROA de 3fff:cafe::/32 solo autoriza anuncios hasta
+`/32`, y los dos sub-bloques son más específicos que eso.
+No se trata del Proveedor A ni del Proveedor B - es el prefijo. En
+`rov-mark` los dos se quedan visibles, degradados, exactamente como el
+secuestro del Paso 3. Ejecute `step8-drop` y desaparecen de la misma forma
+en que después desapareció el secuestro.
+
+Deshaga cuando termine:
 
 ```
 # Panel: haga clic en el recuadro origen, luego en Shell:
@@ -1463,18 +1519,6 @@ filter only_mine_v4 {
 # O, desde la terminal de su computadora:
 #docker exec lab-origin birdc configure
 ```
-
-`10.0.0.0/25` llega a los observadores por el Proveedor B (la sesión con
-el Proveedor A usa su propio filtro de prepend, que usted no tocó) con
-`bgp_path: 64502 64500` - un
-camino perfectamente legítimo por un proveedor autorizado - pero **ROV
-Invalid**: la ROA de `10.0.0.0/24` solo autoriza anuncios hasta
-`/24`, y `/25` es más específico que eso. En `rov-mark` se queda visible,
-degradada, exactamente como el secuestro del Paso 3. Ejecute `step8-drop`
-y desaparece de la misma forma en que después desapareció el secuestro.
-
-Deshaga los dos cambios (quite la línea `route` extra, restaure el filtro original
-`only_mine_v4`) y recargue `lab-origin` cuando termine.
 
 > **El patrón:** el ROV verifica *qué se está anunciando y quién lo anuncia*. El ASPA
 > verifica *si el camino que lo trajo hasta aquí es uno que el origen
@@ -1557,11 +1601,11 @@ aparezcan a propósito, sacando objetos:
 
    ```
    # Panel: haga clic en el recuadro Krill, luego en Shell:
-   #krillc roas update --ca minha_ca --remove "10.0.0.0/24-24 => 64500"
+   #krillc roas update --ca minha_ca --remove "203.0.113.0/24-24 => 64500"
    #krillc aspas remove --ca minha_ca --customer AS64500
    #krillc bulk publish
    # O, desde la terminal de su computadora:
-   #docker exec lab-krill krillc roas update --ca minha_ca --remove "10.0.0.0/24-24 => 64500"
+   #docker exec lab-krill krillc roas update --ca minha_ca --remove "203.0.113.0/24-24 => 64500"
    #docker exec lab-krill krillc aspas remove --ca minha_ca --customer AS64500
    #docker exec lab-krill krillc bulk publish
    ```
@@ -1574,7 +1618,7 @@ aparezcan a propósito, sacando objetos:
    #./scripts/lab.sh refresh
    ```
 
-3. Verifique los veredictos de `10.0.0.0/24` en los dos observadores: los dos caminos deberían
+3. Verifique los veredictos de `203.0.113.0/24` en los dos observadores: los dos caminos deberían
    figurar ahora como **ROV NotFound, ASPA Unknown** - "no tenemos opinión", no un
    rechazo: se quedan en la tabla aunque las dos verificaciones estén activas. Note
    que `3fff:cafe::/32` no se ve afectado: su propia ROA sigue ahí, así que
@@ -1587,11 +1631,11 @@ aparezcan a propósito, sacando objetos:
 
    ```
    # Panel: haga clic en el recuadro Krill, luego en Shell:
-   #krillc roas update --ca minha_ca --add "10.0.0.0/24-24 => 64500"
+   #krillc roas update --ca minha_ca --add "203.0.113.0/24-24 => 64500"
    #krillc aspas add --ca minha_ca --aspa "AS64500 => AS64501, AS64502"
    #krillc bulk publish
    # O, desde la terminal de su computadora:
-   #docker exec lab-krill krillc roas update --ca minha_ca --add "10.0.0.0/24-24 => 64500"
+   #docker exec lab-krill krillc roas update --ca minha_ca --add "203.0.113.0/24-24 => 64500"
    #docker exec lab-krill krillc aspas add --ca minha_ca --aspa "AS64500 => AS64501, AS64502"
    #docker exec lab-krill krillc bulk publish
    #./scripts/lab.sh refresh

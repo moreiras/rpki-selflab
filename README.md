@@ -75,10 +75,10 @@ access. See [vm/README.md](vm/README.md).
                      \                          /
                       \                        /
                        origin  AS64500  --  Krill (the holder's CA)
-                       10.0.0.0/24 , 3fff:cafe::/32
+                       203.0.113.0/24 , 3fff:cafe::/32
 ```
 
-AS64500 is multihomed and announces `10.0.0.0/24` and `3fff:cafe::/32`. Each
+AS64500 is multihomed and announces `203.0.113.0/24` and `3fff:cafe::/32`. Each
 observer receives the same prefix over both providers. The origin prefers
 Provider B: it prepends its ASN twice when announcing to Provider A (the
 backup), so A's path is two hops longer. Two more routers are on
@@ -318,12 +318,12 @@ English, regardless of the lab's own language.
 ## Different values
 
 Everything you might want to change lives in **`lab.conf`**. The values shown
-throughout this README (AS64500, 10.0.0.0/24, ...) are the **defaults**; the
+throughout this README (AS64500, 203.0.113.0/24, ...) are the **defaults**; the
 guide, on the other hand, is compiled from `lab.conf` and always shows yours:
 
 ```sh
 ORIGIN_ASN=64500
-ORIGIN_V4=10.0.0.0/24
+ORIGIN_V4=203.0.113.0/24
 ORIGIN_V4_MAXLEN=24
 ORIGIN_V6=3fff:cafe::/32
 ORIGIN_V6_MAXLEN=32

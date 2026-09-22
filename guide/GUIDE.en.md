@@ -89,7 +89,7 @@ this lab*. Skip ahead if you're already comfortable with them.
                           \          /
                            \        /
                     origin AS64500   +   Krill (the holder's CA)
-                    10.0.0.0/24 , 3fff:cafe::/32
+                    203.0.113.0/24 , 3fff:cafe::/32
 ```
 
 AS64500 is multihomed, and it has a preference: **Provider B is the way in, Provider A
@@ -324,7 +324,7 @@ happens between a provider and their RIR.
 ### Checking
 
 12. In Krill, the CA should show the resources received from the parent: the
-    ASN 64500 and the prefixes 10.0.0.0/24 and 3fff:cafe::/32.
+    ASN 64500 and the prefixes 203.0.113.0/24 and 3fff:cafe::/32.
 
 13. In the LabNIC panel, the *Delegated RPKI* section now shows **active**,
     with the date of the latest Up-Down exchange and the count of objects in
@@ -401,16 +401,16 @@ validators whenever a step asks you to create one.)
 
    ```
    # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all 10.0.0.0/24
+   #birdc show route table master4 all 203.0.113.0/24
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   10.0.0.0/24  unicast [provider_b_v4 ...] * (100) [AS64500i]
+   203.0.113.0/24  unicast [provider_b_v4 ...] * (100) [AS64500i]
         bgp_path: 64502 64500
         bgp_local_pref: 100
 
@@ -421,8 +421,8 @@ validators whenever a step asks you to create one.)
 
    ```
    flags  vs destination          gateway          lpref   med aspath origin
-   *>    N-? 10.0.0.0/24          10.200.6.10       100     0 64502 64500 i
-   *     N-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
+   *>    N-? 203.0.113.0/24          10.200.6.10       100     0 64502 64500 i
+   *     N-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
    Two paths on each observer: `64502 64500` (selected: the origin's preferred way in, 2
@@ -495,24 +495,24 @@ AS666 announces the origin's prefix as if it were its own.
 
    ```
    # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all 10.0.0.0/24
+   #birdc show route table master4 all 203.0.113.0/24
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   10.0.0.0/24  unicast [attacker_v4 ...] * (100) [AS666i]
+   203.0.113.0/24  unicast [attacker_v4 ...] * (100) [AS666i]
         bgp_path: 666
         bgp_local_pref: 100
    ```
 
    ```
-   *>    N-? 10.0.0.0/24          10.200.8.10       100     0 666 i
-   *     N-? 10.0.0.0/24          10.200.6.10       100     0 64502 64500 i
-   *     N-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
+   *>    N-? 203.0.113.0/24          10.200.8.10       100     0 666 i
+   *     N-? 203.0.113.0/24          10.200.6.10       100     0 64502 64500 i
+   *     N-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
    The hijack **won**: it's the selected route (`*`, `*>`) on both observers -
@@ -553,7 +553,7 @@ the **Observers validate** them - only marking, for now.
    | field | value |
    |---|---|
    | ASN | 64500 |
-   | Prefix | 10.0.0.0/24 |
+   | Prefix | 203.0.113.0/24 |
    | Max length | 24 |
 
 3. Create the IPv6 ROA:
@@ -565,7 +565,7 @@ the **Observers validate** them - only marking, for now.
    | Max length | 32 |
 
    (Prefer the command line? In the Krill box's terminal:
-   `krillc roas update --add "10.0.0.0/24-24 => 64500"`, and the same with
+   `krillc roas update --add "203.0.113.0/24-24 => 64500"`, and the same with
    `"3fff:cafe::/32-32 => 64500"`. If Krill says an ROA is a *duplicate*,
    it's already there.)
 
@@ -665,25 +665,25 @@ observers again if you like - the hijack is still winning.
 
    ```
    # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all 10.0.0.0/24
+   #birdc show route table master4 all 203.0.113.0/24
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   10.0.0.0/24  unicast [attacker_v4 ...] (100) [AS666i]
+   203.0.113.0/24  unicast [attacker_v4 ...] (100) [AS666i]
         bgp_path: 666
         bgp_local_pref: 10
         bgp_large_community: (64510, 1, 0)                   <- ROV Invalid
    ```
 
    ```
-   *>    V-? 10.0.0.0/24          10.200.6.10       100     0 64502 64500 i
-   *     V-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
-   *     !-? 10.0.0.0/24          10.200.8.10        10     0 666 i
+   *>    V-? 203.0.113.0/24          10.200.6.10       100     0 64502 64500 i
+   *     V-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
+   *     !-? 203.0.113.0/24          10.200.8.10        10     0 666 i
    ```
 
    The hijack is still in the table - visible, not gone - but now it carries
@@ -774,16 +774,16 @@ in the path - so what if the last AS were the right one?
 
    ```
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
    flags  vs destination          gateway          lpref   med aspath origin
-   *>    V-? 10.0.0.0/24          10.200.8.10       100     0 666 64500 i
-   *m    V-? 10.0.0.0/24          10.200.6.10       100     0 64502 64500 i
-   *     V-? 10.0.0.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
+   *>    V-? 203.0.113.0/24          10.200.8.10       100     0 666 64500 i
+   *m    V-? 203.0.113.0/24          10.200.6.10       100     0 64502 64500 i
+   *     V-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
    It isn't flagged. ROV says `Valid` - the path ends in 64500, which is
@@ -942,15 +942,15 @@ and no router is verifying paths.
 
    ```
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   *>    V-V 10.0.0.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
-   *     V-! 10.0.0.0/24          10.200.8.10        20     0 666 64500 i
-   *     V-! 10.0.0.0/24          10.200.6.10        20     0 64502 64500 i
+   *>    V-V 203.0.113.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
+   *     V-! 203.0.113.0/24          10.200.8.10        20     0 666 64500 i
+   *     V-! 203.0.113.0/24          10.200.6.10        20     0 64502 64500 i
    ```
 
    The forged path is now **ASPA Invalid** - the hop `64500 → 666` isn't
@@ -1007,15 +1007,15 @@ which is the same thing said differently.)
 
    ```
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
-   *     V-V 10.0.0.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
-   *     V-! 10.0.0.0/24          10.200.8.10        20     0 666 64500 i
+   *>    V-V 203.0.113.0/24          10.200.6.10       200     0 64502 64500 i
+   *     V-V 203.0.113.0/24          10.200.5.10       200     0 64501 64500 64500 64500 i
+   *     V-! 203.0.113.0/24          10.200.8.10        20     0 666 64500 i
    ```
 
    Both legitimate paths are back at `V-V` and `local_pref` 200, and Provider
@@ -1082,13 +1082,13 @@ Then somebody edits a configuration...
 
    ```
    # Panel: click the provider-a box, then Shell:
-   #birdc show route 10.0.0.0/24 all
+   #birdc show route 203.0.113.0/24 all
    # Or, from your computer's terminal:
-   #docker exec lab-provider-a birdc show route 10.0.0.0/24 all
+   #docker exec lab-provider-a birdc show route 203.0.113.0/24 all
    ```
 
    ```
-   10.0.0.0/24  unicast [customer_peer_v4 ...] * (100) [AS64500i]
+   203.0.113.0/24  unicast [customer_peer_v4 ...] * (100) [AS64500i]
         bgp_path: 64999 64500
         bgp_local_pref: 100
                 unicast [customer_v4 ...] (100) [AS64500i]
@@ -1108,15 +1108,15 @@ Then somebody edits a configuration...
 
    ```
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
-   *     V-! 10.0.0.0/24          10.200.8.10        20     0 666 64500 i
-   *     V-! 10.0.0.0/24          10.200.5.10        20     0 64501 64999 64500 i
+   *>    V-V 203.0.113.0/24          10.200.6.10       200     0 64502 64500 i
+   *     V-! 203.0.113.0/24          10.200.8.10        20     0 666 64500 i
+   *     V-! 203.0.113.0/24          10.200.5.10        20     0 64501 64999 64500 i
    ```
 
    **Provider A's own path is already gone** - it stopped advertising it the
@@ -1193,13 +1193,13 @@ start.
 
    ```
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    ```
-   *>    V-V 10.0.0.0/24          10.200.6.10       200     0 64502 64500 i
+   *>    V-V 203.0.113.0/24          10.200.6.10       200     0 64502 64500 i
    ```
 
    **Two routes disappeared, not one.** AS666's forged path is gone, as
@@ -1208,9 +1208,9 @@ start.
 
    ```
    # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 filtered 10.0.0.0/24
+   #birdc show route table master4 filtered 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 filtered 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 filtered 203.0.113.0/24
    ```
 
    The badge now reads *ROV + ASPA: dropping*. Notice what dropping did
@@ -1362,16 +1362,21 @@ The path through Provider B now reads Invalid on both observers.
    only one word in a config file will. Do you expect the path through
    Provider B to still read Invalid, or to flip?
 
-2. On observer2, edit `openbgpd/observer2-aspa-mark.conf`: change `role
-   provider` to `role customer` on the Provider B neighbors (10.200.6.10 and
-   fd00:6::10), then apply it:
+2. `openbgpd/observer2-extra-a-role-customer.conf` is
+   `openbgpd/observer2-aspa-mark.conf` with exactly that one word changed:
+   `role provider` to `role customer` on the Provider B neighbors
+   (10.200.6.10 and fd00:6::10). Open it and compare (`diff
+   openbgpd/observer2-aspa-mark.conf openbgpd/observer2-extra-a-role-customer.conf`),
+   then apply it by hand - not through `lab.sh`, since this state only exists
+   for this exercise:
 
    ```
-   #./scripts/lab.sh step5-aspa-mark
    # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib 10.0.0.0/24
+   #cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload
+   #bgpctl show rib 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib 10.0.0.0/24
+   #docker exec lab-observer2 sh -c "cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload"
+   #docker exec lab-observer2 bgpctl show rib 203.0.113.0/24
    ```
 
    The path through Provider B comes back **Valid**. Same objects, same
@@ -1379,12 +1384,16 @@ The path through Provider B now reads Invalid on both observers.
    the clearest demonstration in this lab that "is this path ASPA-valid?"
    cannot be answered without also saying *from whom* you received it.
 
-3. Now do the equivalent on BIRD: swap `aspa_check_upstream` for
-   `aspa_check_downstream` in `bird/observer1-aspa-mark.conf` and apply it the
-   same way:
+3. Now do the equivalent on BIRD: `bird/observer1-extra-a-downstream.conf` is
+   `bird/observer1-aspa-mark.conf` with `aspa_check_upstream` swapped for
+   `aspa_check_downstream` in both filters - open it and compare the same
+   way, then apply it by hand:
 
    ```
-   #./scripts/lab.sh step5-aspa-mark
+   # Panel: click the observer1 box, then Shell:
+   #birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
+   # Or, from your computer's terminal:
+   #docker exec lab-observer1 birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
    ```
 
    **Before you look:** do you expect observer1's new verdict to match
@@ -1393,9 +1402,9 @@ The path through Provider B now reads Invalid on both observers.
 
    ```
    # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all 10.0.0.0/24
+   #birdc show route table master4 all 203.0.113.0/24
    # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 all 10.0.0.0/24
+   #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
    ```
 
    Neither, quite: BIRD reports the Provider B path as **ASPA Unknown**
@@ -1428,23 +1437,66 @@ The path through Provider B now reads Invalid on both observers.
 
 Step 2 was a hijack with the wrong origin ASN. This is the opposite mistake:
 the origin is completely legitimate, but the prefix exceeds what the ROA
-authorized. Edit `bird/origin.conf` - add a second static route and
-temporarily broaden the export filter to also match it:
+authorized. An IPv4 example would mean deaggregating 203.0.113.0/24 down to a
+`/25` - something that gets filtered network-wide on the real Internet and
+would feel contrived here. Announcing an IPv6 block more specific than a
+`/32` (a `/36` or `/40`, say) is completely ordinary operational practice, so
+that's what this exercise uses instead - and to make the point that it isn't
+about either provider, it uses **two** sub-blocks of 3fff:cafe::/32, one
+announced only to Provider A and the other only to Provider B.
+
+`bird/origin-extra-b.conf` is `bird/origin.conf` plus exactly that: two
+static routes for `3fff:cafe:1000::/40` and `3fff:cafe:2000::/40` (both
+inside 3fff:cafe::/32, both more specific than 32 authorizes),
+and each provider's export filter extended to also carry its own sub-block.
+Open it and compare with `bird/origin.conf` (`diff bird/origin.conf
+bird/origin-extra-b.conf`) before applying it by hand:
 
 ```
-protocol static origin4 {
-    ipv4;
-    route ORIGIN_V4 unreachable;
-    route 10.0.0.0/25 unreachable;
-}
+# Panel: click the origin box, then Shell:
+#birdc configure "/etc/bird-lab/origin-extra-b.conf"
+# Or, from your computer's terminal:
+#docker exec lab-origin birdc configure "/etc/bird-lab/origin-extra-b.conf"
+```
+
+Look at what each provider actually received:
+
+```
+# Panel: click the provider-a box, then Shell:
+#birdc show route
+# Panel: click the provider-b box, then Shell:
+#birdc show route
+```
+
+Provider A has `3fff:cafe:1000::/40`; Provider B has `3fff:cafe:2000::/40` -
+each only the one meant for it. Now the observers:
+
+```
+# Panel: click the observer2 box, then Shell:
+#bgpctl show rib 3fff:cafe:1000::/40
+#bgpctl show rib 3fff:cafe:2000::/40
+# Or, from your computer's terminal:
+#docker exec lab-observer2 bgpctl show rib 3fff:cafe:1000::/40
+#docker exec lab-observer2 bgpctl show rib 3fff:cafe:2000::/40
 ```
 
 ```
-filter only_mine_v4 {
-    if (net = ORIGIN_V4 || net = 10.0.0.0/25) && source = RTS_STATIC then accept;
-    reject;
-}
+*>    !-? 3fff:cafe:1000::/40  fd00:5::10         10     0 64501 64500 64500 64500 i
 ```
+
+```
+*>    !-? 3fff:cafe:2000::/40  fd00:6::10         10     0 64502 64500 i
+```
+
+Both paths are **ROV Invalid** - each a perfectly legitimate announcement
+through an authorized provider, rejected for the same reason on both sides:
+the ROA for 3fff:cafe::/32 only authorizes announcements up to
+`/32`, and both sub-blocks are more specific than that. It
+isn't about Provider A or Provider B - it's the prefix. In `rov-mark` both
+stay visible, demoted, exactly like the hijack in Step 3. Run `step8-drop`
+and they disappear the same way the hijack later did.
+
+Undo when you're done:
 
 ```
 # Panel: click the origin box, then Shell:
@@ -1452,18 +1504,6 @@ filter only_mine_v4 {
 # Or, from your computer's terminal:
 #docker exec lab-origin birdc configure
 ```
-
-`10.0.0.0/25` arrives at the observers through Provider B (the session with
-Provider A uses its own prepending filter, which you didn't touch) with
-`bgp_path: 64502 64500` - a
-perfectly legitimate path through an authorized provider - but **ROV
-Invalid**: the ROA for `10.0.0.0/24` only authorizes announcements up to
-`/24`, and `/25` is more specific than that. In `rov-mark` it stays visible,
-demoted, exactly like the hijack in Step 3. Run `step8-drop` and it
-disappears the same way the hijack later did.
-
-Undo both changes (remove the extra `route` line, restore the original
-`only_mine_v4` filter) and reload `lab-origin` when you're done.
 
 > **The pattern:** ROV checks *what is being announced and by whom*. ASPA
 > checks *whether the path that carried it here is one the origin
@@ -1546,11 +1586,11 @@ appear on purpose, by taking objects away:
 
    ```
    # Panel: click the krill box, then Shell:
-   #krillc roas update --ca minha_ca --remove "10.0.0.0/24-24 => 64500"
+   #krillc roas update --ca minha_ca --remove "203.0.113.0/24-24 => 64500"
    #krillc aspas remove --ca minha_ca --customer AS64500
    #krillc bulk publish
    # Or, from your computer's terminal:
-   #docker exec lab-krill krillc roas update --ca minha_ca --remove "10.0.0.0/24-24 => 64500"
+   #docker exec lab-krill krillc roas update --ca minha_ca --remove "203.0.113.0/24-24 => 64500"
    #docker exec lab-krill krillc aspas remove --ca minha_ca --customer AS64500
    #docker exec lab-krill krillc bulk publish
    ```
@@ -1563,7 +1603,7 @@ appear on purpose, by taking objects away:
    #./scripts/lab.sh refresh
    ```
 
-3. Check the verdicts for `10.0.0.0/24` on both observers: both paths should
+3. Check the verdicts for `203.0.113.0/24` on both observers: both paths should
    now read **ROV NotFound, ASPA Unknown** - "we have no opinion", not a
    rejection: they stay in the table even though both checks are on. Notice
    that `3fff:cafe::/32` is unaffected: its own ROA is still there, so it
@@ -1576,11 +1616,11 @@ appear on purpose, by taking objects away:
 
    ```
    # Panel: click the krill box, then Shell:
-   #krillc roas update --ca minha_ca --add "10.0.0.0/24-24 => 64500"
+   #krillc roas update --ca minha_ca --add "203.0.113.0/24-24 => 64500"
    #krillc aspas add --ca minha_ca --aspa "AS64500 => AS64501, AS64502"
    #krillc bulk publish
    # Or, from your computer's terminal:
-   #docker exec lab-krill krillc roas update --ca minha_ca --add "10.0.0.0/24-24 => 64500"
+   #docker exec lab-krill krillc roas update --ca minha_ca --add "203.0.113.0/24-24 => 64500"
    #docker exec lab-krill krillc aspas add --ca minha_ca --aspa "AS64500 => AS64501, AS64502"
    #docker exec lab-krill krillc bulk publish
    #./scripts/lab.sh refresh

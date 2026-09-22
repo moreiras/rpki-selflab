@@ -75,10 +75,10 @@ Internet. Veja [vm/README.pt.md](vm/README.pt.md).
                      \                          /
                       \                        /
                        origem  AS64500  --  Krill (a CA do titular)
-                       10.0.0.0/24 , 3fff:cafe::/32
+                       203.0.113.0/24 , 3fff:cafe::/32
 ```
 
-O AS64500 é multihomed e anuncia `10.0.0.0/24` e `3fff:cafe::/32`. Cada
+O AS64500 é multihomed e anuncia `203.0.113.0/24` e `3fff:cafe::/32`. Cada
 observador recebe o mesmo prefixo pelos dois provedores. A origem prefere o
 Provedor B: ela repete seu ASN duas vezes (prepend) ao anunciar para o
 Provedor A (o backup), então o caminho de A é dois saltos mais longo. Mais dois
@@ -322,12 +322,12 @@ Python) estão todos em inglês, independentemente do idioma do laboratório.
 ## Valores diferentes
 
 Tudo o que você pode querer mudar fica no **`lab.conf`**. Os valores mostrados
-ao longo deste README (AS64500, 10.0.0.0/24, ...) são os **padrões**; o guia,
+ao longo deste README (AS64500, 203.0.113.0/24, ...) são os **padrões**; o guia,
 por outro lado, é compilado a partir do `lab.conf` e sempre mostra os seus:
 
 ```sh
 ORIGIN_ASN=64500
-ORIGIN_V4=10.0.0.0/24
+ORIGIN_V4=203.0.113.0/24
 ORIGIN_V4_MAXLEN=24
 ORIGIN_V6=3fff:cafe::/32
 ORIGIN_V6_MAXLEN=32

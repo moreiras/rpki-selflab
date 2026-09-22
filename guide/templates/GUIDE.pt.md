@@ -1372,15 +1372,20 @@ O caminho pelo Provedor B agora aparece como Invalid nos dois observadores.
    só uma palavra num arquivo de configuração. Você espera que o caminho pelo
    Provedor B continue Invalid, ou que vire?
 
-2. No observer2, edite `openbgpd/observer2-aspa-mark.conf`: troque `role
-   provider` por `role customer` nos vizinhos do Provedor B (10.200.6.10 e
-   fd00:6::10), depois aplique:
+2. `openbgpd/observer2-extra-a-role-customer.conf` é o
+   `openbgpd/observer2-aspa-mark.conf` com exatamente essa uma palavra trocada:
+   `role provider` virou `role customer` nos vizinhos do Provedor B
+   (10.200.6.10 e fd00:6::10). Abra e compare (`diff
+   openbgpd/observer2-aspa-mark.conf openbgpd/observer2-extra-a-role-customer.conf`),
+   depois aplique à mão - não pelo `lab.sh`, já que esse estado só existe
+   para este exercício:
 
    ```
-   #./scripts/lab.sh step5-aspa-mark
    # Painel: clique na caixa observer2 e depois em Shell:
+   #cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload
    #bgpctl show rib {{ORIGIN_V4}}
    # Ou, no terminal do seu computador:
+   #docker exec lab-observer2 sh -c "cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload"
    #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
    ```
 
@@ -1389,12 +1394,16 @@ O caminho pelo Provedor B agora aparece como Invalid nos dois observadores.
    a demonstração mais clara neste laboratório de que "este caminho é ASPA-válido?"
    não pode ser respondido sem dizer também *de quem* você o recebeu.
 
-3. Agora faça o equivalente no BIRD: troque `aspa_check_upstream` por
-   `aspa_check_downstream` em `bird/observer1-aspa-mark.conf` e aplique da
-   mesma forma:
+3. Agora faça o equivalente no BIRD: `bird/observer1-extra-a-downstream.conf` é
+   o `bird/observer1-aspa-mark.conf` com `aspa_check_upstream` trocado por
+   `aspa_check_downstream` nos dois filtros - abra e compare da mesma forma,
+   depois aplique à mão:
 
    ```
-   #./scripts/lab.sh step5-aspa-mark
+   # Painel: clique na caixa observer1 e depois em Shell:
+   #birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
+   # Ou, no terminal do seu computador:
+   #docker exec lab-observer1 birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
    ```
 
    **Antes de olhar:** você espera que o novo veredito do observer1 coincida com o
@@ -1438,23 +1447,66 @@ O caminho pelo Provedor B agora aparece como Invalid nos dois observadores.
 
 O Passo 2 foi um sequestro com o ASN de origem errado. Este é o erro oposto:
 a origem é totalmente legítima, mas o prefixo excede o que a ROA
-autorizou. Edite `bird/origin.conf` - adicione uma segunda rota estática e
-amplie temporariamente o filtro de exportação para casar com ela também:
+autorizou. Um exemplo em IPv4 significaria desagregar {{ORIGIN_V4}} até um
+`/25` - algo que é filtrado na Internet real em toda a rede e
+pareceria artificial aqui. Anunciar um bloco IPv6 mais específico que um
+`/32` (um `/36` ou `/40`, digamos) é uma prática operacional completamente
+comum, então é isso que este exercício usa - e para deixar claro que não é
+sobre nenhum dos dois provedores, ele usa **dois** sub-blocos de
+{{ORIGIN_V6}}, um anunciado só ao Provedor A e o outro só ao Provedor B.
+
+O `bird/origin-extra-b.conf` é o `bird/origin.conf` mais exatamente isso: duas
+rotas estáticas para `3fff:cafe:1000::/40` e `3fff:cafe:2000::/40` (ambas
+dentro de {{ORIGIN_V6}}, ambas mais específicas do que {{ORIGIN_V6_MAXLEN}}
+autoriza), e o filtro de exportação de cada provedor ampliado para carregar
+também o seu próprio sub-bloco. Abra e compare com o `bird/origin.conf` (`diff
+bird/origin.conf bird/origin-extra-b.conf`) antes de aplicar à mão:
 
 ```
-protocol static origin4 {
-    ipv4;
-    route ORIGIN_V4 unreachable;
-    route 10.0.0.0/25 unreachable;
-}
+# Painel: clique na caixa origin e depois em Shell:
+#birdc configure "/etc/bird-lab/origin-extra-b.conf"
+# Ou, no terminal do seu computador:
+#docker exec lab-origin birdc configure "/etc/bird-lab/origin-extra-b.conf"
+```
+
+Veja o que cada provedor de fato recebeu:
+
+```
+# Painel: clique na caixa provider-a e depois em Shell:
+#birdc show route
+# Painel: clique na caixa provider-b e depois em Shell:
+#birdc show route
+```
+
+O Provedor A tem `3fff:cafe:1000::/40`; o Provedor B tem `3fff:cafe:2000::/40`
+- cada um só o que era destinado a ele. Agora os observadores:
+
+```
+# Painel: clique na caixa observer2 e depois em Shell:
+#bgpctl show rib 3fff:cafe:1000::/40
+#bgpctl show rib 3fff:cafe:2000::/40
+# Ou, no terminal do seu computador:
+#docker exec lab-observer2 bgpctl show rib 3fff:cafe:1000::/40
+#docker exec lab-observer2 bgpctl show rib 3fff:cafe:2000::/40
 ```
 
 ```
-filter only_mine_v4 {
-    if (net = ORIGIN_V4 || net = 10.0.0.0/25) && source = RTS_STATIC then accept;
-    reject;
-}
+*>    !-? 3fff:cafe:1000::/40  fd00:5::10         10     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
 ```
+
+```
+*>    !-? 3fff:cafe:2000::/40  fd00:6::10         10     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
+```
+
+Os dois caminhos são **ROV Invalid** - cada um um anúncio perfeitamente
+legítimo por um provedor autorizado, rejeitado pelo mesmo motivo nos dois
+lados: a ROA de {{ORIGIN_V6}} só autoriza anúncios até
+`/{{ORIGIN_V6_MAXLEN}}`, e os dois sub-blocos são mais específicos que isso.
+Não é sobre o Provedor A ou o Provedor B - é o prefixo. Em `rov-mark` os dois
+continuam visíveis, rebaixados, exatamente como o sequestro no Passo 3. Rode
+`step8-drop` e eles somem do mesmo jeito que o sequestro sumiu depois.
+
+Desfaça quando terminar:
 
 ```
 # Painel: clique na caixa origin e depois em Shell:
@@ -1462,18 +1514,6 @@ filter only_mine_v4 {
 # Ou, no terminal do seu computador:
 #docker exec lab-origin birdc configure
 ```
-
-O `10.0.0.0/25` chega aos observadores pelo Provedor B (a sessão com o
-Provedor A usa o seu próprio filtro de prepend, que você não tocou) com
-`bgp_path: {{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` - um caminho
-perfeitamente legítimo por um provedor autorizado - mas **ROV
-Invalid**: a ROA de `{{ORIGIN_V4}}` só autoriza anúncios até
-`/24`, e `/25` é mais específico que isso. Em `rov-mark` ela continua visível,
-rebaixada, exatamente como o sequestro no Passo 3. Rode `step8-drop` e ela
-some do mesmo jeito que o sequestro sumiu depois.
-
-Desfaça as duas mudanças (remova a linha `route` extra, restaure o filtro
-`only_mine_v4` original) e recarregue o `lab-origin` quando terminar.
 
 > **O padrão:** o ROV confere *o que está sendo anunciado e por quem*. O ASPA
 > confere *se o caminho que o trouxe até aqui é um que a origem

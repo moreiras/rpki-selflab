@@ -716,8 +716,8 @@ const NODES = {
     },
     origin: {
       name: "origem — AS64500",
-      role: "O seu AS. Origina 10.0.0.0/24 e 3fff:cafe::/32 e é multihomed nos Provedores A e B. Prefere o B: o anúncio para o A leva prepend duas vezes.",
-      info: { "ASN": "64500", "IPv4": "10.0.0.0/24", "IPv6": "3fff:cafe::/32",
+      role: "O seu AS. Origina 203.0.113.0/24 e 3fff:cafe::/32 e é multihomed nos Provedores A e B. Prefere o B: o anúncio para o A leva prepend duas vezes.",
+      info: { "ASN": "64500", "IPv4": "203.0.113.0/24", "IPv6": "3fff:cafe::/32",
               "Enlace A": "10.200.1.10 / fd00:1::10", "Enlace B": "10.200.2.10 / fd00:2::10", "Config": "bird/origin.conf" },
       term: [["Terminal (birdc)", "origin", "birdc"], ["Shell", "origin"]],
       hint: "show protocols\nshow route export provider_a_v4",
@@ -834,8 +834,8 @@ const NODES = {
     },
     origin: {
       name: "origen — AS64500",
-      role: "Su AS. Origina 10.0.0.0/24 y 3fff:cafe::/32 y es multihomed en los Proveedores A y B. Prefiere B: el anuncio hacia A lleva prepend dos veces.",
-      info: { "ASN": "64500", "IPv4": "10.0.0.0/24", "IPv6": "3fff:cafe::/32",
+      role: "Su AS. Origina 203.0.113.0/24 y 3fff:cafe::/32 y es multihomed en los Proveedores A y B. Prefiere B: el anuncio hacia A lleva prepend dos veces.",
+      info: { "ASN": "64500", "IPv4": "203.0.113.0/24", "IPv6": "3fff:cafe::/32",
               "Enlace A": "10.200.1.10 / fd00:1::10", "Enlace B": "10.200.2.10 / fd00:2::10", "Config": "bird/origin.conf" },
       term: [["Terminal (birdc)", "origin", "birdc"], ["Shell", "origin"]],
       hint: "show protocols\nshow route export provider_a_v4",
@@ -952,8 +952,8 @@ const NODES = {
     },
     origin: {
       name: "origin — AS64500",
-      role: "Your AS. Originates 10.0.0.0/24 and 3fff:cafe::/32 and is multihomed to Providers A and B. It prefers B: the announcement to A is prepended twice.",
-      info: { "ASN": "64500", "IPv4": "10.0.0.0/24", "IPv6": "3fff:cafe::/32",
+      role: "Your AS. Originates 203.0.113.0/24 and 3fff:cafe::/32 and is multihomed to Providers A and B. It prefers B: the announcement to A is prepended twice.",
+      info: { "ASN": "64500", "IPv4": "203.0.113.0/24", "IPv6": "3fff:cafe::/32",
               "Link A": "10.200.1.10 / fd00:1::10", "Link B": "10.200.2.10 / fd00:2::10", "Config": "bird/origin.conf" },
       term: [["Terminal (birdc)", "origin", "birdc"], ["Shell", "origin"]],
       hint: "show protocols\nshow route export provider_a_v4",
@@ -1029,7 +1029,7 @@ function tag(v) {
 // lab.conf has different ones, they get swapped in at render time - this
 // way the Markdown guide stays readable outside the browser too, with no
 // template placeholders.
-const DEFAULTS = { ASN: "64500", V4: "10.0.0.0/24", V6: "3fff:cafe::/32",
+const DEFAULTS = { ASN: "64500", V4: "203.0.113.0/24", V6: "3fff:cafe::/32",
                  V4MAX: "24", V6MAX: "32" };
 
 function substituteDefaults(text) {
