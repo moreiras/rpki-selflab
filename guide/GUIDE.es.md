@@ -4,20 +4,11 @@
 
 *[English](GUIDE.en.md) · [Español](GUIDE.es.md) · [Português](GUIDE.pt.md)*
 
-**Objetivo:** seguir a un atacante y a un peer con fuga de rutas a través de un laboratorio que corre en su
-propia máquina. Ver qué detecta la validación de origen (ROV), qué deja pasar,
-y qué agrega el ASPA - con cada veredicto verificado por dos pilas
-independientes (BIRD + Routinator, y OpenBGPD + FORT).
+**Objetivo:** seguir a un atacante y a un peer con fuga de rutas por un laboratorio que corre en su propia máquina, y ver qué detecta la validación de origen (ROV), qué deja pasar sin más, y qué suma el ASPA. Cada veredicto queda verificado por dos pilas independientes: BIRD + Routinator, y OpenBGPD + FORT.
 
-Este es un laboratorio autocontenido: todo corre en contenedores en su propia
-máquina, y asume que usted ya tiene una noción básica de RPKI, ROAs, ROV
-y ASPA. Puede certificar sus recursos completamente de forma local, o, si
-prefiere usar un registro del mundo real, contra el sistema de pruebas de
-Registro.br.
+Es un laboratorio autocontenido: todo corre en contenedores, en su propia máquina. Asume que usted ya tiene una noción básica de RPKI, ROAs, ROV y ASPA - esto no es una introducción a esos temas. Puede certificar sus recursos completamente de forma local o, si prefiere un registro del mundo real, contra el sistema de pruebas de Registro.br.
 
-El laboratorio es una sola historia en nueve pasos: **tres ataques, y el momento en que cada
-uno deja de funcionar.** Primero viene una breve preparación (levantar el laboratorio
-y certificar sus recursos), y al final algunos ejercicios extra.
+El laboratorio cuenta una sola historia en nueve pasos: **tres ataques, y el momento en que cada uno deja de funcionar.** Antes hay una breve preparación (levantar el laboratorio y certificar sus recursos); al final quedan algunos ejercicios extra para quien quiera seguir tirando del hilo.
 
 ## Qué le pide RPKI a su propio AS - y qué despliega este laboratorio
 
@@ -28,13 +19,9 @@ RPKI tiene dos mitades, y cada una tiene dos partes:
 | **Quién puede originar un prefijo** | **ROAs** (Route Origin Authorizations) | **ROV** (Route Origin Validation) |
 | **Qué caminos son plausibles** | un objeto **ASPA** (Autonomous System Provider Authorization) | **verificación ASPA** |
 
-En la vida real, **las dos van en el AS que usted opera**: usted *publica* objetos
-sobre sus propios recursos, y *valida* lo que le envían sus vecinos.
-Publicar sin validar protege a los demás pero no a usted; validar sin
-publicar lo protege a usted pero deja sus propios prefijos desprotegidos para todos
-los demás.
+En la vida real, **las dos van en el AS que usted opera**: usted *publica* objetos sobre sus propios recursos y *valida* lo que le envían sus vecinos. Publicar sin validar protege a los demás, pero no a usted. Validar sin publicar lo protege a usted, pero deja sus propios prefijos desprotegidos para todos los demás.
 
-En este laboratorio, con fines didácticos, las dos se separan:
+Este laboratorio separa las dos cosas, con fines didácticos:
 
 - **La publicación se despliega solo en el AS de origen** (AS64500, cuya CA vive en
   Krill). Es el único AS que crea ROAs y un objeto ASPA.
@@ -42,18 +29,11 @@ En este laboratorio, con fines didácticos, las dos se separan:
   observer2), los dos routers que va a observar. Todo lo demás en el laboratorio
   es un router BGP común que nunca mira RPKI.
 
-La validación se despliega en los observadores **en dos etapas, para cada verificación**:
-primero el router solo *marca* lo que la verificación señala (una community, una
-preferencia menor - no se descarta nada, así que puede ver qué pasaría), y después
-lo *descarta*. **Descartar las inválidas es lo que hacen los routers reales**; marcar
-es el ensayo que se hace antes de confiar lo suficiente en una verificación como para dejar que rechace
-rutas.
+La validación se despliega en los observadores en dos etapas, para cada verificación. Primero el router solo *marca* lo que la verificación señala: una community, una preferencia menor, nada se descarta todavía, así que usted puede ver qué pasaría. Después lo *descarta* de verdad. **Descartar las inválidas es lo que hacen los routers reales**; marcar es el ensayo, el paso que se da antes de confiar lo suficiente en una verificación como para dejarla rechazar rutas.
 
 ## Glosario
 
-Un repaso rápido, no una introducción completa - esto es lo que estos
-términos significan *en este laboratorio*. Salte adelante si ya se siente
-cómodo con ellos.
+Un repaso rápido, no una introducción completa: esto es lo que estos términos significan *en este laboratorio*. Si ya los tiene claros, siga adelante sin más.
 
 | Término | Significado |
 |---|---|
@@ -94,17 +74,9 @@ cómodo con ellos.
                     203.0.113.0/24 , 3fff:cafe::/32
 ```
 
-El AS64500 es multihomed, y tiene una preferencia: **el Proveedor B es la entrada, el Proveedor A
-es el respaldo.** Para lograrlo, el origen hace *prepend* de su propio ASN dos veces cuando anuncia
-al Proveedor A (`64500 64500 64500` en lugar de solo `64500`), así que todo camino a través de
-A parece dos saltos más largo que el que pasa por B - ingeniería de tráfico entrante común y corriente.
-Los dos proveedores pasan el **mismo prefijo** a los dos observadores, con el mismo AS de origen. El laboratorio corre toda la historia **dos veces, en
-paralelo**, sobre dos pilas independientes: observer1 y observer2 ven exactamente los
-mismos anuncios y los mismos objetos RPKI, pero cada uno tiene su propio router
-y su propio validador.
+El AS64500 es multihomed y tiene una preferencia clara: **el Proveedor B es la entrada, el Proveedor A es el respaldo.** Para lograrlo, el origen hace *prepend* de su propio ASN dos veces cuando anuncia al Proveedor A (`64500 64500 64500` en lugar de solo `64500`), así que cualquier camino que pase por A parece dos saltos más largo que el que pasa por B. Es ingeniería de tráfico entrante de manual. Los dos proveedores pasan el **mismo prefijo** a los dos observadores, con el mismo AS de origen, y el laboratorio corre toda la historia **dos veces, en paralelo**, sobre dos pilas independientes: observer1 y observer2 ven exactamente los mismos anuncios y los mismos objetos RPKI, pero cada uno con su propio router y su propio validador.
 
-Dos routers más se suman a la historia. Los dos están en el panel, y los dos están en silencio
-hasta que la historia los activa:
+Dos routers más se suman a la historia. Los dos están en el panel, y los dos se quedan callados hasta que la historia los activa:
 
 ```
    AS666 (el atacante) ---- sesiones BGP directas ----> observer1, observer2
@@ -112,7 +84,7 @@ hasta que la historia los activa:
                               puede enviarles un anuncio, y nadie
                               lo verifica a menos que los observadores validen)
 
-   peer AS64999 ---- peering privado ---- origen AS64500
+   peer AS64499 ---- peering privado ---- origen AS64500
         |
         +---- tránsito ---- Proveedor A
 ```
@@ -125,12 +97,9 @@ hasta que la historia los activa:
 | observer1 | 64510 | router que valida: **BIRD** + **Routinator** |
 | observer2 | 64511 | router que valida: **OpenBGPD** + **FORT Validator** |
 | AS666 | 666 | el atacante: un cliente de los observadores, y secuestra los prefijos del origen |
-| peer | 64999 | una red legítima que hace peering con el origen, y compra tránsito del Proveedor A |
+| peer | 64499 | una red legítima que hace peering con el origen, y compra tránsito del Proveedor A |
 
-Los ASN 64496–64511 son ASN reservados para documentación (RFC 5398). El AS64999 está en el
-rango de uso privado (RFC 6996), y el AS666 no está en ninguno - simplemente es
-fácil de recordar. Todos son inofensivos aquí: esta red nunca toca la Internet
-real.
+Los ASN 64496–64511 son ASN reservados para documentación (RFC 5398), y todos los del laboratorio caen ahí dentro: el origen, los proveedores, los observadores y el peer AS64499. La única excepción es el AS666: ese no está en ningún bloque reservado, 666 es simplemente fácil de recordar. De cualquier forma, todos son inofensivos aquí: esta red nunca toca la Internet real.
 
 > El ASN y los prefijos del origen están en el archivo **`lab.conf`**, en la
 > raíz del laboratorio. Si quiere otros, edítelos ahí y ejecute
@@ -141,19 +110,9 @@ real.
 
 ### Cómo está organizada la historia
 
-Cada paso empieza con un cuadro de **Estado**: en qué etapa de despliegue están los observadores,
-qué están haciendo el AS666 y el peer, y qué objetos RPKI deberían
-existir. Si su laboratorio no coincide, el cuadro también dice cómo volver a dejarlo.
+Cada paso empieza con un cuadro de **Estado**: en qué etapa de despliegue están los observadores, qué están haciendo el AS666 y el peer, y qué objetos RPKI deberían existir ya. Si su laboratorio no coincide, el mismo cuadro le dice cómo volver a dejarlo así.
 
-Esa recuperación es deliberadamente simple: **cada comando `./scripts/lab.sh
-stepN-*` fija el estado *entero* de su paso**, no solo lo que cambió desde el
-anterior. Ejecute `step9-leak-off` y después `step3-rov-mark`, y llega
-exactamente adonde el Paso 3 espera - la fuga, la etapa de descarte, todo lo
-que dejó `step9-leak-off` desaparece, reiniciado por el propio
-`step3-rov-mark`. Eso vale para cualquier par de pasos, en cualquier
-dirección: los comandos no suponen que usted va hacia adelante, ni dejan
-nada atrás para que el siguiente tropiece con eso. Tres cosas se mueven
-juntas cada vez que se ejecuta un comando `stepN-*`:
+Esa recuperación es deliberadamente simple: **cada comando `./scripts/lab.sh stepN-*` fija el estado *entero* de su paso**, no solo lo que cambió desde el anterior. Ejecute `step9-leak-off` y después `step3-rov-mark`, y llega exactamente adonde el Paso 3 espera: la fuga, la etapa de descarte, todo lo que dejó `step9-leak-off` desaparece, porque `step3-rov-mark` lo reinicia todo por su cuenta. Y eso vale para cualquier par de pasos, en cualquier dirección - los comandos no suponen que usted avanza en orden, ni dejan nada a medio camino para que el siguiente tropiece con eso. Cada vez que corre un comando `stepN-*`, tres cosas se mueven juntas:
 
 - **La etapa de despliegue de los observadores.** Empiezan sin ninguna validación,
   y la historia los lleva por cuatro etapas: las dos verificaciones se marcan
@@ -171,11 +130,11 @@ juntas cada vez que se ejecuta un comando `stepN-*`:
   Cada etapa es un archivo de configuración completo por observador
   (`bird/observer1-<stage>.conf`, `openbgpd/observer2-<stage>.conf`), y la
   guía le pide que los abra: **lo que cambia de un archivo al siguiente es lo que
-  significa desplegar esa verificación.** No tiene que recordar en qué etapa está -
-  la insignia en el encabezado del panel lo dice (*validación: ninguna*, *ROV: marcando*,
-  *ROV: descartando*, ...), y se pone ámbar si los dos observadores no están en la
-  misma. observer2 se reinicia cada vez que cambia la etapa (OpenBGPD negocia
-  sus roles RFC 9234 y su versión de RTR cuando se abre una sesión), así que dele diez
+  significa desplegar esa verificación.** No hace falta que recuerde en qué etapa está: la
+  insignia en el encabezado del panel lo dice (*validación: ninguna*, *ROV: marcando*,
+  *ROV: descartando*, ...), y se pone ámbar si los dos observadores no coinciden.
+  observer2 se reinicia cada vez que cambia de etapa (OpenBGPD negocia
+  sus roles RFC 9234 y su versión de RTR al abrir sesión), así que dele diez
   o quince segundos para estabilizarse antes de sacar conclusiones de lo que muestra.
 - **El AS666 y el peer.** Todo comando `stepN-*` también fija su
   estado - silencioso, secuestro ingenuo, ruta falsificada, en fuga - al que
@@ -191,10 +150,10 @@ juntas cada vez que se ejecuta un comando `stepN-*`:
   misma facilidad.
 
   Este es también el único punto donde un comando `stepN-*` puede fallar sin
-  culpa propia: desde `step3-rov-mark` en adelante, cada uno empieza
-  comprobando que la Preparación realmente haya terminado - que la CA
+  culpa propia. Desde `step3-rov-mark` en adelante, cada uno empieza
+  comprobando que la Preparación realmente haya terminado: que la CA
   exista, tenga un padre activo, tenga el número de AS y los prefijos de
-  `lab.conf`, y tenga un repositorio funcionando. Si no es así, el comando
+  `lab.conf`, y tenga un repositorio funcionando. Si algo de eso falta, el comando
   se detiene y se lo dice, en vez de crear en silencio ROAs que Krill en
   realidad no puede publicar. La Preparación es la única parte de la
   historia que un comando `stepN-*` no puede hacer por usted.
@@ -210,11 +169,7 @@ El laboratorio tiene dos modos, elegidos con la variable `MODE` en `lab.conf`:
 | `local` | **LabNIC**, un registro simulado que corre dentro del laboratorio | no |
 | `beta` | **beta.registro.br**, el sistema de pruebas de Registro.br | sí, y un login en beta.registro.br |
 
-Los dos modos usan exactamente los mismos protocolos - RFC 6492 para la delegación y
-RFC 8181 para la publicación. Lo que cambia es el panel donde pega los XML,
-y cuánto tardan los objetos en aparecer en el validador: segundos en modo
-local, algunos minutos en beta. El próximo paso de preparación tiene una versión por
-modo; haga solo la que corresponde al suyo.
+Los dos modos usan exactamente los mismos protocolos: RFC 6492 para la delegación y RFC 8181 para la publicación. Lo que cambia es el panel donde pega los XML, y cuánto tardan los objetos en aparecer en el validador - segundos en modo local, unos minutos en beta. El próximo paso de preparación tiene una versión por modo; haga solo la que le corresponde.
 
 1. Requisitos: Docker instalado (Mac, Windows o Linux - **OrbStack**,
    Docker Desktop o Docker Engine) y acceso a Internet.
@@ -277,9 +232,7 @@ modo; haga solo la que corresponde al suyo.
 > Haga esto si `lab.conf` tiene `MODE=local`. Si tiene `MODE=beta`, pase a la
 > Preparación 2-B.
 
-Aquí va a actuar en **los dos lados** de la conversación: el titular, en Krill,
-y el registro, en el panel de LabNIC. Es el mismo intercambio de XML que ocurre
-entre un proveedor y su RIR.
+Aquí va a actuar en **los dos lados** de la conversación: el titular, en Krill, y el registro, en el panel de LabNIC. Es el mismo intercambio de XML que ocurre entre un proveedor real y su RIR - solo que aquí usted hace ambos papeles.
 
 ### Su lado: la CA en Krill
 
@@ -289,7 +242,7 @@ entre un proveedor y su RIR.
    advertencia de certificado. La dirección directa, `https://localhost:3000`,
    sigue funcionando, con un certificado autofirmado.)
 
-2. Inicie sesión con el token **`passlab`**.
+2. Inicie sesión con el token **`labpass`**.
 
 3. Cree su CA con el nombre **`acme_ca`**.
    Si quiere, cambie el idioma a Español en la esquina superior derecha.
@@ -337,11 +290,9 @@ entre un proveedor y su RIR.
 > **¿Por qué dos partes separadas?** Porque son dos cosas independientes. La
 > primera dice *qué recursos son suyos*; la segunda dice *dónde va a publicar
 > los objetos firmados*. Un RIR puede certificar sus recursos mientras usted
-> publica en otro lugar - incluso en su propio servidor de publicación.
+> publica en otro lugar, incluso en su propio servidor de publicación.
 
-**Fíjese en lo que *no* hizo:** crear una ROA, o un objeto ASPA. Sus
-recursos están certificados, pero nada dice quién puede anunciarlos. Ahí es donde
-empieza la historia.
+**Fíjese en lo que *no* hizo:** no creó ninguna ROA, ni ningún objeto ASPA. Sus recursos están certificados, pero nada todavía dice quién puede anunciarlos. Ahí empieza la historia.
 
 ---
 
@@ -351,7 +302,7 @@ empieza la historia.
 > login en beta.registro.br.
 
 1. Abra Krill en **http://krill.localhost:8080**, entre con el token
-   **`passlab`** y cree la CA **`acme_ca`**.
+   **`labpass`** y cree la CA **`acme_ca`**.
 
 2. En otra pestaña, entre en **https://beta.registro.br/login/**. En el
    Panel, vaya a *Titularidad*, seleccione el AS y baje hasta la sección
@@ -375,10 +326,7 @@ empieza la historia.
 
 7. Al final, Krill debe mostrar los recursos recibidos del padre.
 
-**Fíjese en lo que *no* hizo:** crear una ROA, o un objeto ASPA. Sus
-recursos están certificados, pero nada dice quién puede anunciarlos. Ahí es donde
-empieza la historia. (En beta, cuente con que los objetos tarden unos minutos en llegar a los
-validadores cada vez que un paso le pida crear uno.)
+**Fíjese en lo que *no* hizo:** no creó ninguna ROA, ni ningún objeto ASPA. Sus recursos están certificados, pero nada todavía dice quién puede anunciarlos. Ahí empieza la historia. (En beta, cuente con que los objetos tarden unos minutos en llegar a los validadores cada vez que un paso le pida crear uno.)
 
 ---
 
@@ -429,11 +377,11 @@ validadores cada vez que un paso le pida crear uno.)
    *     N-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
-   Dos caminos en cada observador: `64502 64500` (seleccionado: la entrada preferida del origen, 2
-   saltos) y `64501 64500 64500 64500` (el respaldo, mantenido en la tabla pero de 4 saltos
-   por los prepends). No tienen
-   veredictos (BIRD no tiene communities; el `N-?` de OpenBGPD es solo "nada
-   con qué comparar", y el panel muestra `-` en los dos) - porque **los
+   Dos caminos en cada observador: `64502 64500` (el seleccionado, la entrada preferida del origen, 2
+   saltos) y `64501 64500 64500 64500` (el respaldo, que se mantiene en la tabla pero con 4 saltos
+   por los prepends). Ninguno tiene
+   veredicto todavía (BIRD no tiene communities; el `N-?` de OpenBGPD es solo "nada
+   con qué comparar", y el panel muestra `-` en los dos). Es lógico: **los
    observadores todavía no validan nada.** La insignia del encabezado del panel dice
    *validación: ninguna*.
 
@@ -466,13 +414,11 @@ validadores cada vez que un paso le pida crear uno.)
    ```
 
    No hay sesión RTR con Routinator ni con FORT (los dos están corriendo, pero nadie
-   los escucha), y nada que pueda distinguir una ROA de un agujero en la
-   pared. Todo lo que la historia le hace a estos dos archivos, de aquí en adelante, es cómo se ve
+   los escucha), y nada que distinga una ROA de un agujero en la
+   pared. Todo lo que la historia le va a hacer a estos dos archivos, de aquí en adelante, es cómo se ve
    *desplegar la validación RPKI* en un router.
 
-**En el camino:** los validadores, la CA y el repositorio ya existen,
-y los recursos están certificados - y aun así, desde donde está un router, nada de
-eso importa hasta que se le dice que escuche.
+**En el camino:** los validadores, la CA y el repositorio ya existen, y los recursos ya están certificados. Y aun así, desde donde está parado un router, nada de eso importa hasta que alguien le dice que escuche.
 
 ---
 
@@ -483,7 +429,7 @@ eso importa hasta que se le dice que escuche.
 >
 > **Si el suyo difiere:** `./scripts/lab.sh step1-clean`.
 
-El AS666 anuncia el prefijo del origen como si fuera suyo.
+El AS666 anuncia el prefijo del origen como si fuera suyo, sin más vuelta.
 
 1. Actívelo:
 
@@ -519,15 +465,14 @@ El AS666 anuncia el prefijo del origen como si fuera suyo.
    *     N-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
-   El secuestro **ganó**: es la ruta seleccionada (`*`, `*>`) en los dos observadores -
-   su camino es más corto (1 salto contra 2 y 4), y nada más lo distingue. En el panel,
+   El secuestro **ganó**. Es la ruta seleccionada (`*`, `*>`) en los dos observadores: su camino es más corto (1 salto contra 2 y 4), y nada más lo distingue de los legítimos. En el panel,
    la insignia del atacante dice *secuestrando* y sus enlaces a los observadores se ponen
-   **ámbar**: un observador está aceptando lo que anuncia. La tabla de *Veredictos*
-   tiene filas nuevas rotuladas *AS666*, sin veredictos, porque no hay
+   **ámbar** - un observador está aceptando lo que anuncia. La tabla de *Veredictos*
+   suma filas nuevas rotuladas *AS666*, sin veredictos, porque todavía no hay
    validación.
 
-**En el camino:** un secuestro con el ASN de origen equivocado - el truco más
-viejo que existe, y para el que se inventaron las ROAs.
+**En el camino:** un secuestro con el ASN de origen equivocado. El truco más
+viejo que existe, y justo el que motivó que se inventaran las ROAs.
 
 ---
 
@@ -539,8 +484,8 @@ viejo que existe, y para el que se inventaron las ROAs.
 > **Si el suyo difiere:** `./scripts/lab.sh step1-clean`, y luego
 > `./scripts/lab.sh step2-hijack-simple`.
 
-Este paso tiene dos mitades, en este orden: el **Origen publica** las ROAs, y
-los **Observadores** la **validan** - por ahora, solo marcando.
+Este paso tiene dos mitades, en este orden: primero el **Origen publica** las ROAs, y después
+los **Observadores** las **validan** - por ahora, solo marcando lo que ven.
 
 ### El Origen publica: crear las ROAs
 
@@ -581,13 +526,12 @@ los **Observadores** la **validan** - por ahora, solo marcando.
    ```
 
    `validate.sh` imprime lo que Routinator validó (dos ROAs). En el panel,
-   los recuadros de Routinator y FORT muestran `2 VRP`. Si todavía no aparece nada, **es
-   cuestión de tiempo**: Krill tiene que publicar y los validadores tienen que releer
-   (segundos en modo local, minutos en beta); ejecute `refresh` de nuevo.
+   los recuadros de Routinator y FORT muestran `2 VRP`. Si todavía no aparece nada, no se preocupe: **es
+   cuestión de tiempo** (Krill tiene que publicar y los validadores tienen que releer, segundos en modo local, minutos en beta). Ejecute `refresh` de nuevo.
 
-Por ahora nada cambió para los routers: las ROAs están publicadas y
-validadas, y **ningún router está escuchando a los validadores.** Mire los
-observadores de nuevo si quiere - el secuestro sigue ganando.
+Por ahora nada cambió para los routers: las ROAs ya están publicadas y
+validadas, pero **ningún router está escuchando a los validadores.** Mire los
+observadores de nuevo si quiere - el secuestro sigue ganando, como antes.
 
 ### Los Observadores validan
 
@@ -598,7 +542,7 @@ observadores de nuevo si quiere - el secuestro sigue ganando.
    ```
 
 2. **Vea de qué está hecho este despliegue.** Compare los archivos nuevos con la
-   base que leyó en el Paso 1 (`diff` muestra exactamente lo que se agregó):
+   base que leyó en el Paso 1: `diff` muestra exactamente lo que se agregó.
 
    ```
    #diff bird/observer1-none.conf bird/observer1-rov-mark.conf
@@ -654,12 +598,12 @@ observadores de nuevo si quiere - el secuestro sigue ganando.
    > validador (RTR), una política que compara el estado de validación, y una
    > acción. En Cisco IOS XR es una `route-policy` que prueba `validation-state`;
    > en Junos, una `policy-statement` que compara `validation-database`; en
-   > Huawei, `if-match rpki` en una route-policy - consulte la
-   > documentación de su plataforma para la sintaxis exacta. Aquí se usan BIRD y OpenBGPD
+   > Huawei, `if-match rpki` en una route-policy. Consulte la
+   > documentación de su plataforma para la sintaxis exacta. Aquí usamos BIRD y OpenBGPD
    > porque son libres y fáciles de correr en contenedores, no porque sean
-   > lo que va a encontrar en el trabajo: lo que se traslada es la anatomía.
+   > lo que se va a encontrar en el trabajo. Lo que se traslada es la anatomía.
    >
-   > Si prefiere escribir la configuración usted mismo en vez de leerla: parta
+   > Si prefiere escribir la configuración usted mismo en vez de solo leerla, parta
    > de `bird/observer1-none.conf`, agregue las piezas de arriba, guarde el resultado como
    > un archivo nuevo en `bird/`, y cárguelo con `docker exec lab-observer1 birdc
    > 'configure "/etc/bird-lab/your-file.conf"'`. El script solo le ahorra
@@ -690,21 +634,21 @@ observadores de nuevo si quiere - el secuestro sigue ganando.
    *     !-? 203.0.113.0/24          10.200.8.10        10     0 666 i
    ```
 
-   El secuestro sigue en la tabla - visible, no desaparecido - pero ahora lleva
+   El secuestro sigue en la tabla, visible, no desaparecido, pero ahora lleva
    **ROV Invalid** y un `local_pref` de 10, así que pierde contra los caminos
    legítimos, y el del Proveedor B vuelve a ser la ruta seleccionada. La insignia del encabezado dice
    *ROV: marcando*, y los enlaces del atacante se ponen **rojos**: está anunciando,
-   y los dos observadores lo están marcando. Todo lo que tenía que verificar está
+   y los dos observadores lo están marcando. Todo lo que tenía que salir bien salió
    bien: el secuestro está marcado, los caminos legítimos son `Valid`, y nada
-   legítimo salió perjudicado. **Ese es el sentido de la etapa de marcado** - puede
-   ver qué *haría* la verificación antes de dejar que rechace algo.
+   legítimo salió perjudicado. **Ese es el sentido de la etapa de marcado**, poder
+   ver qué *haría* la verificación antes de dejar que rechace algo de verdad.
 
-   **Aquí es donde el ROV se queda por el resto de la historia - marcando, no
+   **Aquí es donde el ROV se queda por el resto de la historia, marcando y no
    descartando.** Un router que solo marca igual usa una ruta inválida cuando
-   es lo mejor que tiene, así que marcar solo no es el final del trabajo: es el
-   ensayo. Va a ver cómo es descartar de verdad, en producción - para el ROV y
-   el ASPA juntos, a la vez - en el Paso 8, una vez que las dos verificaciones
-   hayan tenido su turno para demostrar lo que hacen de esta forma.
+   es lo mejor que tiene a mano, así que marcar solo no cierra el trabajo: es el
+   ensayo. Cómo es descartar de verdad, en producción, para el ROV y
+   el ASPA juntos y a la vez, lo va a ver en el Paso 8 - una vez que las dos verificaciones
+   hayan tenido su turno para demostrar qué hacen así, marcando primero.
 
 ### Cómo leer los veredictos
 
@@ -723,12 +667,12 @@ Los dos observadores los muestran de forma distinta:
   par **ovs-avs**: estado de validación de origen, luego estado de validación ASPA,
   cada uno `V` (válido), `!` (inválido), o `N`/`?` (not-found / unknown).
   Así, `V-!` es ROV Valid y ASPA Invalid. (Todavía no hay verificación ASPA
-  desplegada, así que la segunda mitad es `?` por ahora.)
+  desplegada, así que la segunda mitad queda en `?` por ahora.)
 
-**En el camino:** de qué está hecho "desplegar ROV" - una sesión RTR, una
-prueba en cada ruta, y una acción sobre el resultado - y cómo llegan los
+**En el camino:** de qué está hecho "desplegar ROV" (una sesión RTR, una
+prueba en cada ruta, una acción sobre el resultado) y cómo llegan los
 objetos nuevos a los routers: Krill publica, los validadores releen, los
-routers reciben el cambio por RTR. Acaba de ver cada salto.
+routers reciben el cambio por RTR. Acaba de ver cada salto de esa cadena.
 
 ---
 
@@ -741,8 +685,8 @@ routers reciben el cambio por RTR. Acaba de ver cada salto.
 > asegura de que existan las ROAs y vuelve a poner a los observadores en
 > `rov-mark`.
 
-El AS666 lee la misma documentación que usted. El ROV solo mira el **último** AS
-del camino - entonces, ¿y si el último AS fuera el correcto?
+El AS666 lee la misma documentación que usted, y sabe que el ROV solo mira el **último** AS
+del camino. ¿Y si el último AS fuera el correcto?
 
 1. Cambie el AS666 al ataque del camino falsificado:
 
@@ -753,9 +697,9 @@ del camino - entonces, ¿y si el último AS fuera el correcto?
    El AS666 ahora anuncia el camino `666 64500`: como si hubiera recibido el
    prefijo directamente del origen real.
 
-   **Esa relación es mentira.** El AS666 no tiene ninguna sesión BGP - ni peering, ni
-   tránsito, nada - con el AS64500: ni siquiera están conectados. La
-   adyacencia `666 64500` existe solo porque la configuración del AS666 *la escribe en
+   **Esa relación es mentira.** El AS666 no tiene ninguna sesión BGP con el AS64500 - ni peering, ni
+   tránsito, nada. Ni siquiera están conectados. La
+   adyacencia `666 64500` existe solo porque la configuración del AS666 *la escribe directamente en
    el camino*. Vea cómo lo hace:
 
    ```
@@ -766,14 +710,14 @@ del camino - entonces, ¿y si el último AS fuera el correcto?
    ```
 
    Encuentre los filtros `forge_export`: `bgp_path.prepend(ORIGIN_ASN)` pone el
-   número del origen en el camino *antes* de que el router agregue el suyo al exportar -
-   esa es toda la falsificación. Compárelo con `bird/attacker-simple.conf` (sin
+   número del origen en el camino *antes* de que el router agregue el suyo al exportar.
+   Eso es toda la falsificación, no hay más truco. Compárelo con `bird/attacker-simple.conf` (sin
    filtro, así que el camino es solo `666`), y verifique que ninguno de los dos archivos tiene una
-   sesión con el origen: solo los dos observadores.
+   sesión con el origen: solo con los dos observadores.
 
-2. **Antes de mirar:** el ROV por ahora solo marca, no descarta nada - pero el
+2. **Antes de mirar:** el ROV por ahora solo marca, no descarta nada, pero el
    secuestro ingenuo igual quedó marcado Invalid y perdió la carrera. ¿Este
-   camino falsificado va a quedar marcado de la misma forma?
+   camino falsificado va a correr la misma suerte?
 
 3. Mire:
 
@@ -791,22 +735,22 @@ del camino - entonces, ¿y si el último AS fuera el correcto?
    *     V-? 203.0.113.0/24          10.200.5.10       100     0 64501 64500 64500 64500 i
    ```
 
-   No quedó marcado. El ROV dice `Valid` - el camino termina en 64500,
-   que es exactamente lo que autoriza la ROA - así que recibe el `local_pref`
-   completo (100) igual que cualquier ruta legítima, y es la seleccionada. Los
-   enlaces del atacante en el panel se ponen **ámbar**: ya no rojos, porque el
-   ROV no tiene nada que marcar. Tres caminos, todos "válidos", uno de ellos
-   una mentira, y *nada de lo que desplegó hasta ahora puede decir cuál*.
+   No quedó marcado. El ROV dice `Valid`, porque el camino termina en 64500,
+   que es exactamente lo que autoriza la ROA. Recibe el `local_pref`
+   completo (100) igual que cualquier ruta legítima, y sale seleccionada. Los
+   enlaces del atacante en el panel se ponen **ámbar**, ya no rojos: el
+   ROV no tiene nada que marcar aquí. Tres caminos, los tres "válidos", uno de ellos
+   una mentira de punta a punta, y *nada de lo que desplegó hasta ahora es capaz de decir cuál*.
 
-   > El camino falsificado (`666 64500`, 2 saltos) empata con el del Proveedor B (`64502 64500`, también 2),
-   > y el atacante gana el empate por un criterio de desempate (su router ID resulta
-   > ser el más bajo); el respaldo del Proveedor A tiene 4 saltos y nunca entra en la carrera.
-   > Eso es secundario: lo importante es que el ROV le entregó tres rutas
-   > igualmente válidas en apariencia y ninguna forma de elegir entre ellas.
+   > El camino falsificado (`666 64500`, 2 saltos) empata con el del Proveedor B (`64502 64500`, también 2 saltos),
+   > y el atacante gana el empate por un criterio de desempate - su router ID resulta
+   > ser el más bajo. El respaldo del Proveedor A tiene 4 saltos y ni entra en la carrera.
+   > Eso es lo de menos: lo que importa es que el ROV entregó tres rutas
+   > igual de válidas en apariencia, sin forma alguna de elegir entre ellas.
 
 **En el camino:** ¿puede la validación de origen distinguir dos caminos para el mismo
-prefijo, cuando el origen es el mismo y una ROA coincide? Ahora lo sabe: no puede.
-Solo mira el último AS.
+prefijo, cuando el origen es el mismo y una ROA coincide? Ahora ya lo sabe: no puede.
+Solo mira el último AS, nada más.
 
 ---
 
@@ -819,14 +763,14 @@ Solo mira el último AS.
 > `./scripts/lab.sh step4-hijack-posrov`; si ya existe un objeto ASPA,
 > `krillc aspas remove --customer AS64500` en la terminal de Krill.
 
-La misma forma que el Paso 3: el **Origen publica** un objeto ASPA, y luego los
-**Observadores lo validan** - con la misma forma segura y de solo marcado que
+La misma forma que el Paso 3: primero el **Origen publica** un objeto ASPA, y luego los
+**Observadores lo validan**, con la misma cautela de solo marcar que
 usó el ROV.
 
 ### El Origen publica: crear el objeto ASPA
 
-Krill 0.16 todavía **no** tiene el ASPA en la interfaz web - se gestiona por la
-línea de comandos (la interfaz está en camino en la próxima versión).
+Krill 0.16 todavía **no** tiene el ASPA en la interfaz web; por ahora se gestiona por la
+línea de comandos (la interfaz llegará en la próxima versión).
 
 1. En el panel, haga clic en el recuadro **Krill** y luego en el botón **Terminal (krillc)**.
    (O, en su propia terminal: `docker exec -it lab-krill bash`.)
@@ -838,8 +782,8 @@ línea de comandos (la interfaz está en camino en la próxima versión).
    ```
 
 3. Cree el objeto ASPA declarando qué proveedores pueden propagar rutas del
-   AS64500. Por el bien de la historia, liste **solo al Proveedor A** por ahora - va a
-   ver por qué en el próximo paso:
+   AS64500. Por el bien de la historia, liste **solo al Proveedor A** por ahora. Ya va a
+   ver por qué en el próximo paso.
 
    ```
    #krillc aspas add --aspa "AS64500 => AS64501"
@@ -859,19 +803,19 @@ línea de comandos (la interfaz está en camino en la próxima versión).
 >
 > **Un objeto por AS cliente.** El RFC exige exactamente un objeto ASPA
 > por ASN cliente, listando *a todos* los proveedores. `krillc aspas add` reemplaza
-> el objeto entero (así que es seguro repetirlo); para cambiar la lista, use
+> el objeto entero, así que es seguro repetirlo; para cambiar la lista, use
 > `krillc aspas update`.
 >
-> **Ojo con un flag.** Sin `--enable-aspa`, Routinator simplemente
-> ignora los objetos ASPA. Es el error número uno al armar un laboratorio
-> como este; aquí ya está activado.
+> **Ojo con este flag.** Sin `--enable-aspa`, Routinator simplemente
+> ignora los objetos ASPA - es el error número uno al armar un laboratorio
+> como este. Aquí ya está activado, no hace falta tocarlo.
 
-Igual que con las ROAs, todavía no cambia nada para los routers: el objeto está publicado,
-y ningún router está verificando caminos.
+Igual que con las ROAs, todavía no cambia nada para los routers: el objeto ya está publicado,
+pero ningún router está verificando caminos todavía.
 
 ### Los Observadores validan
 
-1. Despliegue la verificación ASPA en los dos observadores - el ROV sigue solo marcando:
+1. Despliegue la verificación ASPA en los dos observadores. El ROV sigue solo marcando:
 
    ```
    #./scripts/lab.sh step5-aspa-mark
@@ -932,16 +876,16 @@ y ningún router está verificando caminos.
    ```
 
    > **¿Por qué "upstream"?** El observador trata a cada vecino como su
-   > *cliente*: para las rutas que vienen de un cliente, se aplica el algoritmo
-   > más estricto - cada salto del camino tiene que ser un par
+   > *cliente*. Para las rutas que vienen de un cliente se aplica el algoritmo
+   > más estricto: cada salto del camino tiene que ser un par
    > cliente→proveedor autorizado. BIRD lo pide por nombre
    > (`aspa_check_upstream`); OpenBGPD lo selecciona mediante el rol RFC
-   > 9234 de la sesión. También es la verificación que detecta las fugas de ruta - va a conocer una
-   > en el Paso 7. El ejercicio extra A lo desarma, y muestra qué cambia si
+   > 9234 de la sesión. Es también la verificación que detecta las fugas de ruta, y va a conocer una
+   > en el Paso 7. El ejercicio extra A lo desarma, para mostrar qué cambia si
    > se pide en cambio el algoritmo *downstream*.
    >
    > La verificación ASPA es más nueva que el ROV, y el soporte en plataformas
-   > comerciales todavía está llegando. Donde existe, tiene la misma anatomía que el
+   > comerciales todavía está llegando de a poco. Donde existe, tiene la misma anatomía que el
    > despliegue de ROV que vio en el Paso 3.
 
 3. Mire las rutas:
@@ -959,24 +903,24 @@ y ningún router está verificando caminos.
    *     V-! 203.0.113.0/24          10.200.6.10        20     0 64502 64500 i
    ```
 
-   El camino falsificado ahora es **ASPA Invalid** - el salto `64500 → 666` no está
+   El camino falsificado ahora es **ASPA Invalid**: el salto `64500 → 666` no está
    autorizado, ya que solo 64501 figura en la lista. Sigue visible, pero con un
    `local_pref` de 20 pierde contra el camino del Proveedor A (`V-V`, 200). Los
    enlaces del atacante se ponen **rojos** otra vez, y la insignia dice *ROV: marcando ·
    ASPA: marcando*.
 
-   Pero dos rutas llevan `V-!` - no una. Mire de cerca la segunda: es la del
-   **Proveedor B**, la entrada preferida del propio origen, la de la
+   Pero hay dos rutas con `V-!`, no una. Mire de cerca la segunda: es la del
+   **Proveedor B**, la entrada preferida del propio origen, la misma de la
    ingeniería de tráfico del Paso 1. El objeto ASPA que acaba de crear solo
-   lista al Proveedor A, así que el ASPA también llama inválido al camino del
-   Proveedor B - y lo que quedó seleccionado en su lugar es el camino del
-   Proveedor A, el *respaldo*, el que el origen alargó a propósito con sus
-   prepends. Como todavía no se descarta nada, puede ver este error antes de
-   que le cueste algo: guarde ese pensamiento para el próximo paso.
+   lista al Proveedor A, así que el ASPA también da por inválido el camino del
+   Proveedor B, y lo que queda seleccionado en su lugar es el camino del
+   Proveedor A: el *respaldo*, el que el origen alargó a propósito con sus
+   prepends. Como todavía no se descarta nada, alcanza a ver este error antes de
+   que le cueste algo. Guarde ese pensamiento para el próximo paso.
 
-**En el camino:** el veredicto ASPA que el ROV nunca podría dar - el camino
-mismo es lo que está mal, aunque el origen sea correcto - y un recordatorio
-de por qué marcar corre antes que descartar: le permitió detectar un error en
+**En el camino:** el veredicto ASPA que el ROV nunca podría dar (el camino
+mismo es lo que está mal, aunque el origen sea correcto), y un recordatorio
+de por qué marcar corre antes que descartar. Le permitió detectar un error en
 su propio objeto ASPA antes de que tirara nada abajo.
 
 ---
@@ -990,17 +934,17 @@ su propio objeto ASPA antes de que tirara nada abajo.
 > de Krill `krillc aspas add --aspa "AS64500 => AS64501"` (esto reemplaza el
 > objeto por exactamente esa lista), luego `./scripts/lab.sh refresh`.
 
-La ruta que notó al final del paso anterior - la del Proveedor B, marcada
-ASPA Invalid junto con la falsificada - es un camino *legítimo*, **justamente
-el que el origen prefiere**, degradado sin mejor razón que un objeto
+La ruta que notó al final del paso anterior, la del Proveedor B, marcada
+ASPA Invalid junto con la falsificada, es un camino *legítimo* - **justamente
+el que el origen prefiere** - degradado sin mejor razón que un objeto
 incompleto. Los observadores se quedan usando el camino de respaldo, el que
 el origen alargó a propósito con sus prepends: la ingeniería de tráfico del
-origen, deshecha por un ASPA incompleto. Una vez que esta etapa descarte en
+origen, deshecha por un ASPA a medio terminar. Una vez que esta etapa empiece a descartar en
 lugar de marcar (Paso 8), este va a ser el día en que el tráfico que solía
-llegar por esa interfaz deja de llegar, y alguien empieza a preguntar por qué.
-(Este laboratorio no tiene plano de datos, así que no puede ver cómo se
-detiene el tráfico; puede ver cómo se desploma la preferencia de la ruta,
-que es lo mismo dicho de otra forma.)
+llegar por esa interfaz deja de llegar, y alguien va a empezar a preguntar por qué.
+(Este laboratorio no tiene plano de datos, así que no se puede ver cómo se
+detiene el tráfico en sí; pero se puede ver cómo se desploma la preferencia de la ruta,
+que viene a ser lo mismo dicho de otra forma.)
 
 1. Arregle el objeto:
 
@@ -1026,12 +970,12 @@ que es lo mismo dicho de otra forma.)
    ```
 
    Los dos caminos legítimos volvieron a `V-V` y `local_pref` 200, y el
-   Proveedor B - la entrada preferida del origen - vuelve a ser el
-   seleccionado: una vez empatados en preferencia, gana su camino más corto.
-   El falsificado sigue degradado (`V-!`, 20), y el AS666 - que sigue
-   anunciando - sigue derrotado. Note que el arreglo no involucró al
-   AS666 en absoluto: el objeto ASPA describe *sus* relaciones, y todo
-   lo que las contradiga queda afuera.
+   Proveedor B (la entrada preferida del origen) vuelve a ser el
+   seleccionado: una vez empatados en preferencia, gana el camino más corto.
+   El falsificado sigue degradado (`V-!`, 20), y el AS666, que sigue
+   anunciando igual que antes, sigue derrotado. Note que el arreglo no involucró al
+   AS666 para nada: el objeto ASPA describe *sus* relaciones, y todo
+   lo que las contradiga queda afuera sin excepción.
 
 3. BIRD recogió el cambio por sí solo, sin que nadie tocara el router,
    porque sus sesiones están configuradas con `import table on` y `rpki reload
@@ -1044,16 +988,16 @@ que es lo mismo dicho de otra forma.)
    #docker exec lab-observer1 birdc reload in provider_b_v4
    ```
 
-   (`./scripts/lab.sh step6-add-provider-b` hace exactamente este arreglo -
-   es el comando para saltar directamente al estado de este paso más
+   (`./scripts/lab.sh step6-add-provider-b` hace exactamente este arreglo.
+   Es el comando para saltar directamente al estado de este paso más
    adelante, desde cualquier punto de la historia, sin volver a escribir el
    comando `krillc` a mano.)
 
-**En el camino:** qué pasa cuando un objeto ASPA se olvida de un proveedor real -
-la mitad de Internet empieza a ver las rutas de ese proveedor como inválidas - y cómo
-se propaga un arreglo: republicar, revalidar, sin tocar ningún router.
+**En el camino:** qué pasa cuando un objeto ASPA se olvida de un proveedor real
+(la mitad de Internet empieza a ver las rutas de ese proveedor como inválidas), y cómo
+se propaga un arreglo - republicar, revalidar, sin tocar ningún router.
 
-Deje el AS666 corriendo. Ahora es inofensivo, y va a ser un recordatorio útil en el
+Deje el AS666 corriendo. Ahora es inofensivo, y le va a servir de recordatorio en el
 panel de lo que se está manteniendo afuera.
 
 ---
@@ -1068,10 +1012,10 @@ panel de lo que se está manteniendo afuera.
 > todo lo que este paso necesita (ASPA listando a los dos proveedores, peer
 > en silencio) sin la fuga.
 
-Este no es el ataque de nadie. El peer - una red legítima - tiene un enlace de
+Este no es el ataque de nadie. El peer, una red legítima, tiene un enlace de
 peering privado con el origen, así que *aprende* los prefijos del origen. Un enlace de
-peering es bilateral: lo que el peer aprende ahí no es para su propio proveedor.
-Entonces alguien edita una configuración...
+peering es bilateral: lo que el peer aprende ahí no es para pasárselo a su propio proveedor.
+Pero entonces alguien edita una configuración...
 
 1. Active la fuga:
 
@@ -1080,8 +1024,8 @@ Entonces alguien edita una configuración...
    ```
 
    El peer ahora re-anuncia al Proveedor A lo que aprendió del origen.
-   No se falsifica nada - el peer dice la verdad sobre de dónde
-   vino la ruta. En el panel, la insignia del peer dice *filtrando*.
+   No se falsifica nada: el peer dice la verdad sobre de dónde
+   vino la ruta, punto por punto. En el panel, la insignia del peer dice *filtrando*.
 
 2. **Antes de mirar:** el Proveedor A ahora tiene dos rutas para el prefijo
    del origen - la del propio origen, y la del peer. ¿Cuál le pasa el Proveedor A
@@ -1099,20 +1043,20 @@ Entonces alguien edita una configuración...
 
    ```
    203.0.113.0/24  unicast [customer_peer_v4 ...] * (100) [AS64500i]
-        bgp_path: 64999 64500
+        bgp_path: 64499 64500
         bgp_local_pref: 100
                 unicast [customer_v4 ...] (100) [AS64500i]
         bgp_path: 64500 64500 64500
         bgp_local_pref: 100
    ```
 
-   El Proveedor A solo pasa su *mejor* ruta, y no se configuró nada especial para
-   que la del peer ganara: simplemente es **más corta** - 2 saltos
+   El Proveedor A solo pasa su *mejor* ruta, y nadie configuró nada especial para
+   que ganara la del peer: simplemente es **más corta**, 2 saltos
    contra los 3 del propio origen. Los prepends que hicieron del Proveedor A el
-   *respaldo* también hicieron irresistible una fuga a través de él. (Eso es típico: una
+   *respaldo* también hicieron irresistible una fuga que pasara por él. Es un patrón típico: una
    ruta filtrada gana porque la ingeniería de tráfico de alguien hizo que el camino
-   honesto pareciera peor. Vea `bird/provider-a.conf` - ahí no hay ninguna política
-   en absoluto.)
+   honesto pareciera peor. (Vea `bird/provider-a.conf`: ahí no hay ninguna política,
+   nada.)
 
 4. Ahora los observadores:
 
@@ -1126,33 +1070,33 @@ Entonces alguien edita una configuración...
    ```
    *>    V-V 203.0.113.0/24          10.200.6.10       200     0 64502 64500 i
    *     V-! 203.0.113.0/24          10.200.8.10        20     0 666 64500 i
-   *     V-! 203.0.113.0/24          10.200.5.10        20     0 64501 64999 64500 i
+   *     V-! 203.0.113.0/24          10.200.5.10        20     0 64501 64499 64500 i
    ```
 
-   **El camino propio del Proveedor A ya desapareció** - dejó de anunciarlo en el
+   **El camino propio del Proveedor A ya desapareció.** Dejó de anunciarlo en el
    momento en que eligió como mejor el camino más corto del peer, y eso no tiene
-   nada que ver con lo que los observadores hacen con lo que reciben. Lo que llega
-   desde el Proveedor A en su lugar es el camino filtrado, `64501 64999 64500`
-   - y como marcar nunca saca nada de la tabla, puede mirarlo de frente. Dos cosas
+   nada que ver con lo que hagan los observadores con lo que reciben. Lo que llega
+   desde el Proveedor A en su lugar es el camino filtrado, `64501 64499 64500`,
+   y como marcar nunca saca nada de la tabla, puede mirarlo de frente. Dos cosas
    para notar:
 
-   - **ROV Valid.** Claro - el origen realmente es 64500. No hay nada
-     falsificado. *Una fuga nunca puede ser detectada por el ROV*: no miente sobre quién
-     originó el prefijo, miente sobre la *forma del camino*.
-   - **ASPA Invalid.** El salto `64500 → 64999` nunca fue autorizado: el
+   - **ROV Valid.** Claro que sí: el origen realmente es 64500. No hay nada
+     falsificado. *Una fuga nunca puede ser detectada por el ROV*, porque no miente sobre quién
+     originó el prefijo. Miente sobre la *forma del camino*.
+   - **ASPA Invalid.** El salto `64500 → 64499` nunca fue autorizado. El
      objeto ASPA del origen lista a los Proveedores A y B, y el peer no es ninguno de los dos.
 
    El enlace del peer en el panel se pone **rojo**. El camino del Proveedor B sigue
-   siendo el seleccionado (`V-V`, 200) - no necesita ninguna ayuda del ASPA para
-   ganar, porque además es el más corto - pero el daño es real: el origen perdió
-   su *respaldo*, y los demás clientes del Proveedor A ahora están enviando su
-   tráfico al origen a través del peer.
+   siendo el seleccionado (`V-V`, 200): no necesita ninguna ayuda del ASPA para
+   ganar, porque además es el más corto. Pero el daño ya es real: el origen perdió
+   su *respaldo*, y los demás clientes del Proveedor A están mandando ahora su
+   tráfico al origen a través del peer, sin saberlo.
 
-**En el camino:** una fuga de ruta no es que nadie falsifique nada - es una ruta
-que cruza un límite que nunca debía cruzar - y es un veredicto que el ROV no
+**En el camino:** una fuga de ruta no es que nadie falsifique nada, es una ruta
+que cruza un límite que nunca debía cruzar. Y es un veredicto que el ROV no
 puede dar por estructura, porque el origen al final del camino está diciendo la
 verdad. El ASPA la detecta por la misma razón que detectó la falsificación del
-Paso 4: un salto no autorizado, esté donde esté en el camino.
+Paso 4: hay un salto no autorizado, esté donde esté en el camino.
 
 ---
 
@@ -1166,13 +1110,13 @@ Paso 4: un salto no autorizado, esté donde esté en el camino.
 > lo que este paso necesita, fuga incluida.
 
 Cada ruta inválida que vio hasta ahora se quedó en la tabla, degradada pero
-visible - a propósito, para que pudiera mirar exactamente qué decidió cada
+visible. Fue a propósito, para que pudiera mirar exactamente qué decidió cada
 verificación antes de confiarle algo. **Un router real no se queda ahí.**
 Marcar una ruta como inválida y seguir usándola cuando no aparece nada mejor
 no es para lo que sirven el ROV ni el ASPA; los dos protegen algo recién
 cuando una ruta inválida se *rechaza* de verdad. Este es el paso donde eso
-pasa - para las dos verificaciones, juntas, de la misma forma en que
-configuraría un router de producción desde el principio.
+pasa, para las dos verificaciones juntas, de la misma forma en que
+configuraría un router de producción desde el primer día.
 
 1. Cambie los dos observadores a descartar:
 
@@ -1214,8 +1158,8 @@ configuraría un router de producción desde el principio.
    ```
 
    **Desaparecieron dos rutas, no una.** El camino falsificado del AS666 se
-   fue, como era de esperar. También se fue la entrada que antes estaba bajo el
-   Proveedor A - el camino filtrado que acaba de inspeccionar. No se perdió; BIRD
+   fue, como era de esperar. Pero también se fue la entrada que antes estaba bajo el
+   Proveedor A: el camino filtrado que acaba de inspeccionar. No se perdió del todo; BIRD
    guarda lo que rechazó:
 
    ```
@@ -1228,22 +1172,22 @@ configuraría un router de producción desde el principio.
    La insignia ahora dice *ROV + ASPA: descartando*. Note lo que descartar **no**
    arregló: el camino propio y legítimo del Proveedor A sigue sin aparecer por
    ningún lado, porque el Proveedor A mismo sigue anunciando la ruta filtrada *en
-   lugar de* la suya - y ninguna política en los observadores puede hacer que el
+   lugar de* la suya, y ninguna política en los observadores puede hacer que el
    Proveedor A propague algo que no está enviando. El ASPA protege a los
-   observadores de *usar* la fuga; solo que el peer arregle su política de
+   observadores de *usar* la fuga; pero solo que el peer arregle su política de
    exportación detiene la fuga en la fuente. Eso viene a continuación.
 
 **En el camino:**
 
-- **Marcar versus descartar.** Los mismos veredictos de los Pasos 3, 5 y 7 - lo
-  que cambió fue la política. Marcar es cómo se despliega una verificación sin
-  romper nada; descartar es *para qué* sirve la verificación, y lo que convierte
-  un diagnóstico en una defensa.
+- **Marcar versus descartar.** Los mismos veredictos de los Pasos 3, 5 y 7; lo
+  único que cambió fue la política. Marcar es cómo se despliega una verificación sin
+  romper nada; descartar es *para qué* sirve la verificación en definitiva, lo que convierte
+  un diagnóstico en una defensa de verdad.
 - **Descartar no repara el daño río arriba.** Solo controla lo que los propios
   observadores aceptan. Que el Proveedor A propague la fuga es un problema
-  aparte, que se arregla en la fuente, no en los observadores.
+  aparte, que se arregla en la fuente y no en los observadores.
 - **De aquí en adelante, las dos verificaciones siguen descartando.** Un router
-  que aprendió a rechazar rutas inválidas no vuelve atrás.
+  que aprendió a rechazar rutas inválidas no vuelve atrás, y este tampoco lo hará.
 
 ---
 
@@ -1267,10 +1211,10 @@ configuraría un router de producción desde el principio.
    #./scripts/lab.sh step9-hijack-off
    ```
 
-Los observadores quedan completamente desplegados - ROV y ASPA los dos descartando - que es
+Los observadores quedan completamente desplegados, con ROV y ASPA los dos descartando: ahí es
 donde termina un router real. (`./scripts/lab.sh step1-clean` es el camino de vuelta
-al comienzo de todo: silencia al AS666 y al peer, *y* saca la validación
-de los observadores.)
+al comienzo de todo - silencia al AS666 y al peer, *y* le saca la validación
+a los observadores.)
 
 ---
 
@@ -1280,49 +1224,49 @@ de los observadores.)
 |---|---|---|
 | Secuestro ingenuo (AS_PATH `666`) | **lo detecta** (origen equivocado) | nada que verificar (camino de un solo AS) |
 | Camino falsificado (AS_PATH `666 64500`) | **engañado** (el origen parece correcto) | **lo detecta** (el salto `64500 → 666` no está autorizado) |
-| Fuga de ruta (AS_PATH `64501 64999 64500`) | **no la ve** (el origen es genuino) | **la detecta** (el salto `64500 → 64999` no está autorizado) |
+| Fuga de ruta (AS_PATH `64501 64499 64500`) | **no la ve** (el origen es genuino) | **la detecta** (el salto `64500 → 64499` no está autorizado) |
 
 Ninguno es redundante. El ROV detiene a los atacantes que mienten sobre el origen; el ASPA detiene
 los caminos que no podrían haber ocurrido. Y el origen tiene que hacer su parte: un ASPA
-que se olvida de un proveedor real (Paso 6) es una caída propia.
+que se olvida de un proveedor real (Paso 6) es una caída propia, nadie más tiene la culpa.
 
-En el camino, la historia respondió en silencio preguntas que este laboratorio antes hacía un
-ejercicio a la vez:
+De paso, la historia fue respondiendo en silencio preguntas que este laboratorio antes trataba de a
+una por vez:
 
 - **¿En qué consiste realmente "desplegar validación" en un router?** Una
   sesión con un validador, una prueba en cada ruta o camino, y una acción sobre el
-  resultado - las mismas tres piezas para el ROV (Paso 3) y el ASPA (Paso 5), en el router
-  de cualquier fabricante.
-- **¿Por qué marcar primero y descartar después - y por qué descartar, en definitiva?** Marcar le permite
-  ver qué haría una verificación antes de confiar en ella, y fue lo que le permitió detectar
-  su propio objeto ASPA incompleto en el Paso 6 antes de que tirara algo abajo; descartar es lo que
-  hacen los routers reales, y lo que hace que la verificación proteja algo - el Paso 8 activa las
-  dos verificaciones a la vez, de la forma en que se configura un router de producción desde el principio.
-- **¿Puede el ROV distinguir dos caminos para el mismo prefijo?** No (Paso 4).
+  resultado. Las mismas tres piezas para el ROV (Paso 3) y el ASPA (Paso 5), sin importar el router
+  ni el fabricante.
+- **¿Por qué marcar primero y descartar después, y por qué descartar en definitiva?** Marcar le permite
+  ver qué haría una verificación antes de confiar en ella, y fue justo lo que le permitió detectar
+  su propio objeto ASPA incompleto en el Paso 6 antes de que tirara algo abajo. Descartar es lo que
+  hacen los routers reales, y lo que hace que la verificación proteja algo de verdad: el Paso 8 activa las
+  dos verificaciones a la vez, tal como se configuraría un router de producción desde el principio.
+- **¿Puede el ROV distinguir dos caminos para el mismo prefijo?** No. (Paso 4.)
 - **¿Cómo se ve un secuestro con el ASN de origen equivocado?** Paso 2, y cómo
   lo detiene el ROV en el Paso 3.
 - **¿Qué pasa cuando un ASPA se olvida de un proveedor real?** Paso 6.
-- **¿Se propaga un arreglo por sí solo?** BIRD revalida por sí mismo; los objetos
+- **¿Se propaga un arreglo por sí solo?** BIRD revalida por su cuenta; los objetos
   necesitan una republicación y una revalidación para llegar (Pasos 3, 5 y 6).
 - **¿Coinciden las dos pilas independientes?** Cada paso muestra las dos, y
-  coinciden en todo lo que la historia mira - el Ejercicio extra A muestra dónde no coinciden.
+  coinciden en todo lo que la historia mira. El Ejercicio extra A muestra dónde dejan de coincidir.
 - **¿Qué es una fuga de ruta, y por qué el ROV no la puede ver?** El Paso 7 la
-  muestra; el Paso 8 muestra qué arregla descartar, y qué no.
+  muestra; el Paso 8 muestra qué arregla descartar, y qué se le escapa.
 
-Cuatro temas no cupieron en la historia, y viven en los extras de abajo: en qué se diferencian los algoritmos
-upstream y downstream (y el `role` que selecciona uno),
-un secuestro que acierta el ASN pero se equivoca en la longitud, una mirada dentro de los
+Cuatro temas no entraron en la historia y quedaron para los extras de abajo: en qué se diferencian los algoritmos
+upstream y downstream (y el `role` que elige entre uno y otro),
+un secuestro que acierta el ASN pero se equivoca en la longitud, una mirada por dentro de los
 validadores y de RTR, y los veredictos **NotFound** y **Unknown** - los de "sin
-opinión" que todavía no conoció, porque la historia nunca dejó un prefijo
-sin cubrir.
+opinión" que todavía no conoció, porque en la historia nunca quedó un prefijo
+sin cobertura.
 
 ---
 
 ## Ejercicios extra
 
-Los extras asumen que terminó la historia (los observadores en `aspa-drop`, el
-peer en silencio, `step9-hijack-off` ejecutado) con objetos para los dos prefijos y un
-ASPA que lista a los Proveedores A y B. Cada uno dice qué etapa necesita; los comandos
+Los extras asumen que ya terminó la historia (los observadores en `aspa-drop`, el
+peer en silencio, `step9-hijack-off` ejecutado), con objetos para los dos prefijos y un
+ASPA que lista a los Proveedores A y B. Cada uno indica qué etapa necesita; los comandos
 `step` llevan a los dos observadores ahí de una sola vez.
 
 ### A. Upstream, downstream, y el rol que decide
@@ -1336,10 +1280,10 @@ case aspa_check_upstream(aspa_table) { ... }
 ```
 
 El observador trata a cada vecino como su **cliente**. Para las rutas que vienen de
-un cliente, se aplica el *Algoritmo para Caminos Upstream* - el más estricto:
+un cliente se aplica el *Algoritmo para Caminos Upstream*, el más estricto:
 cada salto del camino tiene que ser una relación cliente→proveedor autorizada.
 Esta es la verificación que detecta las fugas de ruta. Si la sesión fuera con un proveedor
-o un peer, la llamada correcta sería `aspa_check_downstream()`, que es más
+o un peer, la llamada correcta sería `aspa_check_downstream()`, bastante más
 permisiva. BIRD ofrece las dos.
 
 OpenBGPD lo hace con un **rol** de sesión (RFC 9234). Mire
@@ -1352,14 +1296,14 @@ neighbor 10.200.5.10 {
 }
 ```
 
-OpenBGPD solo realiza la verificación ASPA en una sesión que tiene un rol, y
+OpenBGPD solo hace la verificación ASPA en una sesión que tiene un rol, y
 **el rol decide qué algoritmo ASPA corre**. `role provider` dice que el sistema local
-es el upstream de los proveedores - las rutas llegan de un cliente - y eso
+es el upstream de los proveedores (las rutas llegan de un cliente), y eso
 selecciona el algoritmo *upstream*, el mismo que observer1 le pide a BIRD con
 `aspa_check_upstream()`.
 
-Para ver la diferencia, necesita un camino que el algoritmo estricto rechace y
-el permisivo no. Saque al Proveedor B de nuevo del objeto ASPA (en la
+Para ver la diferencia hace falta un camino que el algoritmo estricto rechace y
+el permisivo no. Saque otra vez al Proveedor B del objeto ASPA (en la
 terminal de Krill):
 
 ```
@@ -1369,7 +1313,7 @@ terminal de Krill):
 
 El camino por el Proveedor B ahora figura como Invalid en los dos observadores.
 
-1. **Antes de cambiar nada:** los objetos no van a cambiar en absoluto -
+1. **Antes de cambiar nada:** los objetos no se van a tocar para nada,
    solo una palabra en un archivo de configuración. ¿Espera que el camino por
    el Proveedor B siga figurando como Invalid, o que cambie?
 
@@ -1391,8 +1335,8 @@ El camino por el Proveedor B ahora figura como Invalid en los dos observadores.
    ```
 
    El camino por el Proveedor B vuelve como **Valid**. Los mismos objetos, el mismo
-   AS_PATH, un veredicto distinto - y ninguna de las implementaciones está equivocada. Es
-   la demostración más clara de este laboratorio de que "¿es este camino ASPA-válido?"
+   AS_PATH, un veredicto distinto, y ninguna de las dos implementaciones está equivocada. Es
+   quizás la demostración más clara de este laboratorio de que "¿es este camino ASPA-válido?"
    no se puede responder sin decir también *de quién* lo recibió.
 
 3. Ahora haga el equivalente en BIRD: `bird/observer1-extra-a-downstream.conf`
@@ -1418,29 +1362,29 @@ El camino por el Proveedor B ahora figura como Invalid en los dos observadores.
    #docker exec lab-observer1 birdc show route table master4 all 203.0.113.0/24
    ```
 
-   Ninguno de los dos, exactamente: BIRD informa el camino del Proveedor B como **ASPA Unknown**
+   Ninguno de los dos, en realidad: BIRD informa el camino del Proveedor B como **ASPA Unknown**
    (`(64510, 2, 1)`). Las dos lecturas son mucho más permisivas que el algoritmo
-   upstream, que dijo `Invalid` - pero donde OpenBGPD llama válido al camino,
+   upstream, que dijo `Invalid`. Pero donde OpenBGPD llama válido al camino,
    BIRD dice que no puede saberlo. Dos implementaciones independientes, leyendo un borde
-   del mismo draft de manera distinta.
+   del mismo draft de manera distinta - el ASPA sigue siendo joven.
 
-4. Compare los observadores lado a lado, y luego discutan: si "upstream" y
+4. Compare los observadores lado a lado, y piense en esto: si "upstream" y
    "downstream" tiene que ver fundamentalmente con *de quién recibió la ruta*,
    ¿qué debería pasar en una topología donde el mismo vecino es proveedor de
-   un prefijo y cliente de otro? (Por eso la elección de algoritmo en BIRD es una llamada
-   `aspa_check_*()` por sesión y no un ajuste global del laboratorio, y por qué el `role` de
-   OpenBGPD se fija dentro de cada bloque `neighbor`.)
+   un prefijo y cliente de otro? Por eso la elección de algoritmo en BIRD es una llamada
+   `aspa_check_*()` por sesión, y no un ajuste global del laboratorio - y por eso el `role` de
+   OpenBGPD se fija dentro de cada bloque `neighbor`, no una sola vez.
 
 5. Deshaga: restaure `role provider` y `aspa_check_upstream`, vuelva a agregar al Proveedor B
    al ASPA (`krillc aspas add --aspa "AS64500 => AS64501, AS64502"`),
    ejecute `./scripts/lab.sh step5-aspa-mark` y `./scripts/lab.sh refresh`.
 
-6. Un caso de borde más, ya que está aquí: vuelva a poner al AS666 en su secuestro
+6. Un caso de borde más, ya que está en esto: vuelva a poner al AS666 en su secuestro
    ingenuo (`./scripts/lab.sh step2-hijack-simple`). Con **un solo AS** en el
    camino no hay ningún salto cliente→proveedor que verificar, así que el ASPA no tiene nada que decir
-   sobre *quién puede originar un prefijo* - ese nunca fue su trabajo. BIRD llama
-   `Valid` a un camino así (`(64510, 2, 2)`), OpenBGPD `Unknown` (`?`). De nuevo dos
-   lecturas de un borde. Vuelva con `./scripts/lab.sh step9-hijack-off`.
+   sobre *quién puede originar un prefijo* - ese nunca fue su trabajo, eso es cosa del ROV. BIRD llama
+   `Valid` a un camino así (`(64510, 2, 2)`), OpenBGPD `Unknown` (`?`). Otra vez dos
+   lecturas del mismo borde. Vuelva con `./scripts/lab.sh step9-hijack-off`.
 
 ### B. ASN correcto, prefijo demasiado específico
 
@@ -1449,12 +1393,12 @@ El camino por el Proveedor B ahora figura como Invalid en los dos observadores.
 El Paso 2 fue un secuestro con el ASN de origen equivocado. Este es el error opuesto:
 el origen es completamente legítimo, pero el prefijo excede lo que la ROA
 autorizó. Un ejemplo en IPv4 significaría desagregar 203.0.113.0/24 hasta un
-`/25` - algo que en la Internet real se filtra en toda la red y que aquí
+`/25`, algo que en la Internet real se filtra en toda la red y que aquí
 resultaría artificial. Anunciar un bloque IPv6 más específico que un
-`/32` (un `/36` o un `/40`, por ejemplo) es una práctica operativa
-completamente normal, así que este ejercicio usa eso en su lugar - y para
-dejar en claro que no se trata de uno u otro proveedor, usa **dos**
-sub-bloques de 3fff:cafe::/32, uno anunciado solo al Proveedor A y el otro
+`/32` (un `/36` o un `/40`, por ejemplo) es en cambio una práctica operativa
+del todo normal, así que este ejercicio usa eso. Y para
+dejar en claro que no se trata de un problema del Proveedor A o del B, usa **dos**
+sub-bloques de 3fff:cafe::/32: uno anunciado solo al Proveedor A y el otro
 solo al Proveedor B.
 
 `bird/origin-extra-b.conf` es `bird/origin.conf` más exactamente eso: dos
@@ -1482,7 +1426,7 @@ Vea qué recibió realmente cada proveedor:
 ```
 
 El Proveedor A tiene `3fff:cafe:1000::/40`; el Proveedor B tiene
-`3fff:cafe:2000::/40` - cada uno solo el que le correspondía. Ahora los
+`3fff:cafe:2000::/40`. Cada uno solo el que le correspondía. Ahora los
 observadores:
 
 ```
@@ -1502,14 +1446,14 @@ observadores:
 *>    !-? 3fff:cafe:2000::/40  fd00:6::10         10     0 64502 64500 i
 ```
 
-Los dos caminos son **ROV Invalid** - cada uno un anuncio perfectamente
-legítimo a través de un proveedor autorizado, rechazado por la misma razón
-en ambos lados: la ROA de 3fff:cafe::/32 solo autoriza anuncios hasta
+Los dos caminos salen **ROV Invalid**: cada uno un anuncio perfectamente
+legítimo por un proveedor autorizado, rechazado por la misma razón
+en ambos lados. La ROA de 3fff:cafe::/32 solo autoriza anuncios hasta
 `/32`, y los dos sub-bloques son más específicos que eso.
-No se trata del Proveedor A ni del Proveedor B - es el prefijo. En
-`rov-mark` los dos se quedan visibles, degradados, exactamente como el
+No es cosa del Proveedor A ni del Proveedor B, es el prefijo. En
+`rov-mark` los dos se quedan visibles, degradados, exactamente igual que el
 secuestro del Paso 3. Ejecute `step8-drop` y desaparecen de la misma forma
-en que después desapareció el secuestro.
+en que después desapareció aquel secuestro.
 
 Deshaga cuando termine:
 
@@ -1522,21 +1466,21 @@ Deshaga cuando termine:
 
 > **El patrón:** el ROV verifica *qué se está anunciando y quién lo anuncia*. El ASPA
 > verifica *si el camino que lo trajo hasta aquí es uno que el origen
-> autorizó*. Este ejercicio, y el secuestro ingenuo del Paso 2, rompen el ROV
+> autorizó*. Este ejercicio, junto con el secuestro ingenuo del Paso 2, rompe el ROV
 > sin tocar el ASPA; el camino falsificado y la fuga rompen el ASPA sin
-> tocar el ROV. Un despliegue real quiere los dos funcionando.
+> tocar el ROV. Un despliegue serio quiere los dos funcionando a la vez.
 
 ### C. Dentro de los validadores, y RTR
 
 *Etapa:* `step5-aspa-mark` (para que existan tanto la tabla de ROAs como la de ASPAs).
 
-La historia solo miró los veredictos de los routers. Esto mira cómo llegaron
+La historia solo miró los veredictos que daban los routers. Esto mira cómo llegaron
 hasta ahí.
 
 1. Abra Routinator: **http://routinator.localhost:8080**
 
    Está configurado para validar **solo** el ancla de confianza del propio laboratorio, no
-   toda la Internet:
+   toda la Internet real:
 
    ```
    --no-rir-tals  --extra-tals-dir=/tals  --enable-aspa
@@ -1582,20 +1526,20 @@ hasta ahí.
    ```
 
    `show rtr` tiene que decir `Version: 2`. El ASPA solo viaja en PDUs de RTR
-   versión 2: en la versión 1 la sesión igual se establece y las ROAs igual llegan,
-   pero todo veredicto ASPA quedaría `unknown`. `show sets` lista una entrada de ROA
+   versión 2 - en la versión 1 la sesión se establece igual y las ROAs llegan igual,
+   pero todo veredicto ASPA se quedaría en `unknown`. `show sets` lista una entrada de ROA
    para IPv4, una para IPv6, y un ASPA (`#ASnum 1`).
 
 ### D. NotFound y Unknown
 
 *Etapa:* `step5-aspa-mark`.
 
-La historia solo mostró **Valid** e **Invalid**. Los otros dos veredictos -
+La historia solo mostró **Valid** e **Invalid**. Los otros dos veredictos,
 **NotFound** (ninguna ROA cubre el prefijo) y **Unknown** (no existe ningún objeto ASPA
-para ese ASN cliente) - son en realidad el estado *por defecto*, el más común
-en la Internet real, donde la mayoría de los prefijos todavía no tienen ninguna cobertura RPKI.
-Nunca aparecieron porque cada ruta de la historia estaba cubierta. Haga que
-aparezcan a propósito, sacando objetos:
+para ese ASN cliente), son en realidad el estado *por defecto* - el más común,
+de hecho, en la Internet real, donde la mayoría de los prefijos todavía no tiene ninguna cobertura RPKI.
+Nunca aparecieron en la historia porque cada ruta estaba cubierta. Ahora los va a hacer
+aparecer a propósito, sacando objetos:
 
 1. Quite la ROA de IPv4 y el objeto ASPA:
 
@@ -1619,12 +1563,12 @@ aparezcan a propósito, sacando objetos:
    ```
 
 3. Verifique los veredictos de `203.0.113.0/24` en los dos observadores: los dos caminos deberían
-   figurar ahora como **ROV NotFound, ASPA Unknown** - "no tenemos opinión", no un
-   rechazo: se quedan en la tabla aunque las dos verificaciones estén activas. Note
+   figurar ahora como **ROV NotFound, ASPA Unknown**. Es "no tenemos opinión", no un
+   rechazo, así que se quedan en la tabla aunque las dos verificaciones estén activas. Note
    que `3fff:cafe::/32` no se ve afectado: su propia ROA sigue ahí, así que
-   mantiene sus veredictos normales. La cobertura es por prefijo - no tenerla
-   en uno no dice nada sobre otro. (Esta es también la razón por la que desplegar ROV no protege
-   nada hasta que los *otros* AS publiquen ROAs: un prefijo sin ROA no puede ser
+   mantiene sus veredictos normales. La cobertura es por prefijo; no tenerla
+   en uno no dice nada sobre el otro. (Por la misma razón, desplegar ROV no protege
+   nada hasta que los *otros* AS publiquen sus propias ROAs - un prefijo sin ROA no puede ser
    detectado por nada.)
 
 4. Restaure los dos objetos y refresque de nuevo:
@@ -1642,9 +1586,9 @@ aparezcan a propósito, sacando objetos:
    ```
 
 > Si los veredictos del punto 4 no vuelven después de un refresh, normalmente
-> significa que el refresh corrió antes de que Krill terminara de publicar
+> es que el refresh corrió antes de que Krill terminara de publicar
 > (verifique con `krillc roas list`/`krillc aspas list` primero, como en el punto 2).
-> Ejecutar `./scripts/lab.sh refresh` de nuevo unos segundos después lo resuelve.
+> Ejecute `./scripts/lab.sh refresh` de nuevo unos segundos después y se resuelve solo.
 
 ---
 

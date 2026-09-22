@@ -34,9 +34,9 @@ msg() {
       es:lbl_krill)         echo "Krill:" ;;
       en:lbl_krill)         echo "Krill:" ;;
 
-      pt:note_krill)        echo "(token: passlab)" ;;
-      es:note_krill)        echo "(token: passlab)" ;;
-      en:note_krill)        echo "(token: passlab)" ;;
+      pt:note_krill)        echo "(token: labpass)" ;;
+      es:note_krill)        echo "(token: labpass)" ;;
+      en:note_krill)        echo "(token: labpass)" ;;
 
       pt:lbl_routinator)    echo "Routinator:" ;;
       es:lbl_routinator)    echo "Routinator:" ;;

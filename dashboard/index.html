@@ -403,7 +403,7 @@
         <rect x="150" y="560" width="170" height="70"/>
         <use class="ico" href="#ico-router" x="156" y="565" width="21" height="21"/>
         <text class="title" x="235" y="583" text-anchor="middle" id="n-peer-title">peer</text>
-        <text class="asn" x="235" y="598" text-anchor="middle">AS64999</text>
+        <text class="asn" x="235" y="598" text-anchor="middle">AS64499</text>
         <text class="role" x="235" y="612" text-anchor="middle" id="n-peer-role">peers with the origin</text>
         <text class="pill" id="p-peer" x="235" y="625" text-anchor="middle">&#8212;</text>
       </g>
@@ -662,7 +662,7 @@ const NODES = {
       info: {
         "Imagem": "nlnetlabs/krill:v0.16.0",
         "Interface web": KRILL_URL,
-        "Token": "passlab",
+        "Token": "labpass",
         "Nome da CA": "acme_ca",
         "ASPA": "só via krillc (CLI)",
       },
@@ -706,9 +706,9 @@ const NODES = {
       hint: "show protocols\nshow route export observer1_v4",
     },
     peer: {
-      name: "peer — AS64999",
+      name: "peer — AS64499",
       role: "Uma rede legítima que faz peering privado com a origem e compra trânsito do Provedor A. Normalmente guarda para si o que aprende da origem; quando o vazamento do roteiro é ligado, repassa essas rotas ao Provedor A.",
-      info: { "ASN": "64999 (faixa de uso privado, RFC 6996)",
+      info: { "ASN": "64499 (ASN de documentação, RFC 5398)",
               "Peering com a origem": "10.200.9.10 / fd00:9::10", "Trânsito do Provedor A": "10.200.10.10 / fd00:10::10",
               "Configs": "bird/peer-off.conf, peer-leak.conf" },
       term: [["Terminal (birdc)", "peer", "birdc"], ["Shell", "peer"]],
@@ -780,7 +780,7 @@ const NODES = {
       info: {
         "Imagen": "nlnetlabs/krill:v0.16.0",
         "Interfaz web": KRILL_URL,
-        "Token": "passlab",
+        "Token": "labpass",
         "Nombre de la CA": "acme_ca",
         "ASPA": "solo vía krillc (CLI)",
       },
@@ -824,9 +824,9 @@ const NODES = {
       hint: "show protocols\nshow route export observer1_v4",
     },
     peer: {
-      name: "peer — AS64999",
+      name: "peer — AS64499",
       role: "Una red legítima que hace peering privado con el origen y compra tránsito del Proveedor A. Normalmente se guarda lo que aprende del origen; cuando se activa la fuga de la guía, pasa esas rutas al Proveedor A.",
-      info: { "ASN": "64999 (rango de uso privado, RFC 6996)",
+      info: { "ASN": "64499 (ASN de documentación, RFC 5398)",
               "Peering con el origen": "10.200.9.10 / fd00:9::10", "Tránsito del Proveedor A": "10.200.10.10 / fd00:10::10",
               "Configs": "bird/peer-off.conf, peer-leak.conf" },
       term: [["Terminal (birdc)", "peer", "birdc"], ["Shell", "peer"]],
@@ -898,7 +898,7 @@ const NODES = {
       info: {
         "Image": "nlnetlabs/krill:v0.16.0",
         "Web UI": KRILL_URL,
-        "Token": "passlab",
+        "Token": "labpass",
         "CA name": "acme_ca",
         "ASPA": "krillc (CLI) only",
       },
@@ -942,9 +942,9 @@ const NODES = {
       hint: "show protocols\nshow route export observer1_v4",
     },
     peer: {
-      name: "peer — AS64999",
+      name: "peer — AS64499",
       role: "A legitimate network that peers privately with the origin and buys transit from Provider A. Normally it keeps what it learns from the origin to itself; when the guide's leak is switched on, it passes those routes on to Provider A.",
-      info: { "ASN": "64999 (private-use range, RFC 6996)",
+      info: { "ASN": "64499 (documentation ASN, RFC 5398)",
               "Peering with origin": "10.200.9.10 / fd00:9::10", "Transit from Provider A": "10.200.10.10 / fd00:10::10",
               "Configs": "bird/peer-off.conf, peer-leak.conf" },
       term: [["Terminal (birdc)", "peer", "birdc"], ["Shell", "peer"]],
@@ -1310,7 +1310,7 @@ function paint(state) {
   const peeringUp = (peerNode.protocols || []).some(p => p.name === "origin_v4" && p.state === "up");
   const peeringEl = document.getElementById("e-peer-org");
   if (peeringEl) peeringEl.classList.toggle("good", peeringUp);
-  const peerAsn = String((state.config || {}).PEER_ASN || "64999");
+  const peerAsn = String((state.config || {}).PEER_ASN || "64499");
   const leaked = [...routesFor("observer1"), ...routesFor("observer2")]
     .filter(x => String(x.path).split(/\s+/).includes(peerAsn));
   const leakAccepted = leaked.some(x => x.rov !== "Invalid" && x.aspa !== "Invalid");

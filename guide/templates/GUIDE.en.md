@@ -5,22 +5,22 @@
 *[English](GUIDE.en.md) · [Español](GUIDE.es.md) · [Português](GUIDE.pt.md)*
 
 **Goal:** follow a hijacker and a leaky peer through a lab that runs on your
-own machine. See what origin validation (ROV) catches, what it lets through,
-and what ASPA adds - with every verdict checked by two independent stacks
-(BIRD + Routinator, and OpenBGPD + FORT).
+own machine. See what origin validation (ROV) catches, what slips past it,
+and what ASPA adds on top - with every verdict checked twice, by two
+independent stacks (BIRD + Routinator, and OpenBGPD + FORT).
 
-This is a self-contained lab: everything runs in containers on your own
+This is a self-contained lab. Everything runs in containers on your own
 machine, and it assumes you already have a basic grasp of RPKI, ROAs, ROV
 and ASPA. You can certify your resources entirely locally, or, if you'd
-rather use a real-world registry, against Registro.br's test system.
+rather deal with a real-world registry, against Registro.br's test system.
 
-The lab is a single story in nine steps: **three attacks, and the moment each
-one stops working.** A short preparation comes first (bring the lab up and
-certify your resources), a few extra exercises come last.
+The lab is one story told in nine steps: **three attacks, and the moment each
+one stops working.** A short preparation comes first (bring the lab up,
+certify your resources); a few extra exercises come after.
 
 ## What RPKI asks of your own AS - and what this lab deploys
 
-RPKI has two halves, and each one has two parts:
+RPKI has two halves, and each half has two parts:
 
 | | The origin publishes... | ...and routers validate |
 |---|---|---|
@@ -29,11 +29,11 @@ RPKI has two halves, and each one has two parts:
 
 In real life, **both belong in the AS you operate**: you *publish* objects
 about your own resources, and you *validate* what your neighbors send you.
-Publishing without validating protects others but not you; validating without
-publishing protects you but leaves your own prefixes unprotected for everybody
-else.
+Publish without validating and you protect others but not yourself. Validate
+without publishing and you protect yourself but leave your own prefixes
+unprotected for everybody else.
 
-In this lab, for teaching purposes, the two are split up:
+This lab splits the two up, for teaching purposes:
 
 - **Publication is deployed only in the Origin AS** (AS{{ORIGIN_ASN}}, whose CA lives in
   Krill). It's the only AS that creates ROAs and an ASPA object.
@@ -41,16 +41,15 @@ In this lab, for teaching purposes, the two are split up:
   observer2), the two routers you'll be watching. Everything else in the lab
   is an ordinary BGP router that never looks at RPKI.
 
-Validation is deployed on the observers **in two stages, for each check**:
-first the router only *marks* what the check flags (a community, a lower
-preference - nothing is dropped, so you can see what would happen), and then
-it *drops* it. **Dropping the invalid ones is what real routers do**; marking
-is the rehearsal you do before you trust a check enough to let it reject
-routes.
+Validation goes on the observers **in two stages, for each check**. First the
+router only *marks* what the check flags - a community, a lower preference,
+nothing actually dropped, so you can see what would happen. Then it *drops*
+it. Dropping invalid routes is what real routers do; marking is the rehearsal
+you run before trusting a check enough to let it reject anything.
 
 ## Glossary
 
-A quick review, not a full introduction - this is what these terms mean *in
+A quick review, not a full introduction: this is what these terms mean *in
 this lab*. Skip ahead if you're already comfortable with them.
 
 | Term | Meaning |
@@ -95,11 +94,12 @@ this lab*. Skip ahead if you're already comfortable with them.
 AS{{ORIGIN_ASN}} is multihomed, and it has a preference: **Provider B is the way in, Provider A
 is the backup.** To get that, the origin *prepends* its own ASN twice when it announces
 to Provider A (`{{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}}` instead of just `{{ORIGIN_ASN}}`), so every path through
-A looks two hops longer than the one through B - ordinary inbound traffic engineering.
+A looks two hops longer than the one through B. Ordinary inbound traffic
+engineering, nothing exotic.
 The two providers pass the **same prefix** on to both observers, with the same origin AS. The lab runs the whole story **twice, in
 parallel**, on two independent stacks: observer1 and observer2 see exactly the
-same announcements and the same RPKI objects, but each one has its own router
-and its own validator.
+same announcements and the same RPKI objects, but each has its own router and
+its own validator.
 
 Two more routers join the story. Both are on the panel, and both are silent
 until the story switches them on:
@@ -125,10 +125,10 @@ until the story switches them on:
 | AS{{ATTACKER_ASN}} | {{ATTACKER_ASN}} | the attacker: a customer of the observers, and hijacks the origin's prefixes |
 | peer | {{PEER_ASN}} | a legitimate network that peers with the origin, and buys transit from Provider A |
 
-ASNs 64496–64511 are reserved documentation ASNs (RFC 5398). AS{{PEER_ASN}} is in the
-private-use range instead (RFC 6996), and AS{{ATTACKER_ASN}} is in neither - it's just
-memorable. All of them are harmless here: this network never touches the real
-Internet.
+ASNs 64496–64511 are reserved documentation ASNs (RFC 5398), and every ASN in
+this lab lives inside that block - except AS{{ATTACKER_ASN}}, which sits
+outside it on purpose. 666 isn't reserved for anything; it's just memorable.
+None of them touch the real Internet.
 
 > The origin's ASN and prefixes live in the **`lab.conf`** file, at the lab's
 > root. If you want different ones, edit it there and run
@@ -139,18 +139,18 @@ Internet.
 
 ### How the story is organized
 
-Every step begins with a **State** box: which deployment stage the observers
-are in, what AS{{ATTACKER_ASN}} and the peer are doing, and which RPKI objects should
-exist. If your lab doesn't match, the box also says how to put it back.
+Every step opens with a **State** box: which deployment stage the observers
+are in, what AS{{ATTACKER_ASN}} and the peer are doing, which RPKI objects should exist.
+If your lab doesn't match, the box also tells you how to fix it.
 
-That recovery is deliberately simple: **each `./scripts/lab.sh stepN-*`
+That recovery is deliberately simple. **Each `./scripts/lab.sh stepN-*`
 command sets its step's *entire* state**, not just what changed since the
 previous one. Run `step9-leak-off`, then `step3-rov-mark`, and you land
-exactly where Step 3 expects - the leak, the drop stage, everything Step 9
-left behind is gone, reset by `step3-rov-mark` itself. That holds for any
-pair of steps, in either direction: the commands don't assume you're going
-forward, and don't leave anything behind for the next one to trip over. Three
-things move together every time a `stepN-*` command runs:
+exactly where Step 3 expects: the leak, the drop stage, everything Step 9
+left behind - gone, wiped by `step3-rov-mark` itself. That holds for any pair
+of steps, in either direction. The commands don't assume you're moving
+forward, and they don't leave anything behind for the next one to trip over.
+Three things move together every time a `stepN-*` command runs:
 
 - **The observers' deployment stage.** They start with no validation at all,
   and the story walks them through four stages: both checks are marked
@@ -168,12 +168,13 @@ things move together every time a `stepN-*` command runs:
   Each stage is one complete config file per observer
   (`bird/observer1-<stage>.conf`, `openbgpd/observer2-<stage>.conf`), and the
   guide asks you to open them: **what changes from one file to the next is what
-  deploying that check means.** You don't have to remember the stage you're in -
-  the badge in the panel's header says it (*validation: none*, *ROV: marking*,
-  *ROV: dropping*, ...), and turns amber if the two observers aren't in the
-  same one. observer2 restarts every time the stage changes (OpenBGPD negotiates
-  its RFC 9234 roles and its RTR version when a session opens), so give it ten
-  or fifteen seconds to settle before you conclude anything from what it shows.
+  deploying that check means.** You don't have to remember which stage you're
+  in - the badge in the panel's header says it (*validation: none*, *ROV:
+  marking*, *ROV: dropping*, ...) and turns amber if the two observers
+  disagree. observer2 restarts every time the stage changes, because OpenBGPD
+  negotiates its RFC 9234 roles and its RTR version when a session opens.
+  Give it ten or fifteen seconds to settle before drawing any conclusions
+  from what it shows.
 - **AS{{ATTACKER_ASN}} and the peer.** Every `stepN-*` command also sets their state -
   silent, naive hijack, forged path, leaking - to whatever the guide's text
   for that step describes, even the ones whose name doesn't mention them
@@ -186,12 +187,12 @@ things move together every time a `stepN-*` command runs:
   just as easily.
 
   This is also the one place a `stepN-*` command can fail through no fault of
-  its own: from `step3-rov-mark` on, each one starts by checking that
+  its own. From `step3-rov-mark` on, each one starts by checking that
   Preparation actually finished - the CA exists, has an active parent, holds
-  the AS number and prefixes from `lab.conf`, and has a working repository.
-  If it hasn't, the command stops and tells you so, instead of silently
-  creating ROAs Krill can't actually publish. Preparation is the one part of
-  the story a `stepN-*` command can't do for you.
+  the AS number and prefixes from `lab.conf`, has a working repository. If it
+  hasn't, the command stops and tells you so, instead of quietly creating
+  ROAs Krill can't actually publish. Preparation is the one part of the story
+  a `stepN-*` command can't do for you.
 
 The names of all these commands carry the number of the step they belong to.
 
@@ -206,9 +207,9 @@ The lab has two modes, chosen with the `MODE` variable in `lab.conf`:
 | `local` | **{{RIR_NAME}}**, a simulated registry that runs inside the lab | no |
 | `beta` | **beta.registro.br**, Registro.br's test system | yes, and a beta.registro.br login |
 
-Both modes use exactly the same protocols - RFC 6492 for delegation and
-RFC 8181 for publication. What changes is the panel where you paste the XML,
-and how long the objects take to show up at the validator: seconds in local
+Both modes use exactly the same protocols, RFC 6492 for delegation and RFC
+8181 for publication. What changes is the panel where you paste the XML, and
+how long the objects take to show up at the validator - seconds in local
 mode, a few minutes on beta. The next preparation step has one version per
 mode; only do the one that matches yours.
 
@@ -236,15 +237,15 @@ mode; only do the one that matches yours.
 
    - **On the panel (the way the blocks are written first).** Click a box
      and use its **Shell** button (**Terminal (krillc)** on Krill): you land
-     inside that container, so a command is written without any prefix -
-     for example `birdc show protocols` in observer1's Shell. The
+     inside that container, so a command is written without any prefix, for
+     example `birdc show protocols` in observer1's Shell. The
      **Lab commands** button opens a terminal already in the lab's folder,
      for `./scripts/lab.sh ...`, `cat bird/...` and `diff ...`.
    - **From your own computer's terminal, in the lab's folder.** The same
      command, run from outside: `docker exec lab-<box> <command>`, as in
-     `docker exec lab-observer1 birdc show protocols`. Use this if you prefer
-     your own terminal - or for `reset`, which must never run from the
-     panel.
+     `docker exec lab-observer1 birdc show protocols`. Use this if you
+     prefer your own terminal, or for `reset`, which must never run from
+     the panel.
 
 4. Check that the routers came up and that the BGP sessions are established.
    On the panel, each router's pill shows how many of its BGP sessions are
@@ -275,7 +276,7 @@ mode; only do the one that matches yours.
 
 Here you'll play **both sides** of the conversation: the holder, in Krill,
 and the registry, in the {{RIR_NAME}} panel. It's the same XML exchange that
-happens between a provider and their RIR.
+happens between a provider and its RIR.
 
 ### Your side: the CA in Krill
 
@@ -285,7 +286,7 @@ happens between a provider and their RIR.
    warning. The direct address, `https://localhost:3000`, still works, with a
    self-signed certificate.)
 
-2. Log in with the token **`passlab`**.
+2. Log in with the token **`labpass`**.
 
 3. Create your CA named **`acme_ca`**.
    If you like, switch the language to English in the top-right corner.
@@ -333,7 +334,7 @@ happens between a provider and their RIR.
 > **Why two separate parts?** Because they're two independent things. The
 > first says *which resources are yours*; the second says *where you're going
 > to publish the signed objects*. A RIR can certify your resources while you
-> publish somewhere else - including your own publication server.
+> publish somewhere else entirely - your own publication server, say.
 
 **Notice what you have *not* done:** created a ROA, or an ASPA object. Your
 resources are certified, but nothing says who may announce them. That's where
@@ -347,7 +348,7 @@ the story begins.
 > beta.registro.br login.
 
 1. Open Krill at **http://krill.localhost:8080**, log in with the token
-   **`passlab`**, and create the CA **`acme_ca`**.
+   **`labpass`**, and create the CA **`acme_ca`**.
 
 2. In another tab, log in to **https://beta.registro.br/login/**. In the
    Panel, go to *Holdership*, select the AS, and scroll down to the **RPKI**
@@ -427,11 +428,11 @@ validators whenever a step asks you to create one.)
 
    Two paths on each observer: `{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` (selected: the origin's preferred way in, 2
    hops) and `{{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}}` (the backup, kept in the table but 4 hops
-   long because of the prepends). There are no
-   verdicts on them (BIRD has no communities; OpenBGPD's `N-?` is just "nothing
-   to compare against", and the panel shows `-` for both) - because **the
-   observers aren't validating anything yet.** The panel's header badge says
-   *validation: none*.
+   long because of the prepends). Neither carries a verdict - BIRD has no
+   communities yet, OpenBGPD's `N-?` just means "nothing to compare against",
+   and the panel shows `-` for both. That's because **the observers aren't
+   validating anything yet.** The panel's header badge says *validation:
+   none*.
 
 3. **Take a look at how these routers are configured.** Open the observers'
    baseline files (in the Lab commands terminal, your own terminal in the
@@ -463,12 +464,12 @@ validators whenever a step asks you to create one.)
 
    There's no RTR session to Routinator or FORT (both are running, but nothing
    listens to them), and nothing that could tell a ROA from a hole in the
-   wall. Everything the story does to these two files, from here on, is what
-   *deploying RPKI validation* on a router looks like.
+   wall. Everything the story does to these two files from here on is what
+   *deploying RPKI validation* on a router actually looks like.
 
-**Along the way:** the validators, the CA and the repository all exist by now,
-and the resources are certified - and still, from where a router sits, none of
-it matters until the router is told to listen.
+**Along the way:** the validators, the CA and the repository all exist by
+now, and the resources are certified. Doesn't matter yet, though - from
+where a router sits, none of it counts until the router is told to listen.
 
 ---
 
@@ -487,9 +488,10 @@ AS{{ATTACKER_ASN}} announces the origin's prefix as if it were its own.
    #./scripts/lab.sh step2-hijack-simple
    ```
 
-2. **Before you look:** AS{{ATTACKER_ASN}}'s path is just `{{ATTACKER_ASN}}` - shorter than the
-   legitimate `{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` (and than the backup through A). Which one do you expect the observers to prefer?
-   Is there *anything* the observers could use to tell the two apart?
+2. **Before you look:** AS{{ATTACKER_ASN}}'s path is just `{{ATTACKER_ASN}}`, shorter than the
+   legitimate `{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` (and shorter than the backup through A too).
+   Which one do you expect the observers to prefer? Is there anything at all
+   they could use to tell the two apart?
 
 3. Now look:
 
@@ -515,14 +517,14 @@ AS{{ATTACKER_ASN}} announces the origin's prefix as if it were its own.
    *     N-? {{ORIGIN_V4}}          10.200.5.10       100     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   The hijack **won**: it's the selected route (`*`, `*>`) on both observers -
-   its AS path is shorter (1 hop against 2 and 4), and nothing else distinguishes it. On the panel,
-   the attacker's pill reads *hijacking* and its links to the observers turn
-   **amber**: an observer is accepting what it announces. The *Verdicts* table
-   has new rows labeled *AS{{ATTACKER_ASN}}*, with no verdicts, because there is no
-   validation.
+   The hijack **won**. It's the selected route (`*`, `*>`) on both observers:
+   its AS path is shorter (1 hop against 2 and 4), and nothing else tells the
+   two apart. On the panel, the attacker's pill reads *hijacking* and its
+   links to the observers turn **amber** - an observer is accepting what it
+   announces. The *Verdicts* table gets new rows labeled *AS{{ATTACKER_ASN}}*, with no
+   verdicts, because there's no validation to give one.
 
-**Along the way:** a hijack with the wrong origin ASN - the oldest trick there
+**Along the way:** a hijack with the wrong origin ASN. The oldest trick there
 is, and the one ROAs were invented for.
 
 ---
@@ -535,7 +537,7 @@ is, and the one ROAs were invented for.
 > **If yours differs:** `./scripts/lab.sh step1-clean`, then
 > `./scripts/lab.sh step2-hijack-simple`.
 
-This step has two halves, in this order: the **Origin publishes** ROAs, and
+This step has two halves, in this order: the **Origin publishes** ROAs, then
 the **Observers validate** them - only marking, for now.
 
 ### The Origin publishes: create the ROAs
@@ -577,12 +579,12 @@ the **Observers validate** them - only marking, for now.
    ```
 
    `validate.sh` prints what Routinator validated (two ROAs). On the panel,
-   the Routinator and FORT boxes show `2 VRP`. If nothing shows up yet, **it's
-   a matter of time**: Krill has to publish and the validators have to reread
-   (seconds in local mode, minutes on beta); run `refresh` again.
+   the Routinator and FORT boxes show `2 VRP`. If nothing shows up yet, give
+   it a moment: Krill has to publish and the validators have to reread
+   (seconds in local mode, minutes on beta). Run `refresh` again.
 
-Right now nothing has changed for the routers: the ROAs are published and
-validated, and **no router is listening to the validators.** Look at the
+Nothing has changed for the routers yet. The ROAs are published and
+validated, but **no router is listening to the validators.** Check the
 observers again if you like - the hijack is still winning.
 
 ### The Observers validate
@@ -601,7 +603,7 @@ observers again if you like - the hijack is still winning.
    #diff openbgpd/observer2-none.conf openbgpd/observer2-rov-mark.conf
    ```
 
-   Three ideas, on both routers:
+   Three ideas, same on both routers:
 
    **(a) A session to a validator**, over which the router learns the ROAs:
 
@@ -645,15 +647,15 @@ observers again if you like - the hijack is still winning.
    match from any ovs invalid    set { localpref 10 }      # observer2 (OpenBGPD)
    ```
 
-   > **This is not a BIRD or OpenBGPD thing.** Any router that supports ROV
-   > has the same three pieces, with different syntax: a session to a
+   > **This isn't a BIRD or OpenBGPD quirk.** Any router that supports ROV
+   > has the same three pieces, just different syntax: a session to a
    > validator (RTR), a policy that matches the validation state, and an
    > action. On Cisco IOS XR it's a `route-policy` testing `validation-state`;
    > on Junos, a `policy-statement` matching `validation-database`; on
-   > Huawei, `if-match rpki` in a route-policy - check your platform's
-   > documentation for the exact syntax. BIRD and OpenBGPD are used here
+   > Huawei, `if-match rpki` in a route-policy. Check your platform's
+   > documentation for the exact syntax. BIRD and OpenBGPD show up here
    > because they're free and easy to run in containers, not because they're
-   > what you'll meet at work: what carries over is the anatomy.
+   > what you'll meet at work - what carries over is the anatomy.
    >
    > If you'd rather type the configuration yourself than read it: start
    > from `bird/observer1-none.conf`, add the pieces above, save the result as
@@ -686,28 +688,29 @@ observers again if you like - the hijack is still winning.
    *     !-? {{ORIGIN_V4}}          10.200.8.10        10     0 {{ATTACKER_ASN}} i
    ```
 
-   The hijack is still in the table - visible, not gone - but now it carries
+   The hijack is still in the table, visible, not gone - but now it carries
    **ROV Invalid** and a `local_pref` of 10, so it loses to the legitimate
-   paths, and Provider B's is the selected route again. The badge in the header says
-   *ROV: marking*, and the attacker's links turn **red**: it's announcing,
-   and both observers are flagging it. Everything you needed to check is
-   right: the hijack is flagged, the legitimate paths are `Valid`, and nothing
-   legitimate got hurt. **That's the point of the marking stage** - you get to
-   see what the check *would* do before you let it reject anything.
+   paths, and Provider B's route is selected again. The badge in the header
+   reads *ROV: marking*, and the attacker's links turn **red**: it's still
+   announcing, and both observers are flagging it now. Everything checks out:
+   the hijack is flagged, the legitimate paths read `Valid`, nothing
+   legitimate got hurt. **That's the whole point of the marking stage** -
+   you get to see what the check *would* do before you let it reject
+   anything.
 
-   **This is where ROV stays for the rest of the story - marking, not
+   **This is where ROV stays for the rest of the story: marking, not
    dropping.** A router that only marks still uses an invalid route whenever
-   it's the best one it has, so marking alone isn't the end of the job; it's
-   the rehearsal. You'll see what real, production dropping looks like - for
-   ROV and ASPA together, at once - in Step 8, once both checks have had
-   their turn to prove themselves this way.
+   it happens to be the best one it has, so marking alone doesn't finish the
+   job - it's the rehearsal. Production dropping, for ROV and ASPA together
+   at once, comes in Step 8, once both checks have had their turn to prove
+   themselves this way.
 
 ### How to read the verdicts
 
 The two observers show them differently:
 
-- **observer1 (BIRD)** has no per-route validation attribute, so its
-  filters record each verdict in a large community:
+- **observer1 (BIRD)** has no per-route validation attribute, so its filters
+  record each verdict in a large community:
 
   | community | meaning | | community | meaning |
   |---|---|---|---|---|
@@ -721,10 +724,10 @@ The two observers show them differently:
   So `V-!` is ROV Valid and ASPA Invalid. (No ASPA verification is
   deployed yet, so the second half is `?` for now.)
 
-**Along the way:** what "deploying ROV" is made of - an RTR session, a test on
-every route, and an action on the result - and how new objects reach the
-routers: Krill publishes, the validators reread, the routers get the change
-over RTR. You just watched every hop.
+**Along the way:** what "deploying ROV" is made of (an RTR session, a test on
+every route, an action on the result), and how new objects reach the
+routers - Krill publishes, the validators reread, the routers get the change
+over RTR. You just watched every hop happen.
 
 ---
 
@@ -736,8 +739,8 @@ over RTR. You just watched every hop.
 > **If yours differs:** `./scripts/lab.sh step4-hijack-posrov` - it also makes
 > sure the ROAs exist and puts the observers back in `rov-mark`.
 
-AS{{ATTACKER_ASN}} reads the same documentation you did. ROV only looks at the **last** AS
-in the path - so what if the last AS were the right one?
+AS{{ATTACKER_ASN}} has read the same documentation you have. ROV only looks at the **last**
+AS in the path - so what happens if the last AS is the right one?
 
 1. Switch AS{{ATTACKER_ASN}} to the forged-path attack:
 
@@ -748,10 +751,10 @@ in the path - so what if the last AS were the right one?
    AS{{ATTACKER_ASN}} now announces the path `{{ATTACKER_ASN}} {{ORIGIN_ASN}}`: as if it had received the
    prefix directly from the real origin.
 
-   **That relationship is a lie.** AS{{ATTACKER_ASN}} has no BGP session - no peering, no
-   transit, nothing - with AS{{ORIGIN_ASN}}: the two aren't even connected. The
+   **That relationship is a lie.** AS{{ATTACKER_ASN}} has no BGP session with AS{{ORIGIN_ASN}} - no
+   peering, no transit, nothing. The two aren't even connected. The
    `{{ATTACKER_ASN}} {{ORIGIN_ASN}}` adjacency exists only because AS{{ATTACKER_ASN}}'s configuration *writes it into
-   the path*. Have a look at how it does that:
+   the path*. Take a look at how:
 
    ```
    # Panel: click the attacker box, then Shell:
@@ -761,13 +764,13 @@ in the path - so what if the last AS were the right one?
    ```
 
    Find the `forge_export` filters: `bgp_path.prepend(ORIGIN_ASN)` puts the
-   origin's number into the path *before* the router adds its own on export -
-   that's the whole forgery. Compare it with `bird/attacker-simple.conf` (no
+   origin's number into the path *before* the router adds its own on export.
+   That's the whole forgery. Compare it with `bird/attacker-simple.conf` (no
    filter, so the path is just `{{ATTACKER_ASN}}`), and check that neither file has a
-   session with the origin: only the two observers.
+   session with the origin - only the two observers.
 
-2. **Before you look:** ROV is only marking right now, not dropping anything
-   - but the naive hijack still got flagged Invalid and lost the race. Will
+2. **Before you look:** ROV is only marking right now, not dropping anything,
+   but the naive hijack still got flagged Invalid and lost the race. Will
    this forged path get flagged the same way?
 
 3. Look:
@@ -786,22 +789,22 @@ in the path - so what if the last AS were the right one?
    *     V-? {{ORIGIN_V4}}          10.200.5.10       100     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   It isn't flagged. ROV says `Valid` - the path ends in {{ORIGIN_ASN}}, which is
-   exactly what the ROA authorizes - so it gets full `local_pref` (100) like
-   any legitimate route, and it's the selected one. The attacker's links on
-   the panel turn **amber**: no longer red, because ROV has nothing to flag.
-   Three paths, all "valid", one of them a lie, and *nothing you have
-   deployed so far can tell which*.
+   It isn't flagged. ROV says `Valid` - the path ends in {{ORIGIN_ASN}}, exactly what
+   the ROA authorizes - so it gets full `local_pref` (100) like any
+   legitimate route, and it's the selected one. The attacker's links on the
+   panel turn **amber**, no longer red: ROV has nothing left to flag. Three
+   paths, all "valid," one of them a lie, and *nothing you have deployed so
+   far can tell which*.
 
-   > The forged path (`{{ATTACKER_ASN}} {{ORIGIN_ASN}}`, 2 hops) ties with Provider B's (`{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}`, also 2),
-   > and the attacker wins the tie by a tie-breaker (its router ID happens to
-   > be the lowest); Provider A's backup is 4 hops long and never in the race.
-   > That's beside the point: the point is that ROV has handed you three
-   > equally valid-looking routes and no way to choose between them.
+   > The forged path (`{{ATTACKER_ASN}} {{ORIGIN_ASN}}`, 2 hops) ties with Provider B's (`{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}`, also 2
+   > hops), and the attacker wins the tie by a tie-breaker - its router ID
+   > happens to be lower. Provider A's backup, at 4 hops, was never in the
+   > race. Beside the point, really: the point is that ROV just handed you
+   > three equally valid-looking routes and no way to choose between them.
 
 **Along the way:** can origin validation tell two paths for the same prefix
-apart, when the origin is the same and a ROA matches? Now you know: it can't.
-It only ever looks at the last AS.
+apart, when the origin is the same and a ROA matches? Now you know - it
+can't. It only ever looks at the last AS.
 
 ---
 
@@ -815,7 +818,7 @@ It only ever looks at the last AS.
 > `krillc aspas remove --customer AS{{ORIGIN_ASN}}` in the Krill terminal.
 
 Same shape as Step 3: the **Origin publishes** an ASPA object, then the
-**Observers validate** it - in the same safe, marking-only form ROV used.
+**Observers validate** it, in the same safe, marking-only form ROV used.
 
 ### The Origin publishes: create the ASPA object
 
@@ -860,8 +863,8 @@ command line (the UI is on its way in the next release).
 > ignores ASPA objects. It's the number-one mistake when setting up a lab
 > like this one; here it's already on.
 
-As with ROAs, nothing changes for the routers yet: the object is published,
-and no router is verifying paths.
+As with the ROAs, nothing changes for the routers yet. The object is
+published, and no router is verifying paths.
 
 ### The Observers validate
 
@@ -926,13 +929,13 @@ and no router is verifying paths.
    ```
 
    > **Why "upstream"?** The observer treats each neighbor as its
-   > *customer*: for routes coming from a customer, the strictest algorithm
-   > applies - every hop of the path has to be an authorized
+   > *customer*. For routes coming from a customer, the strictest algorithm
+   > applies: every hop of the path has to be an authorized
    > customer→provider pair. BIRD asks for it by name
    > (`aspa_check_upstream`); OpenBGPD selects it through the session's RFC
    > 9234 role. It's also the check that catches route leaks - you'll meet one
-   > in Step 7. Extra exercise A takes it apart, and shows what changes if you
-   > ask the *downstream* algorithm instead.
+   > in Step 7. Extra exercise A pulls it apart and shows what changes if you
+   > ask for the *downstream* algorithm instead.
    >
    > ASPA verification is newer than ROV, and support in commercial
    > platforms is still arriving. Where it exists, it has the same anatomy as
@@ -953,24 +956,24 @@ and no router is verifying paths.
    *     V-! {{ORIGIN_V4}}          10.200.6.10        20     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   The forged path is now **ASPA Invalid** - the hop `{{ORIGIN_ASN}} → {{ATTACKER_ASN}}` isn't
-   authorized, since only {{PROVIDER_A_ASN}} is listed. It's still visible, but with a
+   The forged path is now **ASPA Invalid**: the hop `{{ORIGIN_ASN}} → {{ATTACKER_ASN}}` isn't
+   authorized, since only {{PROVIDER_A_ASN}} is listed. Still visible, but with a
    `local_pref` of 20 it loses to Provider A's path (`V-V`, 200). The
    attacker's links turn **red** again, and the badge reads *ROV: marking ·
    ASPA: marking*.
 
-   Two routes carry `V-!`, though - not one. Look closely at the second one:
+   Two routes carry `V-!`, though, not one. Look closely at the second one:
    it's **Provider B**, the origin's own preferred way in from Step 1's
-   traffic engineering. The ASPA object you just created only lists Provider
-   A, so ASPA calls Provider B's path invalid too - and what got selected
+   traffic engineering. The ASPA object you just created lists only Provider
+   A, so ASPA calls Provider B's path invalid too - and what gets selected
    instead is Provider A's path, the *backup*, the one the origin deliberately
-   made longer with its prepends. Because nothing is dropped yet, you get to
-   see this mistake before it costs anything: hold that thought into the next
+   made longer with its prepends. Nothing is dropped yet, so you get to catch
+   this mistake before it costs anything. Hold that thought into the next
    step.
 
-**Along the way:** the ASPA verdict that ROV could never give - the path
-itself is what's wrong, even though the origin is right - and a reminder of
-why marking runs before dropping: it let you catch a mistake in your own
+**Along the way:** the ASPA verdict ROV could never give - the path itself is
+what's wrong, even though the origin is right - and a reminder of why
+marking runs before dropping. It's what let you catch a mistake in your own
 ASPA object before it took anything down.
 
 ---
@@ -987,13 +990,13 @@ ASPA object before it took anything down.
 The route you noticed at the end of the last step - Provider B's, marked
 ASPA Invalid alongside the forged one - is a *legitimate* path, **the very
 one the origin prefers**, demoted for no better reason than an incomplete
-object. The observers are left using the backup path, the one the origin
-deliberately made longer with its prepends: the origin's traffic engineering,
-undone by an incomplete ASPA. Once this stage drops instead of marks (Step
-8), this is the day the traffic that used to arrive through that interface
-stops arriving, and someone starts asking why. (This lab has no data plane, so
-you can't watch traffic stop; you can watch the route's preference collapse,
-which is the same thing said differently.)
+object. The observers are stuck using the backup path, the one the origin
+deliberately made longer with its prepends: the origin's own traffic
+engineering, undone by an incomplete ASPA. Once this stage drops instead of
+marks (Step 8), this is the day traffic that used to arrive through that
+interface stops arriving, and someone starts asking why. This lab has no
+data plane, so you can't watch traffic actually stop - but you can watch the
+route's preference collapse, which is the same story told a different way.
 
 1. Fix the object:
 
@@ -1021,9 +1024,10 @@ which is the same thing said differently.)
    Both legitimate paths are back at `V-V` and `local_pref` 200, and Provider
    B - the origin's preferred way in - is reselected: once they're tied on
    preference, its shorter path wins. The forged one stays demoted (`V-!`,
-   20), and AS{{ATTACKER_ASN}} - still announcing - stays defeated. Notice how the fix
-   didn't involve AS{{ATTACKER_ASN}} at all: the ASPA object describes *your*
-   relationships, and anything that contradicts them loses.
+   20), and AS{{ATTACKER_ASN}}, still announcing, stays defeated. Notice that the fix
+   didn't touch AS{{ATTACKER_ASN}} at all - the ASPA object describes *your*
+   relationships, and anything that contradicts them loses, no matter who's
+   sending it.
 
    (`./scripts/lab.sh step6-add-provider-b` does exactly this fix - it's the
    command to jump straight to this step's state later, from anywhere in the
@@ -1042,10 +1046,10 @@ which is the same thing said differently.)
 
 **Along the way:** what happens when an ASPA object forgets a real provider -
 half the Internet starts seeing that provider's routes as invalid - and how
-a fix propagates: republish, revalidate, no router touched.
+a fix propagates: republish, revalidate, no router touched by hand.
 
-Leave AS{{ATTACKER_ASN}} running. It's harmless now, and it'll be a useful reminder on the
-panel of what's being kept out.
+Leave AS{{ATTACKER_ASN}} running. It's harmless now, and it's a useful reminder on the panel
+of what's being kept out.
 
 ---
 
@@ -1060,8 +1064,8 @@ panel of what's being kept out.
 
 This one is nobody's attack. The peer - a legitimate network - has a private
 peering link with the origin, so it *learns* the origin's prefixes. A peering
-link is bilateral: what the peer learns there is not for its own provider.
-Then somebody edits a configuration...
+link is bilateral: what the peer learns there isn't meant for its own
+provider. Then somebody edits a configuration...
 
 1. Switch the leak on:
 
@@ -1097,11 +1101,11 @@ Then somebody edits a configuration...
    ```
 
    Provider A only ever passes on its *best* route, and nothing special was
-   configured to make the peer's win: it's simply **shorter** - 2 hops
+   configured to make the peer's win - it's simply **shorter**, 2 hops
    against the origin's own 3. The prepends that made Provider A the
-   *backup* also made a leak through it irresistible. (That's typical: a
+   *backup* also made a leak through it irresistible. That's typical: a
    leaked route wins because someone's traffic engineering made the honest
-   path look worse. See `bird/provider-a.conf` - there's no policy there at
+   path look worse. (See `bird/provider-a.conf` - there's no policy there at
    all.)
 
 4. Now the observers:
@@ -1119,12 +1123,12 @@ Then somebody edits a configuration...
    *     V-! {{ORIGIN_V4}}          10.200.5.10        20     0 {{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   **Provider A's own path is already gone** - it stopped advertising it the
+   **Provider A's own path is already gone.** It stopped advertising it the
    moment it picked the peer's shorter one as best, and that has nothing to
    do with what the observers do with what they receive. What arrives from
-   Provider A instead is the leaked path, `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}` - and
-   because marking never removes anything from the table, you get to look
-   straight at it. Two things to notice:
+   Provider A instead is the leaked path, `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}` - and since
+   marking never removes anything from the table, you get to look straight
+   at it. Two things worth noticing:
 
    - **ROV Valid.** Of course - the origin really is {{ORIGIN_ASN}}. Nothing is
      forged. *A leak can never be caught by ROV*: it doesn't lie about who
@@ -1133,16 +1137,16 @@ Then somebody edits a configuration...
      origin's ASPA object lists Providers A and B, and the peer is neither.
 
    The peer's link on the panel turns **red**. Provider B's path is still
-   what's selected (`V-V`, 200) - it doesn't need any help from ASPA to win,
-   since it's also the shorter one - but the damage is real: the origin has
-   lost its *backup*, and Provider A's other customers are now sending their
+   selected (`V-V`, 200) - it doesn't need any help from ASPA to win, since
+   it's the shorter one anyway - but the damage is real: the origin has lost
+   its *backup*, and Provider A's other customers are now sending their
    traffic to the origin through the peer.
 
-**Along the way:** a route leak is nobody forging anything - it's a route
-crossing a boundary it was never supposed to cross - and it's a verdict ROV
+**Along the way:** a route leak is nobody forging anything. It's a route
+crossing a boundary it was never supposed to cross, and it's a verdict ROV
 structurally cannot give, because the origin at the end of the path is
 telling the truth. ASPA catches it for the same reason it caught Step 4's
-forgery: an unauthorized hop, wherever in the path it happens to sit.
+forgery: an unauthorized hop, wherever it happens to sit in the path.
 
 ---
 
@@ -1158,9 +1162,9 @@ Every invalid route you've seen so far has stayed on the table, demoted but
 visible - deliberately, so you could look at exactly what each check decided
 before trusting it with anything. **A real router doesn't stop there.**
 Marking a route invalid and still using it whenever nothing better shows up
-is not what ROV or ASPA are for; both only protect anything once an invalid
-route is actually rejected. This is the step where that happens - for both
-checks, together, the way you'd configure a production router from the
+isn't what ROV or ASPA are for; neither protects anything until an invalid
+route is actually rejected. This is the step where that happens, for both
+checks together, the way you'd configure a production router from the
 start.
 
 1. Switch both observers to dropping:
@@ -1203,8 +1207,9 @@ start.
    ```
 
    **Two routes disappeared, not one.** AS{{ATTACKER_ASN}}'s forged path is gone, as
-   expected. So is the entry that used to sit under Provider A - the leaked
-   path you just inspected. It isn't lost; BIRD keeps what it rejected:
+   expected. So is the entry that used to sit under Provider A, the leaked
+   path you just inspected. It isn't lost, though - BIRD keeps what it
+   rejects:
 
    ```
    # Panel: click the observer1 box, then Shell:
@@ -1216,10 +1221,10 @@ start.
    The badge now reads *ROV + ASPA: dropping*. Notice what dropping did
    **not** fix: Provider A's own, legitimate path is still nowhere to be
    seen, because Provider A itself is still advertising the leaked route
-   *instead of* its own - and no policy on the observers can make Provider A
+   *instead of* its own, and no policy on the observers can make Provider A
    propagate something it isn't sending. ASPA protects the observers from
-   *using* the leak; only the peer fixing its export policy stops the leak at
-   the source. That's next.
+   *using* the leak; only the peer fixing its export policy stops the leak
+   at the source. That's next.
 
 **Along the way:**
 
@@ -1255,7 +1260,7 @@ start.
    #./scripts/lab.sh step9-hijack-off
    ```
 
-The observers stay fully deployed - ROV and ASPA both dropping - which is
+The observers stay fully deployed, ROV and ASPA both dropping, which is
 where a real router ends up. (`./scripts/lab.sh step1-clean` is the way back
 to the very beginning: it silences AS{{ATTACKER_ASN}} and the peer, *and* takes validation
 off the observers.)
@@ -1270,9 +1275,9 @@ off the observers.)
 | Forged path (AS_PATH `{{ATTACKER_ASN}} {{ORIGIN_ASN}}`) | **fooled** (origin looks right) | **catches it** (the hop `{{ORIGIN_ASN}} → {{ATTACKER_ASN}}` isn't authorized) |
 | Route leak (AS_PATH `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}`) | **can't see it** (origin is genuine) | **catches it** (the hop `{{ORIGIN_ASN}} → {{PEER_ASN}}` isn't authorized) |
 
-Neither is redundant. ROV stops attackers who lie about the origin; ASPA stops
-paths that couldn't have happened. And the origin has to do its part: an ASPA
-that forgets a real provider (Step 6) is its own outage.
+Neither is redundant. ROV stops attackers who lie about the origin; ASPA
+stops paths that couldn't have happened. And the origin has to do its part
+too: an ASPA object that forgets a real provider (Step 6) is its own outage.
 
 Along the way, the story quietly answered questions this lab used to ask one
 exercise at a time:
@@ -1281,10 +1286,10 @@ exercise at a time:
   session to a validator, a test on every route or path, and an action on the
   result - the same three pieces for ROV (Step 3) and ASPA (Step 5), on any
   vendor's router.
-- **Why mark first and drop later - and why drop at all?** Marking lets you
-  see what a check would do before you trust it, and it's what caught your
-  own incomplete ASPA object in Step 6 before it broke anything; dropping is
-  what real routers do, and what makes the check protect anything - Step 8
+- **Why mark first and drop later, and why drop at all?** Marking lets you
+  see what a check would do before you trust it - it's what caught your own
+  incomplete ASPA object in Step 6 before it broke anything. Dropping is
+  what real routers do, and what makes the check protect anything. Step 8
   turns both checks on at once, the way a production router is configured
   from the start.
 - **Can ROV tell two paths for the same prefix apart?** No (Step 4).
@@ -1298,9 +1303,9 @@ exercise at a time:
 - **What's a route leak, and why can't ROV see it?** Step 7 shows it; Step 8
   shows what dropping does, and doesn't, fix about it.
 
-Four topics didn't fit in the story, and live in the extras below: how the
-upstream and downstream algorithms differ (and the `role` that selects one),
-a hijack that gets the ASN right but the length wrong, a look inside the
+Four topics didn't fit in the story and live in the extras below: how the
+upstream and downstream algorithms differ (and the `role` that picks one), a
+hijack that gets the ASN right but the length wrong, a look inside the
 validators and RTR, and the **NotFound** and **Unknown** verdicts - the "no
 opinion" ones you haven't met yet, because the story never left a prefix
 uncovered.
@@ -1324,12 +1329,12 @@ In `bird/observer1-aspa-mark.conf` the ASPA check is:
 case aspa_check_upstream(aspa_table) { ... }
 ```
 
-The observer treats each neighbor as its **customer**. For routes coming from
-a customer, the *Algorithm for Upstream Paths* applies - the strictest one:
-every hop in the path has to be an authorized customer→provider relationship.
-This is the check that catches route leaks. If the session were with a provider
-or a peer, the right call would be `aspa_check_downstream()`, which is more
-permissive. BIRD offers both.
+The observer treats each neighbor as its **customer**. For routes coming
+from a customer, the *Algorithm for Upstream Paths* applies, and it's the
+strictest one: every hop in the path has to be an authorized
+customer→provider relationship. This is the check that catches route leaks.
+If the session were with a provider or a peer instead, the right call would
+be `aspa_check_downstream()`, which is more permissive. BIRD offers both.
 
 OpenBGPD does it with a session **role** (RFC 9234). Look at
 `openbgpd/observer2-aspa-mark.conf`:
@@ -1341,11 +1346,11 @@ neighbor 10.200.5.10 {
 }
 ```
 
-OpenBGPD only performs ASPA verification on a session that carries a role, and
-**the role decides which ASPA algorithm runs**. `role provider` says the local
-system is the providers' upstream - routes arrive from a customer - and that
-selects the *upstream* algorithm, the same one observer1 asks BIRD for with
-`aspa_check_upstream()`.
+OpenBGPD only performs ASPA verification on a session that carries a role,
+and **the role decides which ASPA algorithm runs**. `role provider` says the
+local system is the providers' upstream - routes arrive from a customer -
+and that selects the *upstream* algorithm, the same one observer1 asks BIRD
+for with `aspa_check_upstream()`.
 
 To see the difference, you need a path that the strict algorithm rejects and
 the permissive one doesn't. Take Provider B back out of the ASPA object (in the
@@ -1380,9 +1385,10 @@ The path through Provider B now reads Invalid on both observers.
    ```
 
    The path through Provider B comes back **Valid**. Same objects, same
-   AS_PATH, a different verdict - and neither implementation is wrong. It is
-   the clearest demonstration in this lab that "is this path ASPA-valid?"
-   cannot be answered without also saying *from whom* you received it.
+   AS_PATH, a different verdict - and neither implementation is wrong. This
+   is the clearest demonstration in the whole lab that "is this path
+   ASPA-valid?" can't be answered without also saying *from whom* you
+   received it.
 
 3. Now do the equivalent on BIRD: `bird/observer1-extra-a-downstream.conf` is
    `bird/observer1-aspa-mark.conf` with `aspa_check_upstream` swapped for
@@ -1407,11 +1413,11 @@ The path through Provider B now reads Invalid on both observers.
    #docker exec lab-observer1 birdc show route table master4 all {{ORIGIN_V4}}
    ```
 
-   Neither, quite: BIRD reports the Provider B path as **ASPA Unknown**
+   Neither, quite. BIRD reports the Provider B path as **ASPA Unknown**
    (`({{OBSERVER1_ASN}}, 2, 1)`). Both readings are far more permissive than the upstream
-   algorithm, which said `Invalid` - but where OpenBGPD calls the path valid,
-   BIRD says it can't tell. Two independent implementations, reading an edge
-   of the same draft differently.
+   algorithm, which said `Invalid` - but where OpenBGPD calls the path
+   valid, BIRD just says it can't tell. Two independent implementations,
+   reading the same edge of the same draft differently.
 
 4. Compare the observers side by side, then discuss: if "upstream" and
    "downstream" is fundamentally about *who you received the route from*,
@@ -1438,10 +1444,10 @@ The path through Provider B now reads Invalid on both observers.
 Step 2 was a hijack with the wrong origin ASN. This is the opposite mistake:
 the origin is completely legitimate, but the prefix exceeds what the ROA
 authorized. An IPv4 example would mean deaggregating {{ORIGIN_V4}} down to a
-`/25` - something that gets filtered network-wide on the real Internet and
+`/25`, something that gets filtered network-wide on the real Internet and
 would feel contrived here. Announcing an IPv6 block more specific than a
-`/32` (a `/36` or `/40`, say) is completely ordinary operational practice, so
-that's what this exercise uses instead - and to make the point that it isn't
+`/32` (a `/36` or `/40`, say) is completely ordinary operational practice,
+so that's what this exercise uses instead. To make the point that it isn't
 about either provider, it uses **two** sub-blocks of {{ORIGIN_V6}}, one
 announced only to Provider A and the other only to Provider B.
 
@@ -1468,8 +1474,8 @@ Look at what each provider actually received:
 #birdc show route
 ```
 
-Provider A has `3fff:cafe:1000::/40`; Provider B has `3fff:cafe:2000::/40` -
-each only the one meant for it. Now the observers:
+Provider A has `3fff:cafe:1000::/40`; Provider B has `3fff:cafe:2000::/40`.
+Each only got the one meant for it. Now the observers:
 
 ```
 # Panel: click the observer2 box, then Shell:
@@ -1489,12 +1495,12 @@ each only the one meant for it. Now the observers:
 ```
 
 Both paths are **ROV Invalid** - each a perfectly legitimate announcement
-through an authorized provider, rejected for the same reason on both sides:
-the ROA for {{ORIGIN_V6}} only authorizes announcements up to
+through an authorized provider, rejected for the same reason on both sides.
+The ROA for {{ORIGIN_V6}} only authorizes announcements up to
 `/{{ORIGIN_V6_MAXLEN}}`, and both sub-blocks are more specific than that. It
 isn't about Provider A or Provider B - it's the prefix. In `rov-mark` both
 stay visible, demoted, exactly like the hijack in Step 3. Run `step8-drop`
-and they disappear the same way the hijack later did.
+and they vanish the same way the hijack later did.
 
 Undo when you're done:
 
@@ -1515,8 +1521,8 @@ Undo when you're done:
 
 *Stage:* `step5-aspa-mark` (so both the ROA and the ASPA tables exist).
 
-The story only looked at the routers' verdicts. This looks at how they got
-there.
+The story only ever looked at the routers' verdicts. This looks at how they
+got there.
 
 1. Open Routinator: **http://routinator.localhost:8080**
 
@@ -1575,12 +1581,12 @@ there.
 
 *Stage:* `step5-aspa-mark`.
 
-The story only ever showed **Valid** and **Invalid**. The other two verdicts -
-**NotFound** (no ROA covers the prefix at all) and **Unknown** (no ASPA object
-exists for that customer ASN) - are actually the *default*, most common state
-on the real Internet, where most prefixes still have no RPKI coverage at all.
-They never appeared because every route in the story was covered. Make them
-appear on purpose, by taking objects away:
+The story only ever showed **Valid** and **Invalid**. The other two verdicts
+- **NotFound** (no ROA covers the prefix at all) and **Unknown** (no ASPA
+object exists for that customer ASN) - are actually the *default* state on
+the real Internet, and the most common one: most prefixes still have no RPKI
+coverage at all. They never showed up because every route in the story was
+covered. Make them appear on purpose, by taking objects away:
 
 1. Remove the IPv4 ROA and the ASPA object:
 
@@ -1604,13 +1610,13 @@ appear on purpose, by taking objects away:
    ```
 
 3. Check the verdicts for `{{ORIGIN_V4}}` on both observers: both paths should
-   now read **ROV NotFound, ASPA Unknown** - "we have no opinion", not a
-   rejection: they stay in the table even though both checks are on. Notice
+   now read **ROV NotFound, ASPA Unknown** - "we have no opinion," not a
+   rejection. They stay in the table even though both checks are on. Notice
    that `{{ORIGIN_V6}}` is unaffected: its own ROA is still there, so it
    keeps its normal verdicts. Coverage is per prefix - having none for one
    says nothing about another. (This is also why deploying ROV protects
-   nothing until the *other* ASes publish ROAs: a prefix with no ROA can't be
-   caught by anything.)
+   nothing until the *other* ASes publish ROAs too: a prefix with no ROA
+   can't be caught by anything.)
 
 4. Restore both objects and refresh again:
 

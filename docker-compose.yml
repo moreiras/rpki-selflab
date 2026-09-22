@@ -32,11 +32,11 @@ services:
     container_name: lab-krill
     hostname: krill
     environment:
-      KRILL_ADMIN_TOKEN: "passlab"
+      KRILL_ADMIN_TOKEN: "labpass"
       KRILL_LOG_LEVEL: "info"
       # so that "krillc" inside the container already works with no arguments
       KRILL_CLI_SERVER: "https://localhost:3000/"
-      KRILL_CLI_TOKEN: "passlab"
+      KRILL_CLI_TOKEN: "labpass"
       KRILL_CLI_MY_CA: "acme_ca"
       # trust the lab's internal CA, to talk to the simulated RIR over
       # HTTPS (RFC 6492 and RFC 8181)
@@ -86,7 +86,7 @@ services:
         exec krill -c /etc/krill-rir.conf
     environment:
       KRILL_CLI_SERVER: "https://localhost:3000/"
-      KRILL_CLI_TOKEN: "passlab"
+      KRILL_CLI_TOKEN: "labpass"
       KRILL_CLI_MY_CA: "testbed"
     volumes:
       - rir-data:/var/krill/data
@@ -317,7 +317,7 @@ services:
       l-666-obs1: { ipv4_address: 10.200.7.10, ipv6_address: "fd00:7::10" }
       l-666-obs2: { ipv4_address: 10.200.8.10, ipv6_address: "fd00:8::10" }
 
-  # peer (AS64999): a legitimate peer of the origin (private peering, not
+  # peer (AS64499): a legitimate peer of the origin (private peering, not
   # transit) that also has its own transit from Provider A. See the guide's
   # route-leak experiment and ./scripts/lab.sh step7-leak-on / step9-leak-off.
   peer:
