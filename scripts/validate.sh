@@ -13,7 +13,10 @@ export LANGUAGE="${LANGUAGE:-pt}"
 title() { printf '\n\033[1;36m== %s\033[0m\n' "$1"; }
 
 title "$(msg t_objects)"
-curl -s -m 8 http://localhost:8323/json \
+# Asked from inside the lab's network (through the console container, which
+# has curl), so this works the same from your computer and from the panel's
+# terminal, and doesn't depend on Routinator's port being published.
+docker exec lab-console curl -s -m 8 http://routinator:8323/json \
   | python3 -c '
 import json, os, sys
 

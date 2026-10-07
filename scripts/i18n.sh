@@ -95,6 +95,99 @@ msg() {
       es:step9_hijack_off_ok)     echo "paso 9: AS666 está callado." ;;
       en:step9_hijack_off_ok)     echo "step 9: AS666 is silent." ;;
 
+      # -- scripts/lab.sh: ports, doctor, clean-objects ---------------------
+      pt:port_busy_host)       echo "porta ocupada por outro programa deste computador:" ;;
+      es:port_busy_host)       echo "puerto ocupado por otro programa de esta computadora:" ;;
+      en:port_busy_host)       echo "port taken by another program on this computer:" ;;
+
+      pt:port_busy_container)  echo "porta ocupada por outro contêiner (fora do laboratório)," ;;
+      es:port_busy_container)  echo "puerto ocupado por otro contenedor (fuera del laboratorio)," ;;
+      en:port_busy_container)  echo "port taken by another container (not part of the lab)," ;;
+
+      pt:port_busy_hint)       echo "Libere a porta (pare o outro programa ou contêiner: 'docker ps' mostra os contêineres, 'lsof -i :<porta>' os programas) e rode 'up' de novo. Se for uma das portas extras, deixe EXPOSE_PORTS=no no lab.conf." ;;
+      es:port_busy_hint)       echo "Libere el puerto (detenga el otro programa o contenedor: 'docker ps' muestra los contenedores, 'lsof -i :<puerto>' los programas) y vuelva a ejecutar 'up'. Si es uno de los puertos extra, deje EXPOSE_PORTS=no en lab.conf." ;;
+      en:port_busy_hint)       echo "Free the port (stop the other program or container: 'docker ps' lists containers, 'lsof -i :<port>' lists programs) and run 'up' again. If it's one of the extra ports, set EXPOSE_PORTS=no in lab.conf." ;;
+
+      pt:beta_warning)         echo "o laboratório vai usar o beta.registro.br, e você vai precisar de acesso à Internet e de um login lá. Para o laboratório autocontido, use MODE=local no lab.conf." ;;
+      es:beta_warning)         echo "el laboratorio va a usar beta.registro.br, y necesitará acceso a Internet y un usuario allí. Para el laboratorio autocontenido, use MODE=local en lab.conf." ;;
+      en:beta_warning)         echo "the lab will use beta.registro.br, which needs Internet access and a login there. For the self-contained lab, set MODE=local in lab.conf." ;;
+
+      pt:clean_objects_ok)     echo "ROAs e objeto ASPA removidos (a CA e a Preparação continuam intactas). Para a linha de base completa, rode também step1-clean." ;;
+      es:clean_objects_ok)     echo "ROAs y objeto ASPA eliminados (la CA y la Preparación siguen intactas). Para la base completa, ejecute también step1-clean." ;;
+      en:clean_objects_ok)     echo "ROAs and the ASPA object removed (the CA and Preparation are untouched). For the full baseline, also run step1-clean." ;;
+
+      pt:doc_title)            echo "Conferindo o ambiente do laboratório..." ;;
+      es:doc_title)            echo "Revisando el entorno del laboratorio..." ;;
+      en:doc_title)            echo "Checking the lab's environment..." ;;
+
+      pt:doc_no_docker)        echo "o comando 'docker' não foi encontrado. Instale o Docker (veja a seção 'Antes de começar' do README)." ;;
+      es:doc_no_docker)        echo "no se encontró el comando 'docker'. Instale Docker (vea la sección 'Antes de empezar' del README)." ;;
+      en:doc_no_docker)        echo "the 'docker' command wasn't found. Install Docker (see the README's 'Before you start' section)." ;;
+
+      pt:doc_no_daemon)        echo "o Docker está instalado, mas não está rodando (ou você não tem permissão: no Linux, entre no grupo 'docker'). Abra o Docker Desktop/OrbStack, ou rode 'sudo systemctl start docker'." ;;
+      es:doc_no_daemon)        echo "Docker está instalado pero no está corriendo (o no tiene permiso: en Linux, únase al grupo 'docker'). Abra Docker Desktop/OrbStack, o ejecute 'sudo systemctl start docker'." ;;
+      en:doc_no_daemon)        echo "Docker is installed but not running (or you lack permission: on Linux, join the 'docker' group). Start Docker Desktop/OrbStack, or run 'sudo systemctl start docker'." ;;
+
+      pt:doc_no_compose)       echo "falta o Docker Compose v2 ('docker compose'). No Linux, instale o pacote docker-compose-plugin." ;;
+      es:doc_no_compose)       echo "falta Docker Compose v2 ('docker compose'). En Linux, instale el paquete docker-compose-plugin." ;;
+      en:doc_no_compose)       echo "Docker Compose v2 ('docker compose') is missing. On Linux, install the docker-compose-plugin package." ;;
+
+      pt:doc_mem)              echo "memória disponível para o Docker:" ;;
+      es:doc_mem)              echo "memoria disponible para Docker:" ;;
+      en:doc_mem)              echo "memory available to Docker:" ;;
+
+      pt:doc_low_mem)          echo "o Docker tem menos de 2 GB de memória; o laboratório pode ficar lento ou instável (aumente em Settings > Resources)" ;;
+      es:doc_low_mem)          echo "Docker tiene menos de 2 GB de memoria; el laboratorio puede volverse lento o inestable (auméntela en Settings > Resources)" ;;
+      en:doc_low_mem)          echo "Docker has less than 2 GB of memory; the lab may be slow or unstable (raise it under Settings > Resources)" ;;
+
+      pt:doc_low_disk)         echo "menos de 4 GB livres em disco; a primeira construção das imagens pode falhar" ;;
+      es:doc_low_disk)         echo "menos de 4 GB libres en disco; la primera construcción de las imágenes puede fallar" ;;
+      en:doc_low_disk)         echo "less than 4 GB of free disk; the first image build may fail" ;;
+
+      pt:doc_bad_mode)         echo "valor inválido no lab.conf (use local ou beta)" ;;
+      es:doc_bad_mode)         echo "valor inválido en lab.conf (use local o beta)" ;;
+      en:doc_bad_mode)         echo "invalid value in lab.conf (use local or beta)" ;;
+
+      pt:doc_port_lab)         echo "porta em uso pelo próprio laboratório:" ;;
+      es:doc_port_lab)         echo "puerto en uso por el propio laboratorio:" ;;
+      en:doc_port_lab)         echo "port in use by the lab itself:" ;;
+
+      pt:doc_port_free)        echo "porta livre:" ;;
+      es:doc_port_free)        echo "puerto libre:" ;;
+      en:doc_port_free)        echo "port free:" ;;
+
+      pt:doc_not_running)      echo "o laboratório não está rodando. Suba-o com './scripts/lab.sh up'." ;;
+      es:doc_not_running)      echo "el laboratorio no está corriendo. Levántelo con './scripts/lab.sh up'." ;;
+      en:doc_not_running)      echo "the lab isn't running. Bring it up with './scripts/lab.sh up'." ;;
+
+      pt:doc_some_down)        echo "alguns contêineres não estão rodando (veja abaixo; './scripts/lab.sh logs <serviço>' mostra o motivo)" ;;
+      es:doc_some_down)        echo "algunos contenedores no están corriendo (vea abajo; './scripts/lab.sh logs <servicio>' muestra el motivo)" ;;
+      en:doc_some_down)        echo "some containers aren't running (see below; './scripts/lab.sh logs <service>' shows why)" ;;
+
+      pt:doc_all_up)           echo "todos os contêineres rodando" ;;
+      es:doc_all_up)           echo "todos los contenedores corriendo" ;;
+      en:doc_all_up)           echo "all containers running" ;;
+
+      pt:doc_panel_ok)         echo "painel respondendo em" ;;
+      es:doc_panel_ok)         echo "panel respondiendo en" ;;
+      en:doc_panel_ok)         echo "panel answering at" ;;
+
+      pt:doc_panel_bad)        echo "o painel não responde em" ;;
+      es:doc_panel_bad)        echo "el panel no responde en" ;;
+      en:doc_panel_bad)        echo "the panel doesn't answer at" ;;
+
+      pt:doc_vhost_bad)        echo "krill.localhost não respondeu deste terminal. Os navegadores resolvem *.localhost sozinhos; se o navegador também falhar, abra o painel em http://localhost:8080 e use os botões dele." ;;
+      es:doc_vhost_bad)        echo "krill.localhost no respondió desde esta terminal. Los navegadores resuelven *.localhost solos; si el navegador también falla, abra el panel en http://localhost:8080 y use sus botones." ;;
+      en:doc_vhost_bad)        echo "krill.localhost didn't answer from this terminal. Browsers resolve *.localhost on their own; if the browser fails too, open the panel at http://localhost:8080 and use its buttons." ;;
+
+      pt:doc_prep_ok)          echo "Preparação concluída: a CA tem pai, recursos e repositório" ;;
+      es:doc_prep_ok)          echo "Preparación terminada: la CA tiene padre, recursos y repositorio" ;;
+      en:doc_prep_ok)          echo "Preparation done: the CA has a parent, resources and a repository" ;;
+
+      pt:doc_prep_missing)     echo "a Preparação ainda não terminou (CA, pai, recursos ou repositório). Siga a Preparação 2 do roteiro." ;;
+      es:doc_prep_missing)     echo "la Preparación todavía no terminó (CA, padre, recursos o repositorio). Siga la Preparación 2 de la guía." ;;
+      en:doc_prep_missing)     echo "Preparation isn't finished yet (CA, parent, resources or repository). Follow the guide's Preparation 2." ;;
+
       # -- scripts/validate.sh ----------------------------------------------
       pt:t_objects)         echo "Objetos validados pelo Routinator" ;;
       es:t_objects)         echo "Objetos validados por el Routinator" ;;
@@ -177,8 +270,10 @@ uso: ./scripts/lab.sh <comando>
   logs [svc]  sigue los logs
   panel       abre el panel del laboratorio en el navegador
   registry    abre el panel del registro (RIR local, o beta.registro.br)
+  doctor      revisa Docker, puertos, contenedores y la Preparación, y dice qué hacer
 
   refresh     fuerza al Routinator y a FORT a revalidar ahora
+  clean-objects borra las ROAs y el ASPA de la CA (sin rehacer la Preparación)
 
   la historia de la guía - AS666 (secuestrador) y peer (con fuga) - pasos 1 a 9:
   step1-clean          AS666 y peer callados; observers sin validación alguna
@@ -195,7 +290,7 @@ uso: ./scripts/lab.sh <comando>
   ./scripts/validate.sh               resumen del estado, en texto
   ./scripts/generate-config.sh        regenera los vars.conf a partir de lab.conf
 
-Los parámetros del laboratorio (ASN y prefijos) están en lab.conf.
+Los parámetros del laboratorio (ASN, prefijos, MODE, EXPOSE_PORTS) están en lab.conf.
 El idioma de esta salida y de los paneles se define con LANGUAGE en lab.conf.
 HELP
         ;;
@@ -210,8 +305,10 @@ usage: ./scripts/lab.sh <command>
   logs [svc]  follows the logs
   panel       opens the lab's panel in the browser
   registry    opens the registry panel (local RIR, or beta.registro.br)
+  doctor      checks Docker, ports, containers and Preparation, and says what to do
 
   refresh     forces Routinator and FORT to revalidate now
+  clean-objects removes the CA's ROAs and ASPA (without redoing Preparation)
 
   the guide's story - AS666 (hijacker) and peer (leaky) - steps 1 to 9:
   step1-clean          AS666 and peer silent; observers with no validation at all
@@ -228,7 +325,7 @@ usage: ./scripts/lab.sh <command>
   ./scripts/validate.sh               text summary of the lab's state
   ./scripts/generate-config.sh        regenerates the vars.conf files from lab.conf
 
-The lab's parameters (ASN and prefixes) live in lab.conf.
+The lab's parameters (ASN, prefixes, MODE, EXPOSE_PORTS) live in lab.conf.
 The language of this output and of the panels is set with LANGUAGE in lab.conf.
 HELP
         ;;
@@ -243,8 +340,10 @@ uso: ./scripts/lab.sh <comando>
   logs [svc]  acompanha os logs
   panel       abre o painel do laboratório no navegador
   registry    abre o painel do registro (RIR local, ou o beta.registro.br)
+  doctor      confere Docker, portas, contêineres e a Preparação, e diz o que fazer
 
   refresh     força o Routinator e o FORT a revalidarem agora
+  clean-objects apaga as ROAs e o ASPA da CA (sem refazer a Preparação)
 
   a história do roteiro - AS666 (sequestrador) e peer (vazando) - passos 1 a 9:
   step1-clean          AS666 e peer calados; observadores sem validação nenhuma
@@ -261,7 +360,7 @@ uso: ./scripts/lab.sh <comando>
   ./scripts/validate.sh               resumo do estado, em texto
   ./scripts/generate-config.sh        regera os vars.conf a partir do lab.conf
 
-Os parâmetros do laboratório (ASN e prefixos) ficam em lab.conf.
+Os parâmetros do laboratório (ASN, prefixos, MODE, EXPOSE_PORTS) ficam em lab.conf.
 O idioma desta saída e dos painéis é definido por LANGUAGE no lab.conf.
 HELP
         ;;

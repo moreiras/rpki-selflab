@@ -66,3 +66,9 @@ for tpl in guide/templates/GUIDE.*.md; do
         exit 1
     fi
 done
+
+# The three templates must keep the same structure (see the script); a
+# mismatch is reported but doesn't stop the lab from coming up.
+if ! ./scripts/check-guide-parity.sh >/dev/null 2>&1; then
+    echo "generate-config.sh: warning: the guide's translations have drifted apart; run ./scripts/check-guide-parity.sh for details" >&2
+fi
