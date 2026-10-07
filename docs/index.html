@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RPKI SelfLab: a hands-on lab for ROA, ROV and ASPA</title>
-<meta name="description" content="A self-contained RPKI lab that runs on your own computer: real BGP routers, two validators, a CA and a simulated registry, with a guided story about hijacks, forged paths and route leaks.">
+<meta name="description" content="A self-contained RPKI lab that runs on your own computer: real BGP routers, three validators, a CA and a simulated registry, with a guided story about hijacks, forged paths and route leaks.">
 <link rel="alternate" hreflang="en" href="./">
 <link rel="alternate" hreflang="pt-BR" href="pt/">
 <link rel="alternate" hreflang="es" href="es/">
@@ -34,14 +34,14 @@
   <div class="wrap">
     <div class="kicker">Open source · Docker or VM · English, Español, Português</div>
     <h1>A hands-on lab for ROA, ROV and ASPA, running on your own computer</h1>
-    <p class="lead">Real BGP routers, two RPKI validators, a CA and a simulated registry, all in containers. A guided story shows what origin validation catches, what slips past it, and what ASPA adds.</p>
+    <p class="lead">Real BGP routers, three RPKI validators, a CA and a simulated registry, all in containers. A guided story shows what origin validation catches, what slips past it, and what ASPA adds.</p>
     <div class="buttons">
       <a class="btn primary" href="#start">Get started</a>
       <a class="btn" href="https://github.com/moreiras/rpki-selflab">Source on GitHub</a>
       <a class="btn" href="https://github.com/moreiras/rpki-selflab/releases/latest">Ready-made VM</a>
     </div>
     <figure class="hero-shot shot">
-      <a href="img/en/panel.webp"><img src="img/en/panel.webp" alt="The lab's web panel: the guide on the left, the live topology in the middle, the verdicts of both observers below" width="1400" height="788"></a>
+      <a href="img/en/panel.webp"><img src="img/en/panel.webp" alt="The lab's web panel: the guide on the left, the live topology in the middle, the observers' verdicts below, one tab per observer" width="1400" height="788"></a>
     </figure>
   </div>
 </section>
@@ -49,20 +49,20 @@
 <section class="block" id="inside">
   <div class="wrap">
     <h2>What's inside</h2>
-    <p class="intro">Everything is real software, not a simulation. Two observers receive the same announcements and RPKI objects, each with a different router and validator, so you can compare two implementations at every step.</p>
+    <p class="intro">Everything is real software, not a simulation. Three observers receive the same announcements and RPKI objects, each pairing a router with a validator in its own way, so you can compare three implementations at every step.</p>
     <div class="grid2">
       <div>
         <ul class="ticks">
-          <li><b>BIRD</b> and <b>OpenBGPD</b> routers: the origin, two providers, two validating observers, an attacker and a peer.</li>
-          <li><b>Routinator</b> and <b>FORT</b> validators, feeding the observers over RTR version 2, which carries ASPA.</li>
+          <li><b>BIRD</b> and <b>OpenBGPD</b> routers: the origin, two providers, three validating observers, an attacker and a peer.</li>
+          <li><b>Routinator</b> and <b>FORT</b> validators, feeding their observers over RTR version 2, which carries ASPA, and <b>rpki-client</b>, which runs on observer2's own host and hands OpenBGPD a file to include, the way OpenBSD does it.</li>
           <li><b>Krill</b> as the holder's CA, where the ROAs and the ASPA object are created.</li>
-          <li>A <b>simulated registry</b> (RIR/NIR) with its own trust anchor and repository. CA delegation and publication use the same XML exchanges as a real registry (RFC 8183, 6492 and 8181).</li>
+          <li>A <b>simulated registry</b> (RIR/NIR) with its own trust anchor and repository. CA delegation and publication use the same XML exchanges as a real registry (RFC 8183, 6492 and 8181). The lab teaches the <b>delegated</b> model: you run your own CA, the registry certifies it, and, as RIRs and NIRs often do, it also offers the repository to publish in.</li>
           <li>A <b>web panel</b> with the live topology, the guide, the routers' terminals and the web interfaces, in tabs.</li>
           <li>Runs on Linux, macOS and Windows (WSL 2) with Docker, or as a ready-made virtual machine. <b>No Internet needed</b> once installed.</li>
         </ul>
       </div>
       <figure class="shot" style="padding:10px">
-        <a href="img/topology.en.svg"><img src="img/topology.en.svg" alt="The lab's topology: the registry and the two validators at the top, the observers below them, the two providers, AS666 and, at the bottom, the origin, its CA and the peer" width="1000" height="730"></a>
+        <a href="img/topology.en.svg"><img src="img/topology.en.svg" alt="The lab's topology: the registry at the top; Routinator and FORT above observer1 and observer3; observer2, which validates on its own host, between them; the two providers and AS666; and, at the bottom, the origin, its CA and the peer" width="1000" height="730"></a>
       </figure>
     </div>
   </div>
@@ -71,13 +71,13 @@
 <section class="block" id="story">
   <div class="wrap">
     <h2>The story, in nine steps</h2>
-    <p class="intro">The guide is one story: three attacks, and which check stops each one. AS64500 is multihomed and prefers Provider B; it prepends twice towards Provider A, its backup. Two observers receive its prefix over both providers. The screenshots below are the panel at each step.</p>
+    <p class="intro">The guide is one story: three attacks, and which check stops each one. AS64500 is multihomed and prefers Provider B; it prepends twice towards Provider A, its backup. Three observers receive its prefix over both providers. The screenshots below are the panel at each step.</p>
 
     <article class="step">
       <div>
         <div class="num">Step 1</div>
         <h3>A clean baseline</h3>
-        <p>Both observers receive <code>203.0.113.0/24</code> over both providers and pick Provider B's shorter path. Nobody validates anything yet: the RPKI pieces exist, but no router talks to a validator.</p>
+        <p>All three observers receive <code>203.0.113.0/24</code> over both providers and pick Provider B's shorter path. Nobody validates anything yet: the RPKI pieces exist, but no router talks to a validator.</p>
       </div>
       <figure class="shot"><a href="img/en/step1.webp"><img src="img/en/step1.webp" alt="Step 1: topology and verdicts, no validation" loading="lazy"></a></figure>
     </article>
@@ -86,10 +86,10 @@
       <div>
         <div class="num">Step 2</div>
         <h3>The naive hijack wins</h3>
-        <p>AS666 announces the origin's prefix as its own. Its path, <code>666</code>, is one hop long against two and four, and nothing else tells the routes apart. The attacker's links turn orange: both observers are using its route.</p>
+        <p>AS666 announces the origin's prefix as its own. Its path, <code>666</code>, is one hop long against two and four, and nothing else tells the routes apart. The attacker's links turn orange: the observers are using its route.</p>
         <p class="lesson">Without validation, BGP has no way to tell a hijack from the real thing.</p>
       </div>
-      <figure class="shot"><a href="img/en/step2.webp"><img src="img/en/step2.webp" alt="Step 2: the hijack is the best route on both observers" loading="lazy"></a></figure>
+      <figure class="shot"><a href="img/en/step2.webp"><img src="img/en/step2.webp" alt="Step 2: the hijack is the best route on the observers" loading="lazy"></a></figure>
     </article>
 
     <article class="step">
@@ -182,7 +182,7 @@
       <div class="card"><h3>Checkpoints</h3><p>They tick themselves as your lab reaches each step, and any step command puts the lab back on track.</p></div>
       <div class="card"><h3>The preparation too</h3><p>Create the CA in Krill and play both sides of the delegation with the simulated registry.</p></div>
       <div class="card"><h3>Your own configs</h3><p>A <code>work/</code> folder to write your own ROV and ASPA configuration and load it on the routers.</p></div>
-      <div class="card"><h3>Extra exercises</h3><p>Upstream vs downstream (and where BIRD and OpenBGPD disagree), maxLength, and a look inside RTR.</p></div>
+      <div class="card"><h3>Extra exercises</h3><p>Upstream vs downstream (and where BIRD and OpenBGPD disagree), maxLength, a look inside RTR, and rpki-client served over RTR.</p></div>
     </div>
     <div class="grid2" style="margin-top:26px">
       <figure class="shot"><a href="img/en/challenge.webp"><img src="img/en/challenge.webp" alt="A challenge in the guide, with hints, timer and Check my lab" loading="lazy"></a></figure>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RPKI SelfLab: laboratorio práctico de ROA, ROV y ASPA</title>
-<meta name="description" content="Un laboratorio de RPKI autocontenido que corre en su computadora: routers BGP reales, dos validadores, una CA y un registro simulado, con una historia guiada sobre secuestros, caminos falsificados y fugas de ruta.">
+<meta name="description" content="Un laboratorio de RPKI autocontenido que corre en su computadora: routers BGP reales, tres validadores, una CA y un registro simulado, con una historia guiada sobre secuestros, caminos falsificados y fugas de ruta.">
 <link rel="alternate" hreflang="en" href="../">
 <link rel="alternate" hreflang="pt-BR" href="../pt/">
 <link rel="alternate" hreflang="es" href="./">
@@ -34,14 +34,14 @@
   <div class="wrap">
     <div class="kicker">Código abierto · Docker o VM · English, Español, Português</div>
     <h1>Un laboratorio práctico de ROA, ROV y ASPA, que corre en su computadora</h1>
-    <p class="lead">Routers BGP reales, dos validadores RPKI, una CA y un registro simulado, todo en contenedores. Una historia guiada muestra qué detecta la validación de origen, qué se le escapa y qué agrega el ASPA.</p>
+    <p class="lead">Routers BGP reales, tres validadores RPKI, una CA y un registro simulado, todo en contenedores. Una historia guiada muestra qué detecta la validación de origen, qué se le escapa y qué agrega el ASPA.</p>
     <div class="buttons">
       <a class="btn primary" href="#start">Cómo empezar</a>
       <a class="btn" href="https://github.com/moreiras/rpki-selflab">Código en GitHub</a>
       <a class="btn" href="https://github.com/moreiras/rpki-selflab/releases/latest">Máquina virtual lista</a>
     </div>
     <figure class="hero-shot shot">
-      <a href="../img/es/panel.webp"><img src="../img/es/panel.webp" alt="El panel web del laboratorio: la guía a la izquierda, la topología en vivo en el medio, los veredictos de los dos observadores abajo" width="1400" height="788"></a>
+      <a href="../img/es/panel.webp"><img src="../img/es/panel.webp" alt="El panel web del laboratorio: la guía a la izquierda, la topología en vivo en el medio, los veredictos de los observadores abajo, una pestaña por observador" width="1400" height="788"></a>
     </figure>
   </div>
 </section>
@@ -49,20 +49,20 @@
 <section class="block" id="inside">
   <div class="wrap">
     <h2>Qué tiene adentro</h2>
-    <p class="intro">Todo es software real, no una simulación. Dos observadores reciben los mismos anuncios y objetos RPKI, cada uno con un router y un validador distintos, así que se pueden comparar dos implementaciones en cada paso.</p>
+    <p class="intro">Todo es software real, no una simulación. Tres observadores reciben los mismos anuncios y objetos RPKI, cada uno combinando un router y un validador a su manera, así que se pueden comparar tres implementaciones en cada paso.</p>
     <div class="grid2">
       <div>
         <ul class="ticks">
-          <li>Routers <b>BIRD</b> y <b>OpenBGPD</b>: el origen, dos proveedores, dos observadores que validan, un atacante y un peer.</li>
-          <li>Validadores <b>Routinator</b> y <b>FORT</b>, que alimentan a los observadores por RTR versión 2, la que transporta el ASPA.</li>
+          <li>Routers <b>BIRD</b> y <b>OpenBGPD</b>: el origen, dos proveedores, tres observadores que validan, un atacante y un peer.</li>
+          <li>Validadores <b>Routinator</b> y <b>FORT</b>, que alimentan a sus observadores por RTR versión 2, la que transporta el ASPA, y <b>rpki-client</b>, que corre en el propio host de observer2 y le entrega a OpenBGPD un archivo para incluir, a la manera de OpenBSD.</li>
           <li><b>Krill</b> como CA del titular, donde se crean las ROAs y el objeto ASPA.</li>
-          <li>Un <b>registro simulado</b> (RIR/NIR), con ancla de confianza y repositorio propios. La delegación de la CA y la publicación usan los mismos intercambios de XML que un registro real (RFC 8183, 6492 y 8181).</li>
+          <li>Un <b>registro simulado</b> (RIR/NIR), con ancla de confianza y repositorio propios. La delegación de la CA y la publicación usan los mismos intercambios de XML que un registro real (RFC 8183, 6492 y 8181). El laboratorio enseña el modelo <b>delegado</b>: usted corre su propia CA, el registro la certifica y, como muchas veces hacen los RIR y NIR, también ofrece el repositorio donde publicar.</li>
           <li>Un <b>panel web</b> con la topología en vivo, la guía, las terminales de los routers y las interfaces web, en pestañas.</li>
           <li>Corre en Linux, macOS y Windows (WSL 2) con Docker, o como máquina virtual lista. <b>No necesita Internet</b> una vez instalado.</li>
         </ul>
       </div>
       <figure class="shot" style="padding:10px">
-        <a href="../img/topology.es.svg"><img src="../img/topology.es.svg" alt="La topología del laboratorio: el registro y los dos validadores arriba, los observadores debajo, los dos proveedores, el AS666 y, abajo, el origen, su CA y el peer" width="1000" height="730"></a>
+        <a href="../img/topology.es.svg"><img src="../img/topology.es.svg" alt="La topología del laboratorio: el registro arriba; Routinator y FORT por encima de observer1 y observer3; entre ellos, observer2, que valida en su propio host; los dos proveedores y el AS666; y, abajo, el origen, su CA y el peer" width="1000" height="730"></a>
       </figure>
     </div>
   </div>
@@ -71,13 +71,13 @@
 <section class="block" id="story">
   <div class="wrap">
     <h2>La historia, en nueve pasos</h2>
-    <p class="intro">La guía es una sola historia: tres ataques, y qué verificación detiene a cada uno. El AS64500 es multihomed y prefiere al Proveedor B; hacia el Proveedor A, su respaldo, antepone su ASN dos veces. Dos observadores reciben su prefijo por los dos proveedores. Las capturas de abajo son el panel en cada paso.</p>
+    <p class="intro">La guía es una sola historia: tres ataques, y qué verificación detiene a cada uno. El AS64500 es multihomed y prefiere al Proveedor B; hacia el Proveedor A, su respaldo, antepone su ASN dos veces. Tres observadores reciben su prefijo por los dos proveedores. Las capturas de abajo son el panel en cada paso.</p>
 
     <article class="step">
       <div>
         <div class="num">Paso 1</div>
         <h3>Una base limpia</h3>
-        <p>Los dos observadores reciben <code>203.0.113.0/24</code> por los dos proveedores y eligen el camino más corto, por el Proveedor B. Nadie valida nada todavía: las piezas de RPKI existen, pero ningún router habla con un validador.</p>
+        <p>Los tres observadores reciben <code>203.0.113.0/24</code> por los dos proveedores y eligen el camino más corto, por el Proveedor B. Nadie valida nada todavía: las piezas de RPKI existen, pero ningún router habla con un validador.</p>
       </div>
       <figure class="shot"><a href="../img/es/step1.webp"><img src="../img/es/step1.webp" alt="Paso 1: topología y veredictos, sin validación" loading="lazy"></a></figure>
     </article>
@@ -86,10 +86,10 @@
       <div>
         <div class="num">Paso 2</div>
         <h3>El secuestro ingenuo gana</h3>
-        <p>El AS666 anuncia el prefijo del origen como propio. Su camino, <code>666</code>, tiene un salto contra dos y cuatro, y nada más distingue las rutas. Los enlaces del atacante se ponen naranjas: los dos observadores están usando su ruta.</p>
+        <p>El AS666 anuncia el prefijo del origen como propio. Su camino, <code>666</code>, tiene un salto contra dos y cuatro, y nada más distingue las rutas. Los enlaces del atacante se ponen naranjas: los observadores están usando su ruta.</p>
         <p class="lesson">Sin validación, BGP no tiene forma de distinguir un secuestro de la ruta verdadera.</p>
       </div>
-      <figure class="shot"><a href="../img/es/step2.webp"><img src="../img/es/step2.webp" alt="Paso 2: el secuestro es la mejor ruta en los dos observadores" loading="lazy"></a></figure>
+      <figure class="shot"><a href="../img/es/step2.webp"><img src="../img/es/step2.webp" alt="Paso 2: el secuestro es la mejor ruta en los observadores" loading="lazy"></a></figure>
     </article>
 
     <article class="step">
@@ -182,7 +182,7 @@
       <div class="card"><h3>Puntos de control</h3><p>Se marcan solos cuando el lab llega a cada paso, y cualquier comando de paso vuelve a encaminar el lab.</p></div>
       <div class="card"><h3>La preparación también</h3><p>Cree la CA en Krill y haga los dos lados de la delegación con el registro simulado.</p></div>
       <div class="card"><h3>Sus propias configuraciones</h3><p>Una carpeta <code>work/</code> para escribir su propia configuración de ROV y ASPA y cargarla en los routers.</p></div>
-      <div class="card"><h3>Ejercicios extra</h3><p>Upstream frente a downstream (y dónde BIRD y OpenBGPD no coinciden), maxLength y una mirada por dentro de RTR.</p></div>
+      <div class="card"><h3>Ejercicios extra</h3><p>Upstream frente a downstream (y dónde BIRD y OpenBGPD no coinciden), maxLength, una mirada por dentro de RTR y rpki-client servido por RTR.</p></div>
     </div>
     <div class="grid2" style="margin-top:26px">
       <figure class="shot"><a href="../img/es/challenge.webp"><img src="../img/es/challenge.webp" alt="Un desafío de la guía, con pistas, cronómetro y Verificar mi laboratorio" loading="lazy"></a></figure>
