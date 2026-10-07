@@ -9,9 +9,9 @@ https://moreiras.github.io/rpki-selflab/es/**
 
 Laboratorio de RPKI (ROA, ROV y ASPA) en contenedores, para correr en cualquier
 computadora con Docker (Mac, Windows o Linux, probado con OrbStack y Docker
-Desktop). Publica ROAs y un objeto ASPA, y después muestra qué hacen **dos
-validadores distintos y dos routers distintos** con exactamente los mismos
-objetos, mientras un secuestrador (AS666) y un peer que filtra rutas intentan
+Desktop). Publica ROAs y un objeto ASPA, y después muestra qué hacen **tres
+validadores distintos, combinados con dos routers distintos,** con exactamente
+los mismos objetos, mientras un secuestrador (AS666) y un peer que filtra rutas intentan
 meterse en el medio. La guía del laboratorio cuenta una sola historia: tres
 ataques, y qué verificación detiene a cada uno.
 
@@ -70,6 +70,13 @@ En modo local el laboratorio es **autocontenido**: tiene su propia ancla de
 confianza, su propio repositorio, y un panel de registro donde ocurren la
 delegación de la CA y la autorización de publicación, con los mismos
 intercambios de XML de las RFC 6492 y 8183.
+
+Los dos modos usan el modelo **delegado** de RPKI: usted corre su propia CA
+(Krill), el registro la certifica, y los objetos se publican en el
+repositorio del registro, un servicio de publicación que los RIR y NIR
+muchas veces ofrecen a las CA delegadas. El modelo hospedado, en el que el
+registro opera la CA por usted, no está cubierto; las ROAs, el ROV y el ASPA
+funcionan igual en los dos.
 
 El modo `beta` se creó solo para algunos cursos de NIC.br. El modo `local`,
 en el que el laboratorio es autocontenido, es el valor por defecto y casi
@@ -130,7 +137,7 @@ a Internet. Vea [vm/README.es.md](vm/README.es.md).
 
 ## Topología
 
-![La topología del laboratorio: el registro y los dos validadores arriba, los observadores debajo, los dos proveedores, el AS666 y, abajo, el origen, su CA y el peer](guide/img/topology.es.svg)
+![La topología del laboratorio: el registro arriba; Routinator y FORT por encima de observer1 y observer3; entre ellos, observer2, que valida en su propio host; los dos proveedores y el AS666; y, abajo, el origen, su CA y el peer](guide/img/topology.es.svg)
 
 El AS64500 es multihomed y anuncia `203.0.113.0/24` y `3fff:cafe::/32`. Cada
 observador recibe el mismo prefijo por los dos proveedores. El origen prefiere
@@ -153,34 +160,54 @@ callados hasta que la historia de la guía los pone en marcha:
 | `lab-l-org-b` | 10.200.2.0/24 | fd00:2::/64 | origen ↔ Proveedor B |
 | `lab-l-a-obs1` | 10.200.3.0/24 | fd00:3::/64 | Proveedor A ↔ observer1 |
 | `lab-l-b-obs1` | 10.200.4.0/24 | fd00:4::/64 | Proveedor B ↔ observer1 |
-| `lab-l-a-obs2` | 10.200.5.0/24 | fd00:5::/64 | Proveedor A ↔ observer2 |
-| `lab-l-b-obs2` | 10.200.6.0/24 | fd00:6::/64 | Proveedor B ↔ observer2 |
+| `lab-l-a-obs3` | 10.200.5.0/24 | fd00:5::/64 | Proveedor A ↔ observer3 |
+| `lab-l-b-obs3` | 10.200.6.0/24 | fd00:6::/64 | Proveedor B ↔ observer3 |
 | `lab-l-666-obs1` | 10.200.7.0/24 | fd00:7::/64 | AS666 ↔ observer1 |
-| `lab-l-666-obs2` | 10.200.8.0/24 | fd00:8::/64 | AS666 ↔ observer2 |
+| `lab-l-666-obs3` | 10.200.8.0/24 | fd00:8::/64 | AS666 ↔ observer3 |
+| `lab-l-a-obs2` | 10.200.11.0/24 | fd00:11::/64 | Proveedor A ↔ observer2 |
+| `lab-l-b-obs2` | 10.200.12.0/24 | fd00:12::/64 | Proveedor B ↔ observer2 |
+| `lab-l-666-obs2` | 10.200.13.0/24 | fd00:13::/64 | AS666 ↔ observer2 |
 | `lab-l-peer-org` | 10.200.9.0/24 | fd00:9::/64 | peer ↔ origen (peering privado) |
 | `lab-l-peer-a` | 10.200.10.0/24 | fd00:10::/64 | peer ↔ Proveedor A (tránsito) |
 | `lab-mgmt` | 172.30.0.0/24 | fd00:30::/64 | Krill, validadores, observadores, panel |
 
-## Los dos observadores
+## Los observadores
 
-Los dos observadores reciben los mismos anuncios y objetos RPKI, pero cada uno
-usa un router y un validador distintos:
+Los tres observadores reciben los mismos anuncios y objetos RPKI, pero cada
+uno combina un router y un validador a su manera:
 
-| | observer1 | observer2 |
-|---|---|---|
-| Router | BIRD 3.1.4 | OpenBGPD 8.8 |
-| Validador | Routinator | FORT Validator |
-| ASN | 64510 | 64511 |
-| Cómo se lee el veredicto | large communities puestas por los filtros del laboratorio | atributos nativos `ovs` / `avs` de la ruta |
-| Inspeccionar con | `birdc show route table master4 all` | `bgpctl show rib detail` |
+| | observer1 | observer2 | observer3 |
+|---|---|---|---|
+| Router | BIRD 3.1.4 | OpenBGPD 8.8 | OpenBGPD 8.8 |
+| Validador | Routinator | rpki-client 9.5, en el mismo host | FORT Validator |
+| Cómo recibe los datos el router | RTR | un archivo que incluye (`include`), reescrito por rpki-client | RTR |
+| ASN | 64509 | 64510 | 64511 |
+| Cómo se lee el veredicto | large communities puestas por los filtros del laboratorio | atributos nativos `ovs` / `avs` de la ruta | atributos nativos `ovs` / `avs` de la ruta |
+| Inspeccionar con | `birdc show route table master4 all` | `bgpctl show rib detail` | `bgpctl show rib detail` |
 
 BIRD no tiene un atributo de validación por ruta, así que los archivos
 `bird/observer1-*.conf` graban cada veredicto en una large community:
-`(64510,1,x)` para ROV y `(64510,2,x)` para ASPA. OpenBGPD calcula los dos
-de forma nativa, y `bgpctl -j` los entrega en JSON. Por eso las dos
+`(64509,1,x)` para ROV y `(64509,2,x)` para ASPA. OpenBGPD calcula los dos
+de forma nativa, y `bgpctl -j` los entrega en JSON. Por eso las
 configuraciones se ven tan distintas probando exactamente lo mismo.
 
-### Por qué observer2 usa `role provider`
+### observer2: validador y router en el mismo host
+
+observer2 sigue el modelo de OpenBSD. rpki-client corre dentro del contenedor
+del router, valida el repositorio y escribe `/var/db/rpki-client/openbgpd`
+(un `roa-set` y un `aspa-set`), que `openbgpd/observer2-<stage>.conf`
+incluye. En producción, una tarea de cron, típicamente cada hora, vuelve a
+ejecutar rpki-client y recarga bgpd; aquí `rpki-refresh` lo hace cada
+`RPKI_CLIENT_INTERVAL` segundos (120, en `docker-compose.yml`) y en cada
+comando de paso, y el entrypoint del contenedor lo ejecuta una vez antes de
+que arranque bgpd. No hay sesión RTR, así que no hay versión de protocolo que
+negociar: el `aspa-set` llega con el archivo.
+
+El ejercicio extra E de la guía sirve la misma salida de rpki-client por RTR,
+con RTRTR en el propio observer2 (`rpki-rtr start`), que es como rpki-client
+alimenta a los routers que solo hablan RTR.
+
+### Por qué observer2 y observer3 usan `role provider`
 
 OpenBGPD solo hace verificación ASPA en una sesión que tenga un rol de la RFC
 9234, y **el rol decide qué algoritmo ASPA corre**. Los observadores están por
@@ -195,9 +222,9 @@ veredicto distinto. Es probablemente lo más sorprendente de este laboratorio, y
 no es un bug de ninguna de las dos implementaciones: las dos están leyendo el
 draft correctamente, solo que desde ángulos distintos.
 
-Una consecuencia de esto: cambiar de etapa en observer2 tiene que reiniciarlo,
-porque el rol se negocia al abrir la sesión, y una sesión RTR ya establecida
-conserva la versión que negoció al principio. Tras un `bgpctl reload` a secas,
+Una consecuencia de esto: cambiar de etapa en observer2 y observer3 los
+reinicia, porque el rol se negocia al abrir la sesión, y en observer3 una
+sesión RTR ya establecida conserva la versión que negoció al principio. Tras un `bgpctl reload` a secas,
 todo `avs` vuelve a `unknown`. Los comandos `step*` que cambian de etapa ya
 hacen ese reinicio por usted (el nombre de la etapa queda guardado en
 `/etc/lab-stage` dentro del contenedor, así que un reinicio posterior vuelve
@@ -211,13 +238,13 @@ router real: primero *marcando* lo que una verificación señala (una community 
 una preferencia menor, sin descartar nada todavía), y después *descartándolo*.
 Cada etapa es un archivo de configuración completo por observador:
 
-| Etapa | observer1 (BIRD) | observer2 (OpenBGPD) | Qué hace |
+| Etapa | observer1 (BIRD) | observer2, observer3 (OpenBGPD) | Qué hace |
 |---|---|---|---|
-| `none` | `observer1-none.conf` | `observer2-none.conf` | BGP común, sin validación (como arranca el laboratorio) |
-| `rov-mark` | `observer1-rov-mark.conf` | `observer2-rov-mark.conf` | sesión RTR + ROV, rutas inválidas solo marcadas |
-| `rov-drop` | `observer1-rov-drop.conf` | `observer2-rov-drop.conf` | rutas ROV Invalid rechazadas |
-| `aspa-mark` | `observer1-aspa-mark.conf` | `observer2-aspa-mark.conf` | ROV y verificación ASPA, ambos solo marcando |
-| `aspa-drop` | `observer1-aspa-drop.conf` | `observer2-aspa-drop.conf` | ROV y ASPA Invalid ambos rechazados |
+| `none` | `observer1-none.conf` | `observer2-none.conf`, `observer3-none.conf` | BGP común, sin validación (como arranca el laboratorio) |
+| `rov-mark` | `observer1-rov-mark.conf` | `observer2-rov-mark.conf`, `observer3-rov-mark.conf` | datos validados (RTR o archivo) + ROV, rutas inválidas solo marcadas |
+| `rov-drop` | `observer1-rov-drop.conf` | `observer2-rov-drop.conf`, `observer3-rov-drop.conf` | rutas ROV Invalid rechazadas |
+| `aspa-mark` | `observer1-aspa-mark.conf` | `observer2-aspa-mark.conf`, `observer3-aspa-mark.conf` | ROV y verificación ASPA, ambos solo marcando |
+| `aspa-drop` | `observer1-aspa-drop.conf` | `observer2-aspa-drop.conf`, `observer3-aspa-drop.conf` | ROV y ASPA Invalid ambos rechazados |
 
 Leer un archivo tras otro es justamente el punto: lo que cambia entre dos
 etapas es lo que significa desplegar esa verificación. El indicador de
@@ -236,9 +263,9 @@ terminado antes de tocar nada, y avisa qué falta si todavía no terminó.
 
 | Comando | Qué hace |
 |---|---|
-| `step1-clean` | AS666 y peer en silencio, y los dos observadores de vuelta a BGP común (sin validación) |
+| `step1-clean` | AS666 y peer en silencio, y los tres observadores de vuelta a BGP común (sin validación) |
 | `step2-hijack-simple` | AS666 anuncia los prefijos del origen como propios |
-| `step3-rov-mark` | despliega ROV en los dos observadores, solo marcando |
+| `step3-rov-mark` | despliega ROV en los tres observadores, solo marcando |
 | `step4-hijack-posrov` | AS666 falsifica el camino para que termine en el origen real |
 | `step5-aspa-mark` | despliega también la verificación ASPA, también solo marcando |
 | `step6-add-provider-b` | agrega al Proveedor B al objeto ASPA |
@@ -247,7 +274,8 @@ terminado antes de tocar nada, y avisa qué falta si todavía no terminó.
 | `step9-leak-off` | peer deja de filtrar |
 | `step9-hijack-off` | AS666 vuelve al silencio |
 
-Además de esos: `refresh` (hace que los validadores revaliden ya), `doctor`
+Además de esos: `refresh` (hace que los validadores revaliden ya, rpki-client
+incluido), `doctor`
 (revisa el entorno), `clean-objects` (borra las ROAs y el ASPA de la CA,
 conservando la CA, para recomenzar la historia sin rehacer la preparación),
 `status`, `logs`, `down` y `reset`. El botón **Comandos** del panel los lista a
@@ -269,15 +297,19 @@ bird/
   attacker-posrov.conf      AS666, camino falsificado (AS_PATH: 666 <origen>)
   peer-off.conf             AS64499, solo peering (comportamiento correcto)
   peer-leak.conf            AS64499, también filtra hacia el Proveedor A
-  observer1-<stage>.conf    AS64510, un archivo por etapa de despliegue (none, rov-mark,
+  observer1-<stage>.conf    AS64509, un archivo por etapa de despliegue (none, rov-mark,
                             rov-drop, aspa-mark, aspa-drop)
+  observer1-extra-*.conf    alternativas para los ejercicios extra A y E de la guía
 openbgpd/
   vars.conf                 GENERADO a partir de lab.conf: macros de OpenBGPD
-  observer2-<stage>.conf    AS64511, un archivo por etapa de despliegue
+  observer2-<stage>.conf    AS64510 (rpki-client, por archivo), un archivo por etapa de despliegue
+  observer3-<stage>.conf    AS64511 (FORT, por RTR), un archivo por etapa de despliegue
+  observer*-extra-*.conf    alternativas para los ejercicios extra A y E de la guía
 rir/krill.conf              el Krill de LabNIC en modo testbed (TA + repositorio)
 rir-web/                    el panel del registro (Python puro + HTML)
 images/bird/                Alpine 3.22 + BIRD 3.1.4 (+ vim, nano)
-images/openbgpd/            Alpine 3.22 + OpenBGPD 8.8 (+ vim, nano)
+images/openbgpd/            Alpine 3.22 + OpenBGPD 8.8 (+ vim, nano), para observer3
+images/openbgpd-rpki-client/  Alpine 3.22 + OpenBGPD 8.8 + rpki-client 9.5 + RTRTR, para observer2
 images/krill/               Krill 0.16.0 oficial + vim, nano
 images/routinator/          Routinator 0.15.2 oficial + vim, nano
 images/fort/                FORT Validator, compilado desde el código fuente
@@ -320,17 +352,19 @@ repositorio.
 |---|---|---|---|
 | Krill | `v0.16.0` | `FROM` en `images/krill/Dockerfile` (usado por los servicios `krill` y `rir`) | las capturas y los pasos de la guía asumen la interfaz web de 0.16 (pestañas ROAs y ASPAs) y los nombres de subcomando de `krillc` |
 | Routinator | `v0.15.2` | `FROM` en `images/routinator/Dockerfile` | necesita `--enable-aspa` y RTR v2; versiones viejas ignoran los objetos ASPA en silencio |
-| FORT Validator | `1.7.0.experimental` | `FORT_VERSION` en `images/fort/Dockerfile` | **ASPA y RTR v2 existen solo a partir de esa tag.** La 1.6.x levanta normalmente y sirve ROAs, y todo `avs` de observer2 queda en `unknown` |
+| FORT Validator | `1.7.0.experimental` | `FORT_VERSION` en `images/fort/Dockerfile` | **ASPA y RTR v2 existen solo a partir de esa tag.** La 1.6.x levanta normalmente y sirve ROAs, y todo `avs` de observer3 queda en `unknown` |
 | BIRD | 3.1.4 | indirectamente, por el `FROM alpine:3.22` en `images/bird/Dockerfile` | `aspa_check_upstream()` necesita BIRD ≥ 2.16. Subir Alpine cambia la versión de BIRD como efecto colateral |
-| OpenBGPD | 8.8 | indirectamente, por el `FROM alpine:3.22` en `images/openbgpd/Dockerfile` | necesita 8.x para `aspa-set`, `role` y `rtr { min-version 2 }` |
+| OpenBGPD | 8.8 | indirectamente, por el `FROM alpine:3.22` en `images/openbgpd/Dockerfile` y `images/openbgpd-rpki-client/Dockerfile` | necesita 8.x para `aspa-set`, `role` y `rtr { min-version 2 }` |
+| rpki-client | 9.5 | indirectamente, por el `FROM alpine:3.22` en `images/openbgpd-rpki-client/Dockerfile` | el panel y `doctor` leen su salida JSON y el `aspa-set` de su salida para OpenBGPD |
+| RTRTR | `v0.3.3` | `FROM nlnetlabs/rtrtr` en `images/openbgpd-rpki-client/Dockerfile` | solo se usa en el ejercicio extra E; tiene que transportar ASPA en RTR v2 (StayRTR 0.6.4, el compañero habitual de rpki-client, no lo hace) |
 | nginx | `1.29-alpine` | `docker-compose.yml` (`web`) | solo sirve el panel; riesgo bajo |
 
-Dos de esas fijaciones son **indirectas**, y conviene conocerlas: BIRD y
-OpenBGPD son paquetes de Alpine, así que sus versiones quedan congeladas por
-`alpine:3.22`, no elegidas aquí. Alpine solo hace backport de correcciones de
-seguridad dentro de una rama de release, así que `3.22` sigue entregando BIRD
-3.1.4 y OpenBGPD 8.8. Pero cambiar esa línea a `alpine:3.23` cambia los dos
-routers a la vez, sin avisar.
+Tres de esas fijaciones son **indirectas**, y conviene conocerlas: BIRD,
+OpenBGPD y rpki-client son paquetes de Alpine, así que sus versiones quedan
+congeladas por `alpine:3.22`, no elegidas aquí. Alpine solo hace backport de
+correcciones de seguridad dentro de una rama de release, así que `3.22` sigue
+entregando BIRD 3.1.4, OpenBGPD 8.8 y rpki-client 9.5. Pero cambiar esa línea
+a `alpine:3.23` los cambia a todos a la vez, sin avisar.
 
 FORT se compila desde el fuente (`images/fort/Dockerfile`) en lugar de bajarse
 de `nicmx/fort-validator`, porque la imagen publicada es solo amd64 y el
@@ -340,7 +374,7 @@ que musl no trae.
 
 Para mover una versión fijada: edite el único lugar listado arriba, corra
 `./scripts/lab.sh up` (reconstruye) y después `./scripts/validate.sh` para
-confirmar que los dos observadores siguen produciendo veredictos, y no puros `?`.
+confirmar que los observadores siguen produciendo veredictos, y no puros `?`.
 
 ### La PKI interna (MODE=local)
 
@@ -354,6 +388,7 @@ entrega a quien necesite confiar en ella:
 |---|---|
 | Routinator | `--rrdp-root-cert=/pki/ca.pem` |
 | FORT | instalado en el trust store del sistema por el entrypoint de la imagen |
+| rpki-client (observer2) | instalado en el trust store del sistema por el entrypoint de la imagen |
 | Krill del titular | `KRILL_HTTPS_ROOT_CERTS=/pki/ca.pem` |
 | Panel del registro | contexto SSL de Python |
 
@@ -363,9 +398,10 @@ del sistema resulta menos frágil que mantener ese directorio a mano.
 
 Routinator también corre con `--allow-dubious-hosts`, porque `rir.lab` no es un
 nombre público, y con `--disable-rsync`, ya que el único transporte que se usa
-aquí es RRDP.
+aquí es RRDP. rpki-client no necesita ninguna de las dos: acepta `rir.lab`, y
+solo intenta rsync cuando RRDP falla.
 
-Todas las imágenes (Alpine, Debian, nginx, Krill, Routinator) son
+Todas las imágenes (Alpine, Debian, nginx, Krill, Routinator, RTRTR) son
 multi-arquitectura (amd64/arm64), y FORT y OpenBGPD se compilan o empaquetan de
 forma nativa, así que nada corre bajo emulación, ni en Apple Silicon, ni en
 Intel/AMD, ni en Windows.
@@ -415,7 +451,7 @@ Edítelo y corra `./scripts/lab.sh up`. Eso llama a
 todos los routers. El panel relee `lab.conf` en cada ciclo, y `up` también
 compila la guía desde `guide/templates/` con sus valores.
 
-Los ASN de los proveedores y de los observadores, 64501/64502/64510/64511,
+Los ASN de los proveedores y de los observadores, 64501/64502/64509/64510/64511,
 también están ahí, pero no hace falta tocarlos: son ASN de documentación (RFC
 5398) y funcionan con cualquier ASN de origen. Lo mismo vale para `PEER_ASN`
 (64499), que también cae dentro de ese mismo bloque de documentación. El único
