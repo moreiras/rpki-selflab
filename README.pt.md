@@ -26,7 +26,34 @@ RFC 6492 e 8183.
 
 O guia está em **[guide/GUIDE.en.md](guide/GUIDE.en.md)** (também em
 [espanhol](guide/GUIDE.es.md) e [português](guide/GUIDE.pt.md)). No painel web,
-o mesmo conteúdo aparece renderizado passo a passo, no idioma selecionado ali.
+o mesmo conteúdo aparece passo a passo ao lado da topologia ao vivo, no idioma
+selecionado ali, e cada bloco de comandos diz onde roda, com um botão que abre
+o terminal certo.
+
+**Como usar.** O painel emula um laboratório completo, e seguir o roteiro é o
+caminho recomendado: cada passo prepara o seguinte, e os pontos de controle
+se marcam sozinhos quando o laboratório chega lá. Um modo *Desafio* esconde
+as soluções atrás de dicas e de um cronômetro, para uma segunda passada.
+Depois de terminar, use o laboratório como quiser: a última seção do roteiro
+tem ideias
+em aberto, a pasta `work/` guarda as suas próprias configurações, e qualquer
+comando de passo põe o laboratório de volta nos trilhos.
+
+## Antes de começar: o Docker
+
+Você precisa do Docker com o Compose v2, de um computador de 64 bits (amd64
+ou arm64), de cerca de 2 GB de memória para o Docker e de 4 GB livres em
+disco. Depois de no ar, o laboratório usa por volta de 300 MB de memória.
+
+| Sistema | O que instalar |
+|---|---|
+| Linux | Docker Engine + o plugin do Compose: https://docs.docker.com/engine/install/ (depois https://docs.docker.com/engine/install/linux-postinstall/ para usá-lo sem `sudo`) |
+| macOS | OrbStack (https://docs.orbstack.dev/quick-start, com o qual o laboratório é testado) ou Docker Desktop (https://docs.docker.com/desktop/setup/install/mac-install/) |
+| Windows | WSL 2 (`wsl --install`, https://learn.microsoft.com/windows/wsl/install) mais o Docker Desktop com a integração WSL (https://docs.docker.com/desktop/features/wsl/). Clone e rode o laboratório **dentro** do terminal do Ubuntu, numa pasta do Linux como `~/lab-aspa`, e não em `/mnt/c` |
+
+Confira com `docker version`, `docker compose version` e
+`docker run --rm hello-world`. A *Preparação 1* do roteiro explica tudo isso
+com mais detalhes.
 
 ## Primeiros passos
 
@@ -35,22 +62,31 @@ o mesmo conteúdo aparece renderizado passo a passo, no idioma selecionado ali.
 open http://localhost:8080
 ```
 
+Se algo der errado, `./scripts/lab.sh doctor` confere o Docker, as portas, os
+contêineres e a preparação, e diz o que fazer a respeito de cada problema.
+
 | Serviço | URL | Observação |
 |---|---|---|
 | Painel do laboratório | http://localhost:8080 | topologia clicável |
 | Krill (CA) | http://krill.localhost:8080 | token `labpass` |
 | Routinator | http://routinator.localhost:8080 | validador do observer1 |
-| FORT (RTR) | localhost:3324 | validador do observer2, sem interface web |
 | Console (ttyd) | http://console.localhost:8080 | terminal no navegador |
 | Painel do registro | http://registry.localhost:8080 | só no `MODE=local` |
 | Krill do LabNIC | http://rir-krill.localhost:8080 | só no `MODE=local`, token `labpass` |
 
 Tudo passa por uma porta só, a 8080: o painel fica em `localhost`, e cada um
 dos outros aplicativos web no seu próprio `<nome>.localhost` (os navegadores
-resolvem `*.localhost` para a sua máquina, e o nginx roteia pelo nome). As
-portas próprias dos serviços (3000, 3001, 7681, 8081, 8323) continuam
-publicadas também. Isso ajuda na máquina virtual, onde só a 8080 precisa ser
-encaminhada.
+resolvem `*.localhost` para a sua máquina, e o nginx roteia pelo nome). No
+painel, a barra de **Ferramentas** abre todos eles, e os terminais, dentro do
+próprio painel, em abas. Abra-o em exatamente `localhost`: pelo endereço IP,
+esses nomes não resolvem.
+
+Só a 8080 é publicada no seu computador, então o laboratório não briga com
+outros programas. `EXPOSE_PORTS=yes` no `lab.conf` publica também a porta
+própria de cada serviço (Krill 3000, Krill do LabNIC 3001, Routinator
+3323/8323, FORT 3324, ttyd 7681, registro 8081; veja
+`docker-compose.ports.yml`), para ligar ferramentas de fora direto a um
+serviço.
 
 ## Como máquina virtual
 
@@ -176,8 +212,8 @@ Cada estágio é um arquivo de configuração completo por observador:
 | `aspa-drop` | `observer1-aspa-drop.conf` | `observer2-aspa-drop.conf` | ROV e ASPA Invalid ambos rejeitados |
 
 O ponto é justamente ler um arquivo depois do outro: o que muda entre dois
-estágios é o que significa implantar aquela verificação. O selo no cabeçalho
-do painel mostra o estágio em que os observadores estão.
+estágios é o que significa implantar aquela verificação. O indicador de
+estágio no cabeçalho do painel mostra o estágio em que os observadores estão.
 
 ## Os comandos da história
 
@@ -203,11 +239,18 @@ qualquer coisa, e avisa o que está faltando quando não terminou.
 | `step9-leak-off` | o peer para de vazar |
 | `step9-hijack-off` | o AS666 fica em silêncio |
 
+Além desses: `refresh` (faz os validadores revalidarem agora), `doctor`
+(confere o ambiente), `clean-objects` (apaga as ROAs e o ASPA da CA, mantendo
+a CA, para recomeçar a história sem refazer a preparação), `status`, `logs`,
+`down` e `reset`. A ferramenta **Comandos do laboratório** do painel lista
+todos, com um botão para rodar cada um.
+
 ## Arquivos
 
 ```
-lab.conf                    MODE, LANGUAGE, titular, ASN e prefixos (o que você edita)
+lab.conf                    MODE, LANGUAGE, EXPOSE_PORTS, titular, ASN e prefixos (o que você edita)
 docker-compose.yml          topologia, redes e as versões fixadas das imagens
+docker-compose.ports.yml    opcional: as portas próprias dos serviços no host (EXPOSE_PORTS=yes)
 bird/
   vars.conf                 GERADO a partir do lab.conf: os "define" do BIRD
   origin.conf               AS64500, origina os prefixos
@@ -225,23 +268,33 @@ openbgpd/
   observer2-<stage>.conf    AS64511, um arquivo por estágio de implantação
 rir/krill.conf              o Krill do LabNIC em modo testbed (TA + repositório)
 rir-web/                    o painel do registro (Python puro + HTML)
-images/bird/                Alpine 3.22 + BIRD 3.1.4
-images/openbgpd/            Alpine 3.22 + OpenBGPD 8.8
+images/bird/                Alpine 3.22 + BIRD 3.1.4 (+ vim, nano)
+images/openbgpd/            Alpine 3.22 + OpenBGPD 8.8 (+ vim, nano)
+images/krill/               Krill 0.16.0 oficial + vim, nano
+images/routinator/          Routinator 0.15.2 oficial + vim, nano
 images/fort/                FORT Validator, compilado do fonte
-images/console/             ttyd (terminal no navegador) + coletor de estado
+images/console/             ttyd (terminais no navegador) + coletor de estado
 images/utils/               gera a PKI interna e instala o TAL
 dashboard/
-  index.html                o painel
+  index.html                a página do painel
+  app.js, app.css           topologia, painel lateral, dock (terminais/apps web em abas), eventos
+  guide.js                  o renderizador do roteiro: blocos de comando, desafios, previsões, pontos de controle
+  checks.js                 como o estado do laboratório deve estar em cada ponto de controle
+  i18n.js, nodes.js         textos da interface e de cada componente (en/es/pt)
   language.js               seletor de idioma (en/es/pt), compartilhado com o rir-web
 guide/
   templates/GUIDE.*.md           as fontes do guia de aula, com marcadores {{NAME}} (edite estes)
   GUIDE.en.md, .es.md, .pt.md    COMPILADOS de templates/ pelo generate-config.sh (não edite)
+  img/                           capturas de tela usadas pelo guia
+  TERMS.md                       termos e regras de tradução
+work/                       os seus próprios arquivos de configuração (graváveis pelo Terminal do laboratório)
 web/nginx.conf              serve o painel e faz proxy do Routinator
 vm/                         a máquina virtual: template do Packer, scripts, releases (veja vm/README.md)
 scripts/
-  lab.sh                    up / down / refresh / reset / step* (os comandos da história)
+  lab.sh                    up / down / refresh / reset / doctor / clean-objects / step* (os comandos da história)
   validate.sh               resumo do estado do laboratório, em texto
   generate-config.sh        lab.conf -> bird/vars.conf + openbgpd/vars.conf + guide/GUIDE.*.md
+  check-guide-parity.sh     confere se as três traduções do guia mantêm a mesma estrutura
   i18n.sh                   catálogo de mensagens (en/es/pt) usado pelos scripts acima
 ```
 
@@ -255,8 +308,8 @@ mudado.
 
 | Componente | Versão | Fixada em | Se você mudar |
 |---|---|---|---|
-| Krill | `v0.16.0` | `docker-compose.yml` (serviços `krill` e `rir`) | no 0.16 o ASPA só existe pela CLI; os passos `krillc aspas` do guia assumem esses nomes de subcomando |
-| Routinator | `v0.15.2` | `docker-compose.yml` (`routinator`) | precisa do `--enable-aspa` e de RTR v2; versões antigas ignoram os objetos ASPA em silêncio |
+| Krill | `v0.16.0` | `FROM` em `images/krill/Dockerfile` (usado pelos serviços `krill` e `rir`) | as capturas de tela e os passos do guia assumem a interface web do 0.16 (abas ROAs e ASPAs) e os nomes de subcomando do `krillc` |
+| Routinator | `v0.15.2` | `FROM` em `images/routinator/Dockerfile` | precisa do `--enable-aspa` e de RTR v2; versões antigas ignoram os objetos ASPA em silêncio |
 | FORT Validator | `1.7.0.experimental` | `FORT_VERSION` em `images/fort/Dockerfile` | **ASPA e RTR v2 só existem a partir desta tag.** A 1.6.x sobe normalmente e serve ROAs, e todo `avs` do observer2 fica `unknown` |
 | BIRD | 3.1.4 | indiretamente, pelo `FROM alpine:3.22` em `images/bird/Dockerfile` | `aspa_check_upstream()` precisa de BIRD ≥ 2.16. Subir o Alpine muda a versão do BIRD como efeito colateral |
 | OpenBGPD | 8.8 | indiretamente, pelo `FROM alpine:3.22` em `images/openbgpd/Dockerfile` | precisa de 8.x para `aspa-set`, `role` e `rtr { min-version 2 }` |
@@ -323,6 +376,13 @@ cruzada com as ferramentas.
 
 Os comentários no código-fonte (scripts, arquivos `*.conf`, Dockerfiles,
 Python) estão todos em inglês, independentemente do idioma do laboratório.
+
+O inglês é a fonte de todas as traduções. Uma mudança no guia começa em
+`guide/templates/GUIDE.en.md` e vai para os templates em espanhol e
+português na mesma mudança; o `scripts/check-guide-parity.sh` (rodado a cada
+`up`) confere se os três continuam com a mesma estrutura, e o
+[guide/TERMS.md](guide/TERMS.md) lista os termos da interface e as palavras a
+evitar em cada idioma.
 
 ## Valores diferentes
 

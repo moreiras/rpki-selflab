@@ -26,8 +26,33 @@ see with a real RIR.
 
 The guide is at **[guide/GUIDE.en.md](guide/GUIDE.en.md)** (also in
 [Spanish](guide/GUIDE.es.md) and [Portuguese](guide/GUIDE.pt.md)). In the web
-panel, the same content shows up rendered step by step, in whichever language
-is selected there.
+panel, the same content shows up step by step next to the live topology, in
+whichever language is selected there, with every command block saying where
+it runs and a button that opens that terminal.
+
+**How to use it.** The panel emulates a complete lab, and following the
+guide is the recommended way in: each step sets up the next, and checkpoints
+tick themselves as your lab gets there. A *Challenge* mode hides the
+solutions behind hints and a timer, for a second pass. Once you're through,
+use the lab freely: the guide's last section has open-ended ideas, the `work/`
+folder holds your own configurations, and any step command puts the lab back
+on track.
+
+## Before you start: Docker
+
+You need Docker with Compose v2, a 64-bit computer (amd64 or arm64), about
+2 GB of memory for Docker and 4 GB of free disk. The lab itself uses around
+300 MB of memory once it's up.
+
+| System | What to install |
+|---|---|
+| Linux | Docker Engine + the Compose plugin: https://docs.docker.com/engine/install/ (then https://docs.docker.com/engine/install/linux-postinstall/ to run it without `sudo`) |
+| macOS | OrbStack (https://docs.orbstack.dev/quick-start, the one the lab is tested with) or Docker Desktop (https://docs.docker.com/desktop/setup/install/mac-install/) |
+| Windows | WSL 2 (`wsl --install`, https://learn.microsoft.com/windows/wsl/install) plus Docker Desktop with WSL integration (https://docs.docker.com/desktop/features/wsl/). Clone and run the lab **inside** the Ubuntu terminal, in a Linux folder such as `~/lab-aspa`, not under `/mnt/c` |
+
+Check it with `docker version`, `docker compose version` and
+`docker run --rm hello-world`. The guide's *Preparation 1* walks through all
+of this in more detail.
 
 ## Getting started
 
@@ -36,21 +61,30 @@ is selected there.
 open http://localhost:8080
 ```
 
+If anything goes wrong, `./scripts/lab.sh doctor` checks Docker, the ports,
+the containers and the preparation, and says what to do about each problem.
+
 | Service | URL | Note |
 |---|---|---|
 | Lab panel | http://localhost:8080 | clickable topology |
 | Krill (CA) | http://krill.localhost:8080 | token `labpass` |
 | Routinator | http://routinator.localhost:8080 | observer1's validator |
-| FORT (RTR) | localhost:3324 | observer2's validator, no web UI |
 | Console (ttyd) | http://console.localhost:8080 | browser terminal |
 | Registry panel | http://registry.localhost:8080 | only in `MODE=local` |
 | LabNIC's Krill | http://rir-krill.localhost:8080 | only in `MODE=local`, token `labpass` |
 
 Everything is reachable through one port, 8080: the panel at `localhost`,
 and each of the other web apps under its own `<name>.localhost` (browsers
-resolve `*.localhost` to your machine, and nginx routes by name). The
-services' own ports (3000, 3001, 7681, 8081, 8323) stay published too, handy
-for the virtual machine, where 8080 is the only port that needs forwarding.
+resolve `*.localhost` to your machine, and nginx routes by name). On the
+panel, the **Tools** bar opens all of them, and the terminals, inside the
+panel itself, in tabs. Open it at exactly `localhost`: by IP address those
+names don't resolve.
+
+Only 8080 is published on your computer, so the lab doesn't collide with
+other software. `EXPOSE_PORTS=yes` in `lab.conf` also publishes each
+service's own port (Krill 3000, LabNIC's Krill 3001, Routinator 3323/8323,
+FORT 3324, ttyd 7681, registry 8081; see `docker-compose.ports.yml`), for
+connecting outside tools straight to a service.
 
 ## As a virtual machine
 
@@ -174,8 +208,8 @@ complete config file per observer:
 | `aspa-drop` | `observer1-aspa-drop.conf` | `observer2-aspa-drop.conf` | ROV and ASPA Invalid both rejected |
 
 Reading one file after another is the point: what changes between two
-stages is what deploying that check means. The panel's header badge shows
-the stage the observers are actually in.
+stages is what deploying that check means. The stage indicator in the panel's
+header shows the stage the observers are actually in.
 
 ## The story's commands
 
@@ -201,11 +235,18 @@ anything, and says what's missing if it didn't.
 | `step9-leak-off` | peer stops leaking |
 | `step9-hijack-off` | AS666 goes silent |
 
+Besides those: `refresh` (make the validators revalidate now), `doctor`
+(check the environment), `clean-objects` (remove the CA's ROAs and ASPA,
+keeping the CA, to restart the story without redoing the preparation),
+`status`, `logs`, `down` and `reset`. The panel's **Lab commands** tool lists
+them all, with a button to run each one.
+
 ## Files
 
 ```
-lab.conf                    MODE, LANGUAGE, holder, ASN and prefixes (what you edit)
+lab.conf                    MODE, LANGUAGE, EXPOSE_PORTS, holder, ASN and prefixes (what you edit)
 docker-compose.yml          topology, networks and the pinned image versions
+docker-compose.ports.yml    optional: the services' own host ports (EXPOSE_PORTS=yes)
 bird/
   vars.conf                 GENERATED from lab.conf: BIRD's "define" statements
   origin.conf               AS64500, originates the prefixes
@@ -223,23 +264,33 @@ openbgpd/
   observer2-<stage>.conf    AS64511, one file per deployment stage
 rir/krill.conf              LabNIC's Krill in testbed mode (TA + repository)
 rir-web/                    the registry panel (stock Python + HTML)
-images/bird/                Alpine 3.22 + BIRD 3.1.4
-images/openbgpd/            Alpine 3.22 + OpenBGPD 8.8
+images/bird/                Alpine 3.22 + BIRD 3.1.4 (+ vim, nano)
+images/openbgpd/            Alpine 3.22 + OpenBGPD 8.8 (+ vim, nano)
+images/krill/               upstream Krill 0.16.0 + vim, nano
+images/routinator/          upstream Routinator 0.15.2 + vim, nano
 images/fort/                FORT Validator, built from source
-images/console/             ttyd (browser terminal) + state collector
+images/console/             ttyd (browser terminals) + state collector
 images/utils/               generates the internal PKI and installs the TAL
 dashboard/
-  index.html                the panel
+  index.html                the panel's page
+  app.js, app.css           topology, side panel, dock (terminals/web apps in tabs), events
+  guide.js                  the guide renderer: command blocks, challenges, predictions, checkpoints
+  checks.js                 what the lab's state should look like at each checkpoint
+  i18n.js, nodes.js         UI strings and per-component texts (en/es/pt)
   language.js               language switcher (en/es/pt), shared with rir-web
 guide/
   templates/GUIDE.*.md           the class guide's sources, with {{NAME}} markers (edit these)
   GUIDE.en.md, .es.md, .pt.md    COMPILED from templates/ by generate-config.sh (don't edit)
+  img/                           screenshots used by the guide
+  TERMS.md                       translation terms and rules
+work/                       your own configuration files (writable from the panel's Lab terminal)
 web/nginx.conf              serves the panel and proxies Routinator
 vm/                         the virtual machine: Packer template, scripts, releases (see vm/README.md)
 scripts/
-  lab.sh                    up / down / refresh / reset / step* (the story's commands)
+  lab.sh                    up / down / refresh / reset / doctor / clean-objects / step* (the story's commands)
   validate.sh               text summary of the lab's state
   generate-config.sh        lab.conf -> bird/vars.conf + openbgpd/vars.conf + guide/GUIDE.*.md
+  check-guide-parity.sh     checks that the three guide translations keep the same structure
   i18n.sh                   message catalog (en/es/pt) used by the scripts above
 ```
 
@@ -252,8 +303,8 @@ panel without a single line of this repo changing.
 
 | Component | Version | Pinned in | If you change it |
 |---|---|---|---|
-| Krill | `v0.16.0` | `docker-compose.yml` (`krill` and `rir` services) | ASPA is CLI-only in 0.16; the guide's `krillc aspas` steps assume these subcommand names |
-| Routinator | `v0.15.2` | `docker-compose.yml` (`routinator`) | needs `--enable-aspa` and RTR v2; older versions silently ignore ASPA objects |
+| Krill | `v0.16.0` | `FROM` in `images/krill/Dockerfile` (used by the `krill` and `rir` services) | the guide's screenshots and steps assume 0.16's web UI (ROAs and ASPAs tabs) and `krillc` subcommand names |
+| Routinator | `v0.15.2` | `FROM` in `images/routinator/Dockerfile` | needs `--enable-aspa` and RTR v2; older versions silently ignore ASPA objects |
 | FORT Validator | `1.7.0.experimental` | `FORT_VERSION` in `images/fort/Dockerfile` | **ASPA and RTR v2 exist only from this tag onwards.** 1.6.x will come up fine and serve ROAs, and every `avs` on observer2 will be `unknown` |
 | BIRD | 3.1.4 | indirectly, via `FROM alpine:3.22` in `images/bird/Dockerfile` | `aspa_check_upstream()` needs BIRD ≥ 2.16. Bumping Alpine changes the BIRD version as a side effect |
 | OpenBGPD | 8.8 | indirectly, via `FROM alpine:3.22` in `images/openbgpd/Dockerfile` | needs 8.x for `aspa-set`, `role` and `rtr { min-version 2 }` |
@@ -319,6 +370,13 @@ cross-checking against the tools.
 
 Source-code comments (scripts, `*.conf` files, Dockerfiles, Python) stay in
 English throughout, regardless of the lab's own language.
+
+English is the source of every translation. A change to the guide starts in
+`guide/templates/GUIDE.en.md` and goes to the Spanish and Portuguese
+templates in the same change; `scripts/check-guide-parity.sh` (run by every
+`up`) checks that the three still have the same structure, and
+[guide/TERMS.md](guide/TERMS.md) lists the interface terms and the words to
+avoid in each language.
 
 ## Different values
 

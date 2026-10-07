@@ -9,29 +9,56 @@ own machine. See what origin validation (ROV) catches, what slips past it,
 and what ASPA adds on top, with every verdict checked twice, by two
 independent stacks (BIRD + Routinator, and OpenBGPD + FORT).
 
-This is a self-contained lab. Everything runs in containers on your own
-machine, and it assumes you already have a basic grasp of RPKI, ROAs, ROV
-and ASPA. You can certify your resources entirely locally, or, if you'd
-rather deal with a real-world registry, against Registro.br's test system.
+Everything runs in containers on your computer. The guide assumes you already
+know the basics of RPKI, ROAs, ROV and ASPA. You can certify your resources
+entirely locally or, if you'd rather work with a real registry, against
+Registro.br's test system.
 
-The lab is one story told in nine steps: **three attacks, and the moment each
-one stops working.** A short preparation comes first (bring the lab up,
-certify your resources); a few extra exercises come after.
+The guide is a single story in nine steps: it sets up **three attacks and shows
+which check stops each one**. A short preparation comes first (install Docker,
+bring the lab up, certify your resources), and a few extra exercises come
+after.
+
+> [!TIP]
+> **How to use this lab.** The panel controls a complete lab: real BGP
+> routers, two real RPKI validators, a real CA and a registry, all running on
+> your computer. **Following this guide step by step is the recommended
+> path**, because each step sets up the next. Once you've finished it, use the
+> lab freely: try your own configurations, break things on purpose, invent
+> scenarios (the last section, *Exploring on your own*, has ideas). If
+> something breaks, the command for the step you're on puts the lab back the
+> way that step expects.
+
+On the panel, the guide is interactive. Expected outputs stay hidden behind
+a button until you've run the command yourself, and some steps are
+**challenges**: the solution stays hidden until you ask for it, a timer runs,
+and *Check my lab* looks at your lab's real state to see whether you got
+there. Anything hidden opens with one click, if you'd rather read straight
+through.
 
 ## What RPKI asks of your own AS, and what this lab deploys
 
-RPKI has two halves, and each half has two parts:
+Deploying RPKI means doing two things, publishing and validating, for each of
+two questions:
 
 | | The origin publishes... | ...and routers validate |
 |---|---|---|
 | **Who may originate a prefix** | **ROAs** (Route Origin Authorizations) | **ROV** (Route Origin Validation) |
 | **Which paths are plausible** | an **ASPA** object (Autonomous System Provider Authorization) | **ASPA verification** |
 
-In real life, **both belong in the AS you operate**: you *publish* objects
-about your own resources, and you *validate* what your neighbors send you.
-Publish without validating and you protect others but not yourself. Validate
-without publishing and you protect yourself but leave your own prefixes
-unprotected for everybody else.
+In real life, **both belong in the AS you operate**, and they protect different
+things. *Publishing* ROAs and an ASPA object protects **your own prefixes**:
+networks that validate will reject a hijack or a leak of your address space, so
+traffic headed to you keeps reaching you. *Validating* protects **the decisions
+your own routers make**: they reject bogus routes towards other people's
+prefixes, so your traffic, and your customers', doesn't get diverted. Neither
+side works alone: your objects protect you only where other networks validate,
+and your validation protects you only for prefixes whose holders published
+objects. Publish without validating, and your prefixes are protected wherever
+others validate, while your own network still accepts hijacked routes to
+everyone else. Validate without publishing, and your network steers clear of
+bogus routes to other people's prefixes, but nobody, not even your own routers,
+can tell a hijack of your prefixes from the real thing.
 
 This lab splits the two up, for teaching purposes:
 
@@ -49,62 +76,92 @@ you run before trusting a check enough to let it reject anything.
 
 ## Glossary
 
-A quick review, not a full introduction: this is what these terms mean *in
-this lab*. Skip ahead if you're already comfortable with them.
+These are the terms the guide uses most. The definitions are short and
+describe how each term is used in this lab; the RFCs under *References* have
+the full details. If you already know them, skip ahead to the topology.
+
+On the panel, these terms are underlined with dots wherever they appear in the
+guide. Hover over one to see its definition.
+
+### Concepts
 
 | Term | Meaning |
 |---|---|
 | **RIR/NIR** | Regional/National Internet Registry: allocates ASNs and IP blocks and, in RPKI, certifies that you hold them |
 | **CA** | Certificate Authority: the RPKI engine that turns "these resources are yours" into signed certificates and objects |
-| **TA** | Trust Anchor: the CA at the root of a validator's chain of trust; everything else is either it, or something it (transitively) certified |
+| **TA** | Trust Anchor: the CA at the root of a validator's chain of trust; every other certificate the validator accepts chains up to it |
+| **TAL** | Trust Anchor Locator: a small file that tells a validator where to fetch the TA's certificate and which key to expect |
 | **ROA** | Route Origin Authorization: a signed object saying "this ASN may originate this prefix, up to this length" |
-| **ASPA** | Autonomous System Provider Authorization: a signed object saying "these are the only ASes this AS accepts routes from as an upstream provider" |
+| **ASPA** | Autonomous System Provider Authorization: a signed object in which an AS (the *customer*) lists all of its upstream providers, the only ASes authorized to pass its routes on upward |
 | **ROV** | Route Origin Validation: checks a route's *last* AS (the one that originated it) against the ROAs |
 | **ASPA verification** | checks the *whole path*, hop by hop, against the ASPA objects |
+| **Upstream / downstream** | the two ASPA verification algorithms; which one applies depends on who sent you the route: a customer or a lateral peer (upstream, the strict one) or a provider (downstream) |
 | **RRDP** | RPKI Repository Delta Protocol: how a validator fetches signed objects from a publication point |
-| **RTR** | RPKI-to-Router protocol: how a validator hands its verdicts to a router |
+| **RTR** | RPKI-to-Router protocol: how a validator hands its verdicts to a router; ASPA needs RTR version 2 |
 | **VRP** | Validated ROA Payload: the (ASN, prefix, max length) triple a validator derived from a ROA |
+| **AS_PATH** | the list of ASes a BGP announcement went through; the last one is the origin |
+| **Prepend** | repeating your own ASN in the AS_PATH to make a path look longer, and so less attractive |
+| **Multihomed** | an AS connected to more than one provider |
+| **local_pref** | BGP's local preference: the highest wins, and it's compared before the AS_PATH length |
+| **Large community** | a numeric label (RFC 8092) attached to a route; observer1 uses them to record its verdicts |
+| **Role** | the relationship declared on a BGP session (RFC 9234: provider, customer, peer...); on OpenBGPD, it's what selects the ASPA algorithm |
 | **Hijack** | announcing a prefix that belongs to someone else, as if it were yours (or as if it came through them) |
 | **Route leak** | passing on a route you learned from one neighbor to another neighbor you shouldn't (RFC 7908); nobody lies about the origin, but the path has a shape that couldn't legitimately happen |
+
+### The lab's software
+
+| Term | Meaning |
+|---|---|
+| **Docker** | runs each piece of the lab in its own container, an isolated little Linux system; `docker compose` starts them all together |
+| **BIRD** | BIRD Internet Routing Daemon, free routing software (BGP, OSPF and more) from CZ.NIC. It runs observer1, the origin, both providers, AS{{ATTACKER_ASN}} and the peer; you talk to it with `birdc` |
+| **OpenBGPD** | the free BGP implementation from the OpenBSD project. It runs observer2, computes ROV and ASPA natively, and you talk to it with `bgpctl` |
+| **Krill** | RPKI CA software from NLnet Labs. It's the holder's CA here (and, in local mode, the simulated registry's too); it has a web UI and the `krillc` command line |
+| **Routinator** | RPKI validator from NLnet Labs; it feeds observer1 |
+| **FORT** | FORT Validator, the RPKI validator from NIC México; it feeds observer2 |
 
 ---
 
 ## The topology
 
-```
+```text
               {{RIR_NAME}}   (RIR/NIR: trust anchor + repository)
-             /                                              \
-         RRDP                                                RRDP
-          v                                                    v
-     Routinator                                          FORT Validator
-          |  RTR v2 :3323                                      |  RTR v2 :3323
-          v                                                    v
-  observer1 AS{{OBSERVER1_ASN}} (BIRD)                       observer2 AS{{OBSERVER2_ASN}} (OpenBGPD)
+             /                                      \
+         RRDP                                        RRDP
+          v                                            v
+     Routinator                                  FORT Validator
+          |  RTR v2 :3323                              |  RTR v2 :3323
+          v                                            v
+  observer1  AS{{OBSERVER1_ASN}}  (BIRD)            observer2  AS{{OBSERVER2_ASN}}  (OpenBGPD)
 
        both observers receive the SAME prefix over BOTH paths:
 
-            Provider A  AS{{PROVIDER_A_ASN}}
-            Provider B  AS{{PROVIDER_B_ASN}}
-                          \          /
-                           \        /
-                    origin AS{{ORIGIN_ASN}}   +   Krill (the holder's CA)
-                    {{ORIGIN_V4}} , {{ORIGIN_V6}}
+       Provider A  AS{{PROVIDER_A_ASN}}                   Provider B  AS{{PROVIDER_B_ASN}}
+                    \                          /
+                     \                        /
+                      origin  AS{{ORIGIN_ASN}}  --  Krill (the holder's CA)
+                      {{ORIGIN_V4}} , {{ORIGIN_V6}}
 ```
 
-AS{{ORIGIN_ASN}} is multihomed, and it has a preference: **Provider B is the way in, Provider A
-is the backup.** To get that, the origin *prepends* its own ASN twice when it announces
-to Provider A (`{{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}}` instead of just `{{ORIGIN_ASN}}`), so every path through
-A looks two hops longer than the one through B. Ordinary inbound traffic
-engineering, nothing exotic.
-The two providers pass the **same prefix** on to both observers, with the same origin AS. The lab runs the whole story **twice, in
-parallel**, on two independent stacks: observer1 and observer2 see exactly the
-same announcements and the same RPKI objects, but each has its own router and
-its own validator.
+AS{{ORIGIN_ASN}} is multihomed, and it has a preference: **Provider B is the way in,
+Provider A is the backup.** To get that, the origin *prepends* its own ASN
+twice when it announces to Provider A (`{{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}}` instead of just
+`{{ORIGIN_ASN}}`), so every path through A looks two hops longer than the one through
+B. This is common inbound traffic engineering.
+
+The two providers pass the **same prefix** on to both observers, with the same
+origin AS. The lab runs the whole story **twice, in parallel**, on two
+independent stacks: observer1 and observer2 see exactly the same announcements
+and the same RPKI objects, but each has its own router and its own validator.
+
+In BGP terms, the observers sit *above* the two providers: they sell them
+transit, so the providers are the observers' customers, and every route
+reaches the observers from a customer. Keep that in mind for Step 5, where
+it decides which ASPA algorithm runs.
 
 Two more routers join the story. Both are on the panel, and both are silent
 until the story switches them on:
 
-```
+```text
    AS{{ATTACKER_ASN}} (the attacker) ---- direct BGP sessions ----> observer1, observer2
                              (a customer of the observers: any customer
                               can send them an announcement, and nobody
@@ -130,18 +187,22 @@ this lab lives inside that block, except AS{{ATTACKER_ASN}}, which sits
 outside it on purpose. 666 isn't reserved for anything; it's just memorable.
 None of them touch the real Internet.
 
+> [!NOTE]
 > The origin's ASN and prefixes live in the **`lab.conf`** file, at the lab's
 > root. If you want different ones, edit it there and run
-> `./scripts/lab.sh up`: the routers, the scripts, and this on-screen script
-> all pick up the new values. (The guide is written with `{{ NAME }}` markers
-> in `guide/templates/`; `up` compiles it into `guide/GUIDE.*.md` with the
+> `./scripts/lab.sh up`: the routers, the scripts, and this guide all pick up
+> the new values. (The guide is written with `{{ NAME }}` markers in
+> `guide/templates/`; `up` compiles it into `guide/GUIDE.*.md` with the
 > values from `lab.conf`. Edit the templates, never the compiled files.)
 
 ### How the story is organized
 
 Every step opens with a **State** box: which deployment stage the observers
 are in, what AS{{ATTACKER_ASN}} and the peer are doing, which RPKI objects should exist.
-If your lab doesn't match, the box also tells you how to fix it.
+If your lab doesn't match, the box also tells you how to fix it. On the panel,
+the header shows which step your lab looks like right now
+(*lab ≈ Step 5*), and the **Checkpoint** boxes inside each step tick
+themselves as your lab gets there.
 
 That recovery is deliberately simple. **Each `./scripts/lab.sh stepN-*`
 command sets its step's *entire* state**, not just what changed since the
@@ -167,19 +228,19 @@ Three things move together every time a `stepN-*` command runs:
 
   Each stage is one complete config file per observer
   (`bird/observer1-<stage>.conf`, `openbgpd/observer2-<stage>.conf`), and the
-  guide asks you to open them: **what changes from one file to the next is what
-  deploying that check means.** You don't have to remember which stage you're
-  in. The badge in the panel's header says it (*validation: none*, *ROV:
-  marking*, *ROV: dropping*, ...) and turns amber if the two observers
-  disagree. observer2 restarts every time the stage changes, because OpenBGPD
-  negotiates its RFC 9234 roles and its RTR version when a session opens.
-  Give it ten or fifteen seconds to settle before drawing any conclusions
-  from what it shows.
-- **AS{{ATTACKER_ASN}} and the peer.** Every `stepN-*` command also sets their state,
-  silent, naive hijack, forged path, or leaking, to whatever the guide's text
+  guide asks you to open them: **the lines that change from one file to the
+  next are exactly what deploying that check takes.** You don't have to
+  remember which stage you're in. The stage indicator in the panel's header
+  says it (*validation: none*, *ROV: marking*, *ROV: dropping*, ...) and turns
+  orange if the two observers disagree. observer2 restarts every time the stage
+  changes, because OpenBGPD negotiates its RFC 9234 roles and its RTR version
+  when a session opens. Give it ten or fifteen seconds to settle before drawing
+  any conclusions from what it shows.
+- **AS{{ATTACKER_ASN}} and the peer.** Every `stepN-*` command also sets their state
+  (silent, naive hijack, forged path or leaking) to whatever the guide's text
   for that step describes, even the ones whose name doesn't mention them
-  (`step6-add-provider-b` and `step8-drop`, for instance, still put
-  AS{{ATTACKER_ASN}} back in its forged-path form, since that's what those steps expect).
+  (`step6-add-provider-b` and `step8-drop`, for instance, still put AS{{ATTACKER_ASN}}
+  back in its forged-path form, since that's what those steps expect).
 - **The origin's RPKI objects**, in Krill: the ROAs (created once, from
   `step3-rov-mark` on) and the ASPA object, kept at exactly the list each
   step expects. `krillc aspas add` replaces the whole object, so a command
@@ -198,67 +259,136 @@ The names of all these commands carry the number of the step they belong to.
 
 ---
 
-## Preparation 1: Bring the lab up
+## Preparation 1: Install Docker and bring the lab up
 
 The lab has two modes, chosen with the `MODE` variable in `lab.conf`:
 
 | MODE | Who certifies | Needs Internet? |
 |---|---|---|
-| `local` | **{{RIR_NAME}}**, a simulated registry that runs inside the lab | no |
+| `local` (default) | **{{RIR_NAME}}**, a simulated registry that runs inside the lab | only to download the lab the first time |
 | `beta` | **beta.registro.br**, Registro.br's test system | yes, and a beta.registro.br login |
 
-Both modes use exactly the same protocols, RFC 6492 for delegation and RFC
-8181 for publication. What changes is the panel where you paste the XML, and
+Both modes use exactly the same protocols: RFC 8183 for the XML documents you
+exchange to set things up, RFC 6492 for delegation and RFC 8181 for
+publication. What changes is the panel where you paste the XML, and
 how long the objects take to show up at the validator: seconds in local
 mode, a few minutes on beta. The next preparation step has one version per
 mode; only do the one that matches yours.
 
-1. Requirements: Docker installed (Mac, Windows, or Linux, with **OrbStack**,
-   Docker Desktop, or Docker Engine) and Internet access.
+### Before you start: Docker
 
-2. In the terminal, inside the lab's folder:
+The lab needs **Docker with Compose v2** (the `docker compose` command), a
+64-bit computer (Intel/AMD or ARM, Apple Silicon included), about **2 GB of
+memory for Docker** and **4 GB of free disk**, and a browser. Once it's
+running, the whole lab uses around 300 MB of memory.
 
+**Linux**
+
+1. Install Docker Engine and the Compose plugin for your distribution:
+   https://docs.docker.com/engine/install/
+2. Let your user run Docker without `sudo` (log out and back in afterwards):
+   https://docs.docker.com/engine/install/linux-postinstall/
+
+Prefer a graphical app? Docker Desktop for Linux also works:
+https://docs.docker.com/desktop/setup/install/linux/
+
+**macOS**
+
+- **OrbStack** (lighter and faster; the lab is tested with it):
+  https://docs.orbstack.dev/quick-start
+- or **Docker Desktop for Mac**:
+  https://docs.docker.com/desktop/setup/install/mac-install/
+
+**Windows**
+
+The lab's scripts are bash scripts, so on Windows they run inside **WSL 2**
+(a real Linux inside Windows), with Docker Desktop providing the containers:
+
+1. Install WSL 2 with Ubuntu: open PowerShell as administrator and run
+   `wsl --install` (details: https://learn.microsoft.com/windows/wsl/install).
+2. Install Docker Desktop for Windows with the WSL 2 backend:
+   https://docs.docker.com/desktop/setup/install/windows-install/
+3. In Docker Desktop, under *Settings → Resources → WSL integration*, turn on
+   your Ubuntu distribution (https://docs.docker.com/desktop/features/wsl/).
+4. Open the **Ubuntu** terminal and do everything from there. Keep the lab's
+   folder inside Linux (for example `~/lab-aspa`), not under `/mnt/c/...`:
+   it's much faster, and it avoids line-ending and permission problems.
+
+Can't or don't want to install anything? The lab also comes as a ready-made
+virtual machine, with Docker and the images already inside: see
+`vm/README.md`.
+
+**Check that Docker works** (in any system's terminal):
+
+```cmd @host
+docker version
+docker compose version
+docker run --rm hello-world
+```
+
+The last one prints *Hello from Docker!*. If you're new to Docker, the official
+introduction is worth twenty minutes: https://docs.docker.com/get-started/
+
+### Bring the lab up
+
+1. In your terminal, inside the lab's folder:
+
+   ```cmd @host
+   ./scripts/lab.sh up
    ```
-   #./scripts/lab.sh up
-   ```
 
-   The first time, Docker pulls the images and builds a few local ones.
-   Takes a few minutes.
+   The first time, Docker downloads the images and builds a few local ones,
+   which takes a few minutes. If something goes wrong, run
+   `./scripts/lab.sh doctor`: it checks Docker, the ports, the containers and
+   the preparation, and says what to do about each problem.
 
-3. Open the lab's panel:
+   > [!WARNING]
+   > The lab only needs **port 8080** free on your computer. If another
+   > program is using it, `up` stops and says which one. (`EXPOSE_PORTS=yes`
+   > in `lab.conf` also publishes each service's own port, 3000, 3323,
+   > 8081..., which you only need to connect outside tools straight to a
+   > service.)
+
+2. Open the lab's panel in your browser:
 
    **http://localhost:8080**
 
-   Clicking each box in the topology opens that component's terminal, its
-   web interface, and its addressing information.
+   Use exactly `localhost`: the panel reaches every other service through
+   names like `krill.localhost`, which browsers send to your own computer.
 
-   **Where to type the commands in this guide.** Everything can be done
-   without leaving the browser, and every command block shows both ways:
+3. **A quick tour of the panel.**
 
-   - **On the panel (the way the blocks are written first).** Click a box
-     and use its **Shell** button (**Terminal (krillc)** on Krill): you land
-     inside that container, so a command is written without any prefix, for
-     example `birdc show protocols` in observer1's Shell. The
-     **Lab commands** button opens a terminal already in the lab's folder,
-     for `./scripts/lab.sh ...`, `cat bird/...` and `diff ...`.
-   - **From your own computer's terminal, in the lab's folder.** The same
-     command, run from outside: `docker exec lab-<box> <command>`, as in
-     `docker exec lab-observer1 birdc show protocols`. Use this if you
-     prefer your own terminal, or for `reset`, which must never run from
-     the panel.
+   - **This guide** is the left column. ◀ and ▶ move between steps, and the
+     thin bar under them shows your progress.
+   - **The topology** is in the middle: clicking a box shows that component's
+     state, addresses and terminal on the right. Under it, **Verdicts** lists
+     every route the observers hold, and **Events** tells you, in words,
+     everything that changed (the same news pops up briefly in the corner).
+   - **The bar at the top** is always in the same place. **Terminal** opens
+     the Lab terminal, already in the lab's folder; **Commands** lists what
+     each `./scripts/lab.sh` command does, with a ▶ to run it; **Krill**,
+     **Routinator** and **Registry** open those web interfaces. Terminals and
+     web interfaces open inside the panel, in tabs; ↗ opens the current one
+     in a separate browser tab.
+
+   **Where to run each command.** Every command block in this guide says
+   where it runs, in its header: *Run on observer1 · Shell*, *Run in the Lab
+   terminal*, and so on. On the panel, **▶ open terminal** opens exactly that
+   terminal, and **copy** copies the commands (without any prompt). If you'd
+   rather use your own computer's terminal, prefix the command with
+   `docker exec lab-<box>` and run it in the lab's folder (for example,
+   `docker exec lab-observer1 birdc show protocols`).
 
 4. Check that the routers came up and that the BGP sessions are established.
-   On the panel, each router's pill shows how many of its BGP sessions are
-   up. To see the detail:
+   On the panel, each router's box shows how many of its BGP sessions are up
+   (for example *BGP 6/6*). To see the detail:
 
+   ```cmd @observer1
+   birdc show protocols
    ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc show protocols
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show summary
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show protocols
-   #docker exec lab-observer2 bgpctl show summary
+
+   ```cmd @observer2
+   bgpctl show summary
    ```
 
    You should see `provider_a_v4`, `provider_a_v6`, `provider_b_v4` and
@@ -271,40 +401,39 @@ mode; only do the one that matches yours.
 
 ## Preparation 2: Certify your resources (MODE=local)
 
-> Do this if `lab.conf` has `MODE=local`. If it has `MODE=beta`, skip to
-> Preparation 2-B.
+> Do this if `lab.conf` has `MODE=local` (the default). If it has `MODE=beta`,
+> skip to Preparation 2-B.
 
-Here you'll play **both sides** of the conversation: the holder, in Krill,
-and the registry, in the {{RIR_NAME}} panel. It's the same XML exchange that
-happens between a provider and its RIR.
+Here you'll play **both sides** of the conversation: the holder, in Krill, and
+the registry, in the {{RIR_NAME}} panel. It's the same XML exchange that happens
+between a network operator and its RIR.
 
 ### Your side: the CA in Krill
 
-1. Open Krill: **http://krill.localhost:8080**
-
-   (It's served through the lab's web server, so there's no certificate
-   warning. The direct address, `https://localhost:3000`, still works, with a
-   self-signed certificate.)
+1. Open Krill: the **Krill** button at the top of the panel (or
+   **http://krill.localhost:8080** in a tab of its own).
 
 2. Log in with the token **`labpass`**.
 
 3. Create your CA named **`acme_ca`**.
-   If you like, switch the language to English in the top-right corner.
+   If Krill's interface isn't in English, switch it in the top-right corner:
+   this guide uses the English labels.
 
 ### The registry's side: the {{RIR_NAME}} panel
 
-4. In another tab, open the registry panel: **http://registry.localhost:8080**
+4. Open the registry panel: the **Registry** button at the top (or
+   **http://registry.localhost:8080**).
 
-   Notice the *Allocated resources* section: it's exactly the ASN and blocks
-   from your `lab.conf`. The certificate the registry is about to issue
-   covers that set, no more, no less.
+   Notice the *Allocated resources* section: it lists the ASN and blocks from
+   your `lab.conf`, and the certificate the registry is about to issue will
+   cover exactly that set.
 
 ### Part 1: CA delegation (RFC 6492)
 
 5. In Krill, go to *Parent CAs* → *Add a new parent CA* and copy the XML from
    the *Child Request* field (the `child_request`).
 
-6. In the {{RIR_NAME}} panel, paste that XML in **Step 1** and click
+6. In the {{RIR_NAME}} panel, paste that XML into box **1 · CA delegation** and click
    *Issue certificate*.
 
 7. The registry hands back the `parent_response`. Copy it.
@@ -317,24 +446,36 @@ happens between a provider and its RIR.
 9. In Krill, go to *Repository* → *Add a repository* and copy the XML from
    the *Publisher Request* (the `publisher_request`).
 
-10. In the {{RIR_NAME}} panel, paste it in **Step 2** and click *Authorize publication*.
+10. In the {{RIR_NAME}} panel, paste it into box **2 · Publication service** and
+    click *Authorize publication*.
 
 11. Copy the `repository_response` that appears and paste it into Krill,
     under *Repository* → *Repository Response*. Confirm.
 
 ### Checking
 
-12. In Krill, the CA should show the resources received from the parent: the
-    ASN {{ORIGIN_ASN}} and the prefixes {{ORIGIN_V4}} and {{ORIGIN_V6}}.
+12. In Krill, the CA's page has four tabs (*ROAs*, *ASPAs*, *Parents*,
+    *Repository*) and, **on the right**, a box with the resources the parent
+    certified: the ASN {{ORIGIN_ASN}} and the prefixes {{ORIGIN_V4}} and {{ORIGIN_V6}}.
+    In a narrow window that box moves **below** the *Add ROA* button, where it
+    looks like it belongs to something else. It's the same box.
+
+    ![Krill's CA page: the box on the right lists the certified resources](img/krill-resources.png)
+
+    Other ways to see the same thing: click the **Krill** box in the panel's
+    topology (it lists the CA's resources, ROAs and ASPA), or run `krillc
+    show` in Krill's terminal.
 
 13. In the {{RIR_NAME}} panel, the *Delegated RPKI* section now shows **active**,
     with the date of the latest Up-Down exchange and the count of objects in
     the repository.
 
-> **Why two separate parts?** Because they're two independent things. The
-> first says *which resources are yours*; the second says *where you're going
-> to publish the signed objects*. A RIR can certify your resources while you
-> publish somewhere else entirely, your own publication server, say.
+<!-- checkpoint: prep -->
+
+> **Why two separate parts?** The first says *which resources are yours*; the
+> second says *where you're going to publish the signed objects*. They're
+> independent: an RIR can certify your resources while you publish somewhere
+> else entirely, on your own publication server, for example.
 
 **Notice what you have *not* done:** created a ROA, or an ASPA object. Your
 resources are certified, but nothing says who may announce them. That's where
@@ -347,10 +488,11 @@ the story begins.
 > Only do this if `lab.conf` has `MODE=beta`. It needs Internet access and a
 > beta.registro.br login.
 
-1. Open Krill at **http://krill.localhost:8080**, log in with the token
+1. Open Krill (the **Krill** button at the top), log in with the token
    **`labpass`**, and create the CA **`acme_ca`**.
 
-2. In another tab, log in to **https://beta.registro.br/login/**. In the
+2. In a browser tab, log in to **https://beta.registro.br/login/** (on the
+   panel, the **beta.registro.br** button at the top opens it). In the
    Panel, go to *Holdership*, select the AS, and scroll down to the **RPKI**
    section → *Configure RPKI*.
 
@@ -363,14 +505,17 @@ the story begins.
    *Parent CAs* → *Parent Response*, with the parent CA name
    **`nicbr_ca`**.
 
-5. Still on Registro.br, under *Configure RPKI* → *Configure remote publication*.
+5. Still on Registro.br, go to *Configure RPKI* → *Configure remote publication*.
    In Krill, under *Repository* → *Add a repository*, copy the *Publisher
    Request* and paste it there.
 
 6. The field turns into **Repository response**. Copy it and paste it into
    Krill, under *Repository* → *Repository Response*.
 
-7. In the end, Krill should show the resources received from the parent.
+7. In the end, Krill should show the resources received from the parent, in
+   the box on the right of the CA's page (see Preparation 2, item 12).
+
+<!-- checkpoint: prep -->
 
 **Notice what you have *not* done:** created a ROA, or an ASPA object. Your
 resources are certified, but nothing says who may announce them. That's where
@@ -381,36 +526,28 @@ validators whenever a step asks you to create one.)
 
 ## Step 1: A clean baseline
 
-> **State:** stage `none` (no validation) · AS{{ATTACKER_ASN}} silent · peer silent · no ROAs,
-> no ASPA.
+> **State:** stage `none` (no validation) · AS{{ATTACKER_ASN}} silent · peer silent · no
+> ROAs, no ASPA.
 >
 > **If yours differs:** `./scripts/lab.sh step1-clean` silences AS{{ATTACKER_ASN}} and the
 > peer *and* puts both observers back to plain BGP. If ROAs or an ASPA object
-> are left over from an earlier run (check with `krillc roas list` and `krillc
-> aspas list` in the Krill terminal), the simplest way out is
-> `./scripts/lab.sh reset`, then `up`, then Preparation 2 again, run from your
-> own computer's terminal, not the panel's.
+> are left over from an earlier run, `./scripts/lab.sh clean-objects` removes
+> them and keeps your CA, so you don't have to redo the preparation.
 
 1. Make sure the lab is at its baseline:
 
-   ```
-   #./scripts/lab.sh step1-clean
+   ```cmd @lab
+   ./scripts/lab.sh step1-clean
    ```
 
 2. Check that the origin's prefix reaches both observers, over both
-   providers, and which one they prefer:
+   providers, and which one they prefer. On observer1 (BIRD):
 
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all {{ORIGIN_V4}}
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 all {{ORIGIN_V4}}
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+   ```cmd @observer1
+   birdc show route table master4 all {{ORIGIN_V4}}
    ```
 
-   ```
+   ```output @observer1
    {{ORIGIN_V4}}  unicast [provider_b_v4 ...] * (100) [AS{{ORIGIN_ASN}}i]
         bgp_path: {{PROVIDER_B_ASN}} {{ORIGIN_ASN}}
         bgp_local_pref: 100
@@ -420,33 +557,38 @@ validators whenever a step asks you to create one.)
         bgp_local_pref: 100
    ```
 
+   And on observer2 (OpenBGPD):
+
+   ```cmd @observer2
+   bgpctl show rib {{ORIGIN_V4}}
    ```
+
+   ```output @observer2
    flags  vs destination          gateway          lpref   med aspath origin
    *>    N-? {{ORIGIN_V4}}          10.200.6.10       100     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     N-? {{ORIGIN_V4}}          10.200.5.10       100     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   Two paths on each observer: `{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` (selected: the origin's preferred way in, 2
-   hops) and `{{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}}` (the backup, kept in the table but 4 hops
-   long because of the prepends). Neither carries a verdict: BIRD has no
-   communities yet, OpenBGPD's `N-?` just means "nothing to compare against",
-   and the panel shows `-` for both. That's because **the observers aren't
-   validating anything yet.** The panel's header badge says *validation:
-   none*.
+   Two paths on each observer: `{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}` (selected: the origin's
+   preferred way in, 2 hops) and `{{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}}` (the backup,
+   kept in the table but 4 hops long because of the prepends). Neither carries
+   a verdict: BIRD has no communities yet, OpenBGPD's `N-?` just means "nothing
+   to compare against", and the panel shows `—` for both. That's because **the
+   observers aren't validating anything yet.** The stage indicator in the
+   panel's header says *validation: none*.
 
 3. **Take a look at how these routers are configured.** Open the observers'
-   baseline files (in the Lab commands terminal, your own terminal in the
-   lab's folder, or your editor):
+   baseline files:
 
-   ```
-   #cat bird/observer1-none.conf
-   #cat openbgpd/observer2-none.conf
+   ```cmd @lab
+   cat bird/observer1-none.conf
+   cat openbgpd/observer2-none.conf
    ```
 
    You'll find ordinary BGP: sessions with the two providers (and with AS{{ATTACKER_ASN}},
    which is silent for now), and a policy that accepts everything:
 
-   ```
+   ```conf @observer1
    template bgp CUSTOMER4 {
        local as OBSERVER1_ASN;
        ipv4 {
@@ -457,19 +599,21 @@ validators whenever a step asks you to create one.)
    }
    ```
 
-   ```
+   ```conf @observer2
    deny from any
    allow from any                      # <- OpenBGPD: same idea
    ```
 
    There's no RTR session to Routinator or FORT (both are running, but nothing
-   listens to them), and nothing that could tell a ROA from a hole in the
-   wall. Everything the story does to these two files from here on is what
-   *deploying RPKI validation* on a router actually looks like.
+   listens to them), and no configuration that uses RPKI at all. From here on,
+   the story changes these two files step by step, and those changes are all it
+   takes to deploy RPKI validation on a router.
+
+<!-- checkpoint: step1 -->
 
 **Along the way:** the validators, the CA and the repository all exist by
-now, and the resources are certified. Doesn't matter yet, though: from
-where a router sits, none of it counts until the router is told to listen.
+now, and the resources are certified. Even so, none of this affects the
+routers until they're configured to talk to a validator.
 
 ---
 
@@ -484,8 +628,8 @@ AS{{ATTACKER_ASN}} announces the origin's prefix as if it were its own.
 
 1. Switch it on:
 
-   ```
-   #./scripts/lab.sh step2-hijack-simple
+   ```cmd @lab
+   ./scripts/lab.sh step2-hijack-simple
    ```
 
 2. **Before you look:** AS{{ATTACKER_ASN}}'s path is just `{{ATTACKER_ASN}}`, shorter than the
@@ -493,25 +637,25 @@ AS{{ATTACKER_ASN}} announces the origin's prefix as if it were its own.
    Which one do you expect the observers to prefer? Is there anything at all
    they could use to tell the two apart?
 
-3. Now look:
+<!-- predict id=s2 answer=1: The hijack: its path is shorter, and nothing else tells them apart | The legitimate path through Provider B: the observers know the origin's real ASN | Neither: the observers notice the conflict and drop both -->
 
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all {{ORIGIN_V4}}
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 all {{ORIGIN_V4}}
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+3. Now look, on both observers:
+
+   ```cmd @observer1
+   birdc show route table master4 all {{ORIGIN_V4}}
    ```
 
-   ```
+   ```output @observer1
    {{ORIGIN_V4}}  unicast [attacker_v4 ...] * (100) [AS{{ATTACKER_ASN}}i]
         bgp_path: {{ATTACKER_ASN}}
         bgp_local_pref: 100
    ```
 
+   ```cmd @observer2
+   bgpctl show rib {{ORIGIN_V4}}
    ```
+
+   ```output @observer2
    *>    N-? {{ORIGIN_V4}}          10.200.8.10       100     0 {{ATTACKER_ASN}} i
    *     N-? {{ORIGIN_V4}}          10.200.6.10       100     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     N-? {{ORIGIN_V4}}          10.200.5.10       100     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
@@ -519,13 +663,17 @@ AS{{ATTACKER_ASN}} announces the origin's prefix as if it were its own.
 
    The hijack **won**. It's the selected route (`*`, `*>`) on both observers:
    its AS path is shorter (1 hop against 2 and 4), and nothing else tells the
-   two apart. On the panel, the attacker's pill reads *hijacking* and its
-   links to the observers turn **amber**: an observer is accepting what it
+   two apart. On the panel, the attacker's box reads *hijacking* and its
+   links to the observers turn **orange**: an observer is accepting what it
    announces. The *Verdicts* table gets new rows labeled *AS{{ATTACKER_ASN}}*, with no
    verdicts, because there's no validation to give one.
 
-**Along the way:** a hijack with the wrong origin ASN. The oldest trick there
-is, and the one ROAs were invented for.
+<!-- /predict -->
+
+<!-- checkpoint: step2 -->
+
+**Along the way:** a hijack with the wrong origin ASN. This is the most basic
+kind of hijack, and the one ROAs were designed to stop.
 
 ---
 
@@ -542,13 +690,22 @@ the **Observers validate** them, only marking, for now.
 
 ### The Origin publishes: create the ROAs
 
+> [!IMPORTANT]
 > **Wait for the CA to receive its certificate before creating ROAs.** Right
-> after the preparation the CA might not yet have the parent's resource
-> class, and Krill accepts the command without creating anything. Check under
-> *ROAs* that Krill already shows your prefixes; if the list is empty, wait a
-> few seconds or run `docker exec lab-krill krillc bulk refresh`.
+> after the preparation the CA might not have the parent's resources yet, and
+> Krill then accepts a ROA without creating anything. Check that the box **on
+> the right** of the CA's page (below *Add ROA* in a narrow window) already
+> lists your prefixes. If it's empty, wait a few seconds or run
+> `krillc bulk refresh` in Krill's terminal.
 
-1. In Krill, go to the **ROAs** section and click *Add ROA*.
+<!-- challenge id=roas check=step3-roas time=300: Create the two ROAs that authorize AS{{ORIGIN_ASN}} to originate {{ORIGIN_V4}} and {{ORIGIN_V6}}, each with a max length equal to its own prefix length, and get both validators to see them. -->
+<!-- hint: In Krill, the CA's page has a ROAs tab with an Add ROA button. Or use krillc roas update in Krill's terminal. -->
+<!-- hint: The max length is the prefix's own length: {{ORIGIN_V4_MAXLEN}} for the IPv4 one, {{ORIGIN_V6_MAXLEN}} for the IPv6 one. Afterwards, ./scripts/lab.sh refresh in the Lab terminal makes the validators look again. -->
+
+1. In Krill, on the CA's **ROAs** tab, click *Add ROA*. Your ROAs will be
+   listed in the table on that tab.
+
+   ![Krill's ROAs tab: the table lists the ROAs, Add ROA creates one](img/krill-roas.png)
 
 2. Create the IPv4 ROA:
 
@@ -566,22 +723,38 @@ the **Observers validate** them, only marking, for now.
    | Prefix | {{ORIGIN_V6}} |
    | Max length | {{ORIGIN_V6_MAXLEN}} |
 
-   (Prefer the command line? In the Krill box's terminal:
-   `krillc roas update --add "{{ORIGIN_V4}}-{{ORIGIN_V4_MAXLEN}} => {{ORIGIN_ASN}}"`, and the same with
-   `"{{ORIGIN_V6}}-{{ORIGIN_V6_MAXLEN}} => {{ORIGIN_ASN}}"`. If Krill says an ROA is a *duplicate*,
-   it's already there.)
+   Prefer the command line? In Krill's terminal:
+
+   ```cmd @krill
+   krillc roas update --add "{{ORIGIN_V4}}-{{ORIGIN_V4_MAXLEN}} => {{ORIGIN_ASN}}"
+   krillc roas update --add "{{ORIGIN_V6}}-{{ORIGIN_V6_MAXLEN}} => {{ORIGIN_ASN}}"
+   krillc roas list
+   ```
+
+   (If Krill says a ROA is a *duplicate*, it's already there.)
+
+   > [!NOTE]
+   > Krill's *State* column shows **NOT SEEN** or **NO ANNOUNCEMENT INFO** for
+   > every ROA. That column compares your ROAs with the BGP announcements Krill
+   > knows about, and Krill doesn't see this lab's BGP table at all. Ignore it:
+   > it doesn't mean anything is wrong.
 
 4. Make the validators pick them up, and check that they did:
 
-   ```
-   #./scripts/lab.sh refresh
-   #./scripts/validate.sh
+   ```cmd @lab
+   ./scripts/lab.sh refresh
+   ./scripts/validate.sh
    ```
 
    `validate.sh` prints what Routinator validated (two ROAs). On the panel,
-   the Routinator and FORT boxes show `2 VRP`. If nothing shows up yet, give
-   it a moment: Krill has to publish and the validators have to reread
-   (seconds in local mode, minutes on beta). Run `refresh` again.
+   the Routinator and FORT boxes show `2 VRP`, and the Krill box shows
+   `2 ROA`. If nothing shows up yet, give it a moment: Krill has to publish
+   and the validators have to reread (seconds in local mode, minutes on
+   beta). Run `refresh` again.
+
+<!-- /challenge -->
+
+<!-- checkpoint: step3-roas -->
 
 Nothing has changed for the routers yet. The ROAs are published and
 validated, but **no router is listening to the validators.** Check the
@@ -591,24 +764,28 @@ observers again if you like: the hijack is still winning.
 
 1. Deploy ROV on both observers, in its safe first form:
 
-   ```
-   #./scripts/lab.sh step3-rov-mark
+   ```cmd @lab
+   ./scripts/lab.sh step3-rov-mark
    ```
 
 2. **See what this deployment is made of.** Compare the new files with the
-   baseline you read in Step 1 (`diff` shows exactly what was added):
+   baseline you read in Step 1. `diff` shows exactly what was added:
 
-   ```
-   #diff bird/observer1-none.conf bird/observer1-rov-mark.conf
-   #diff openbgpd/observer2-none.conf openbgpd/observer2-rov-mark.conf
+   ```cmd @lab
+   diff bird/observer1-none.conf bird/observer1-rov-mark.conf
+   diff openbgpd/observer2-none.conf openbgpd/observer2-rov-mark.conf
    ```
 
-   Three ideas, same on both routers:
+   > [!IMPORTANT]
+   > Don't skip the `diff`s. They are the actual lesson of this step: the lines
+   > they show are everything it takes to deploy ROV on a router.
+
+   The same three pieces on both routers:
 
    **(a) A session to a validator**, over which the router learns the ROAs:
 
-   ```
-   protocol rpki routinator {                      # observer1 (BIRD)
+   ```conf @observer1
+   protocol rpki routinator {
        remote 172.30.0.20 port 3323;
        roa4 { table roa4_table; };
        roa6 { table roa6_table; };
@@ -616,8 +793,8 @@ observers again if you like: the hijack is still winning.
    }
    ```
 
-   ```
-   rtr 172.30.0.50 {                               # observer2 (OpenBGPD)
+   ```conf @observer2
+   rtr 172.30.0.50 {
        port 3323
    }
    ```
@@ -627,8 +804,8 @@ observers again if you like: the hijack is still winning.
    records the result in a large community, so you can read it later;
    OpenBGPD computes it natively into the route's `ovs` attribute:
 
-   ```
-   filter import_customer_v4 {                     # observer1 (BIRD)
+   ```conf @observer1
+   filter import_customer_v4 {
        if roa_check(roa4_table, net, bgp_path.last) = ROA_INVALID then {
            bgp_large_community.add((OBSERVER1_ASN,1,0));
            bgp_local_pref = 10;                    # <- (c) an action: lose to any valid route
@@ -643,10 +820,11 @@ observers again if you like: the hijack is still winning.
    **(c) An action on the result.** In this stage the action is only to
    *lower the preference* of an invalid route; nothing is rejected:
 
-   ```
-   match from any ovs invalid    set { localpref 10 }      # observer2 (OpenBGPD)
+   ```conf @observer2
+   match from any ovs invalid    set { localpref 10 }
    ```
 
+   > [!TIP]
    > **This isn't a BIRD or OpenBGPD quirk.** Any router that supports ROV
    > has the same three pieces, just different syntax: a session to a
    > validator (RTR), a policy that matches the validation state, and an
@@ -654,56 +832,66 @@ observers again if you like: the hijack is still winning.
    > on Junos, a `policy-statement` matching `validation-database`; on
    > Huawei, `if-match rpki` in a route-policy. Check your platform's
    > documentation for the exact syntax. BIRD and OpenBGPD show up here
-   > because they're free and easy to run in containers, not because they're
-   > what you'll meet at work; what carries over is the anatomy.
+   > because they're free and easy to run in containers, not because
+   > they're common in production networks.
    >
-   > If you'd rather type the configuration yourself than read it: start
-   > from `bird/observer1-none.conf`, add the pieces above, save the result as
-   > a new file in `bird/`, and load it with `docker exec lab-observer1 birdc
-   > 'configure "/etc/bird-lab/your-file.conf"'`. The script only saves you
-   > the typing.
+   > **Want to type it yourself?** In the Lab terminal, copy the baseline
+   > into the `work/` folder (the one place the panel can write to), add the
+   > three pieces with `nano` or `vim`, and load your file on observer1:
+   >
+   > `cp bird/observer1-none.conf work/my-rov.conf` · `nano work/my-rov.conf` ·
+   > `docker exec lab-observer1 birdc 'configure "/etc/lab-work/my-rov.conf"'`
+   >
+   > `./scripts/lab.sh step3-rov-mark` puts the guide's version back.
 
-3. Now look at the routes again:
+3. **Before you look:** the hijack is still being announced, exactly as
+   before. What do you expect to happen to it now?
 
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all {{ORIGIN_V4}}
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 all {{ORIGIN_V4}}
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+<!-- predict id=s3 answer=2: It disappears from the observers' tables | It stays in the table, marked Invalid with a lower preference, and loses to the legitimate paths | Nothing changes: it still wins, because ROV only marks -->
+
+4. Now look at the routes again:
+
+   ```cmd @observer1
+   birdc show route table master4 all {{ORIGIN_V4}}
    ```
 
-   ```
+   ```output @observer1
    {{ORIGIN_V4}}  unicast [attacker_v4 ...] (100) [AS{{ATTACKER_ASN}}i]
         bgp_path: {{ATTACKER_ASN}}
         bgp_local_pref: 10
         bgp_large_community: ({{OBSERVER1_ASN}}, 1, 0)                   <- ROV Invalid
    ```
 
+   ```cmd @observer2
+   bgpctl show rib {{ORIGIN_V4}}
    ```
+
+   ```output @observer2
    *>    V-? {{ORIGIN_V4}}          10.200.6.10       100     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     V-? {{ORIGIN_V4}}          10.200.5.10       100     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
    *     !-? {{ORIGIN_V4}}          10.200.8.10        10     0 {{ATTACKER_ASN}} i
    ```
 
-   The hijack is still in the table, visible, not gone, but now it carries
+   The hijack is still in the table, but now it carries
    **ROV Invalid** and a `local_pref` of 10, so it loses to the legitimate
-   paths, and Provider B's route is selected again. The badge in the header
-   reads *ROV: marking*, and the attacker's links turn **red**: it's still
-   announcing, and both observers are flagging it now. Everything checks out:
-   the hijack is flagged, the legitimate paths read `Valid`, nothing
-   legitimate got hurt. **That's the whole point of the marking stage:**
-   you get to see what the check *would* do before you let it reject
-   anything.
+   paths, and Provider B's route is selected again. The stage indicator in the
+   header reads *ROV: marking*, and the attacker's links turn **red**: it's
+   still announcing, and both observers are flagging it now. Everything checks
+   out: the hijack is flagged, the legitimate paths read `Valid`, nothing
+   legitimate got hurt. This is what the marking stage is for: it shows
+   what the check would do before you let it reject anything.
 
-   **This is where ROV stays for the rest of the story: marking, not
-   dropping.** A router that only marks still uses an invalid route whenever
-   it happens to be the best one it has, so marking alone doesn't finish the
-   job; it's the rehearsal. Production dropping, for ROV and ASPA together
-   at once, comes in Step 8, once both checks have had their turn to prove
-   themselves this way.
+   ROV stays in marking mode for the rest of the story. Lowering the
+   preference only helps while a valid alternative exists: if the invalid
+   route is the only one, the router still uses it, and a hijack of a *more
+   specific* prefix wins anyway, because routers forward on the longest
+   match before preference comes into play. Marking is a test phase, not a
+   defense. Dropping, for ROV and ASPA together, comes in Step 8, once both
+   checks have proved themselves this way.
+
+<!-- /predict -->
+
+<!-- checkpoint: step3 -->
 
 ### How to read the verdicts
 
@@ -724,10 +912,13 @@ The two observers show them differently:
   So `V-!` is ROV Valid and ASPA Invalid. (No ASPA verification is
   deployed yet, so the second half is `?` for now.)
 
+The panel's *Verdicts* table shows both observers side by side, already
+decoded.
+
 **Along the way:** what "deploying ROV" is made of (an RTR session, a test on
 every route, an action on the result), and how new objects reach the
 routers: Krill publishes, the validators reread, the routers get the change
-over RTR. You just watched every hop happen.
+over RTR. You've now seen each of these hops.
 
 ---
 
@@ -739,50 +930,48 @@ over RTR. You just watched every hop happen.
 > **If yours differs:** `./scripts/lab.sh step4-hijack-posrov`; it also makes
 > sure the ROAs exist and puts the observers back in `rov-mark`.
 
-AS{{ATTACKER_ASN}} has read the same documentation you have. ROV only looks at the **last**
-AS in the path, so what happens if the last AS is the right one?
+ROV only checks the **last** AS in the path. What happens if an attacker puts
+the right AS there?
 
 1. Switch AS{{ATTACKER_ASN}} to the forged-path attack:
 
-   ```
-   #./scripts/lab.sh step4-hijack-posrov
+   ```cmd @lab
+   ./scripts/lab.sh step4-hijack-posrov
    ```
 
    AS{{ATTACKER_ASN}} now announces the path `{{ATTACKER_ASN}} {{ORIGIN_ASN}}`: as if it had received the
    prefix directly from the real origin.
 
-   **That relationship is a lie.** AS{{ATTACKER_ASN}} has no BGP session with AS{{ORIGIN_ASN}}, no
-   peering, no transit, nothing. The two aren't even connected. The
-   `{{ATTACKER_ASN}} {{ORIGIN_ASN}}` adjacency exists only because AS{{ATTACKER_ASN}}'s configuration *writes it into
-   the path*. Take a look at how:
+   **That relationship doesn't exist.** AS{{ATTACKER_ASN}} has no BGP session with
+   AS{{ORIGIN_ASN}}, neither peering nor transit; the two aren't even connected. The
+   `{{ATTACKER_ASN}} {{ORIGIN_ASN}}` adjacency exists only because AS{{ATTACKER_ASN}}'s configuration
+   *writes it into the path*. You can see how in the attacker's own shell:
 
-   ```
-   # Panel: click the attacker box, then Shell:
-   #cat /etc/bird.conf
-   # Or, from your computer's terminal:
-   #cat bird/attacker-posrov.conf
+   ```cmd @attacker
+   cat /etc/bird.conf
    ```
 
-   Find the `forge_export` filters: `bgp_path.prepend(ORIGIN_ASN)` puts the
-   origin's number into the path *before* the router adds its own on export.
-   That's the whole forgery. Compare it with `bird/attacker-simple.conf` (no
-   filter, so the path is just `{{ATTACKER_ASN}}`), and check that neither file has a
-   session with the origin, only the two observers.
+   (It's the file `bird/attacker-posrov.conf` in the lab's folder.) Find the
+   `forge_export` filters: `bgp_path.prepend(ORIGIN_ASN)` puts the origin's
+   number into the path *before* the router adds its own on export. That
+   one line is all the forgery takes. Compare it with
+   `bird/attacker-simple.conf` (no filter,
+   so the path is just `{{ATTACKER_ASN}}`), and check that neither file has a session
+   with the origin, only the two observers.
 
 2. **Before you look:** ROV is only marking right now, not dropping anything,
    but the naive hijack still got flagged Invalid and lost the race. Will
    this forged path get flagged the same way?
 
+<!-- predict id=s4 answer=2: Yes: it's still AS{{ATTACKER_ASN}} announcing someone else's prefix | No: the path ends in AS{{ORIGIN_ASN}}, exactly what the ROA authorizes, so ROV calls it Valid | It depends on which provider it arrives through -->
+
 3. Look:
 
-   ```
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+   ```cmd @observer2
+   bgpctl show rib {{ORIGIN_V4}}
    ```
 
-   ```
+   ```output @observer2
    flags  vs destination          gateway          lpref   med aspath origin
    *>    V-? {{ORIGIN_V4}}          10.200.8.10       100     0 {{ATTACKER_ASN}} {{ORIGIN_ASN}} i
    *m    V-? {{ORIGIN_V4}}          10.200.6.10       100     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
@@ -792,19 +981,24 @@ AS in the path, so what happens if the last AS is the right one?
    It isn't flagged. ROV says `Valid`: the path ends in {{ORIGIN_ASN}}, exactly what
    the ROA authorizes, so it gets full `local_pref` (100) like any
    legitimate route, and it's the selected one. The attacker's links on the
-   panel turn **amber**, no longer red: ROV has nothing left to flag. Three
-   paths, all "valid," one of them a lie, and *nothing you have deployed so
-   far can tell which*.
+   panel turn **orange**, no longer red: ROV has nothing left to flag. All
+   three paths are ROV Valid, one of them is forged, and nothing deployed
+   so far can tell them apart.
 
-   > The forged path (`{{ATTACKER_ASN}} {{ORIGIN_ASN}}`, 2 hops) ties with Provider B's (`{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}`, also 2
-   > hops), and the attacker wins the tie by a tie-breaker: its router ID
-   > happens to be lower. Provider A's backup, at 4 hops, was never in the
-   > race. Beside the point, really: the point is that ROV just handed you
-   > three equally valid-looking routes and no way to choose between them.
+   > The forged path (`{{ATTACKER_ASN}} {{ORIGIN_ASN}}`, 2 hops) ties with Provider B's
+   > (`{{PROVIDER_B_ASN}} {{ORIGIN_ASN}}`, also 2 hops), and the attacker wins the tie by a
+   > tie-breaker: its router ID happens to be lower. Provider A's backup, at 4
+   > hops, was never in the race. The tie-break doesn't matter here. What
+   > matters is that ROV considers all three routes valid and offers no way to
+   > choose between them.
+
+<!-- /predict -->
+
+<!-- checkpoint: step4 -->
 
 **Along the way:** can origin validation tell two paths for the same prefix
-apart, when the origin is the same and a ROA matches? Now you know: it
-can't. It only ever looks at the last AS.
+apart, when the origin is the same and a ROA matches? No: it only looks at the
+last AS.
 
 ---
 
@@ -815,49 +1009,67 @@ can't. It only ever looks at the last AS.
 >
 > **If yours differs:** `./scripts/lab.sh step3-rov-mark` and
 > `./scripts/lab.sh step4-hijack-posrov`; if an ASPA object already exists,
-> `krillc aspas remove --customer AS{{ORIGIN_ASN}}` in the Krill terminal.
+> `krillc aspas remove --customer AS{{ORIGIN_ASN}}` in Krill's terminal.
 
 Same shape as Step 3: the **Origin publishes** an ASPA object, then the
 **Observers validate** it, in the same safe, marking-only form ROV used.
 
 ### The Origin publishes: create the ASPA object
 
-Krill 0.16 still does **not** have ASPA in the web UI; it's managed from the
-command line (the UI is on its way in the next release).
+<!-- challenge id=aspa check=step5-aspa time=300: Publish an ASPA object for AS{{ORIGIN_ASN}} that authorizes only Provider A (AS{{PROVIDER_A_ASN}}) as its upstream (yes, only A: the next step shows why), and get both validators to see it. -->
+<!-- hint: Krill's CA page has an ASPAs tab with an Add ASPA button. On the command line, it's krillc aspas add in Krill's terminal. -->
+<!-- hint: In Krill's form, the customer is {{ORIGIN_ASN}} and the provider list is {{PROVIDER_A_ASN}}: plain numbers, no "AS". Then ./scripts/lab.sh refresh in the Lab terminal. -->
 
-1. On the panel, click the **Krill** box, then the **Terminal (krillc)**
-   button. (Or, from your own terminal: `docker exec -it lab-krill bash`.)
+1. In Krill, go to the CA's **ASPAs** tab and click *Add ASPA*.
 
-2. See that there's no ASPA yet:
+   ![Krill's ASPAs tab and the Add ASPA form](img/krill-aspa.png)
 
+2. Fill in the form declaring which providers may propagate routes from
+   AS{{ORIGIN_ASN}}. For the story's sake, list **only Provider A** for now:
+
+   | field | value |
+   |---|---|
+   | Customer ASN | {{ORIGIN_ASN}} |
+   | Providers ASNs | {{PROVIDER_A_ASN}} |
+
+   Write plain numbers, with no `AS` in front: the form refuses
+   `AS{{PROVIDER_A_ASN}}` ("The provider ASN list is invalid"). Several providers
+   are separated by commas.
+
+   Prefer the command line? In Krill's terminal (here the `AS` is required):
+
+   ```cmd @krill
+   krillc aspas list
+   krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}"
+   krillc aspas list
    ```
-   #krillc aspas list
+
+3. Make the validators pick it up:
+
+   ```cmd @lab
+   ./scripts/lab.sh refresh
    ```
 
-3. Create the ASPA object declaring which providers may propagate routes from
-   AS{{ORIGIN_ASN}}. For the story's sake, list **only Provider A** for now; you'll
-   see why in the next step:
+   > [!IMPORTANT]
+   > **Don't skip the `refresh`.** Without it, the validators may take a couple
+   > of minutes to notice the new object, and everything you look at in the
+   > rest of this step would seem wrong. On the panel, the Routinator and FORT
+   > boxes must read `2 VRP · 1 ASPA` before you move on.
 
-   ```
-   #krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}"
-   ```
+<!-- /challenge -->
 
-4. Check it, and make the validators pick it up:
+<!-- checkpoint: step5-aspa -->
 
-   ```
-   #krillc aspas list
-   #./scripts/lab.sh refresh
-   ```
-
-> **About the notation.** Krill's syntax accepts a per-address-family
-> restriction (`AS{{PROVIDER_A_ASN}}(v4)`), but the ASPA profile's final version at the
-> IETF **removed** that option: a single ASPA object applies to both IPv4 and
-> IPv6 at once. Don't use the `(v4)`/`(v6)` qualifiers.
+> **About the notation.** Early drafts of the ASPA profile let an object
+> restrict a provider to one address family, and older Krill versions wrote
+> it as `AS{{PROVIDER_A_ASN}}(v4)`. Later versions of the profile **removed** that
+> option, and Krill 0.16 rejects it: a single ASPA object applies to both
+> IPv4 and IPv6 at once.
 >
-> **One object per customer AS.** The RFC requires exactly one ASPA object
-> per customer ASN, listing *all* the providers. `krillc aspas add` replaces
+> **One object per customer AS.** The ASPA profile expects a single object
+> per customer ASN, listing *all* its providers. `krillc aspas add` replaces
 > the whole object (so it's safe to repeat); to change the list, use
-> `krillc aspas update`.
+> `krillc aspas update` (or edit it on the ASPAs tab).
 >
 > **Watch out for a flag.** Without `--enable-aspa`, Routinator simply
 > ignores ASPA objects. It's the number-one mistake when setting up a lab
@@ -870,15 +1082,20 @@ published, and no router is verifying paths.
 
 1. Deploy ASPA verification on both observers; ROV keeps only marking:
 
+   ```cmd @lab
+   ./scripts/lab.sh step5-aspa-mark
    ```
-   #./scripts/lab.sh step5-aspa-mark
-   ```
+
+   > [!IMPORTANT]
+   > Check the stage indicator in the panel's header: it must read
+   > **ROV: marking · ASPA: marking** (`aspa-mark`). observer2 restarts to
+   > apply it, so give it ten or fifteen seconds before looking at its routes.
 
 2. **Compare with the stage you just left** (`rov-mark`):
 
-   ```
-   #diff bird/observer1-rov-mark.conf bird/observer1-aspa-mark.conf
-   #diff openbgpd/observer2-rov-mark.conf openbgpd/observer2-aspa-mark.conf
+   ```cmd @lab
+   diff bird/observer1-rov-mark.conf bird/observer1-aspa-mark.conf
+   diff openbgpd/observer2-rov-mark.conf openbgpd/observer2-aspa-mark.conf
    ```
 
    The same three ideas, this time for paths:
@@ -886,16 +1103,16 @@ published, and no router is verifying paths.
    **(a) The validator now also delivers ASPA objects.** ASPA only travels in
    RTR version 2, so each router asks for it:
 
-   ```
-   aspa table aspa_table;                          # observer1 (BIRD)
+   ```conf @observer1
+   aspa table aspa_table;
    protocol rpki routinator {
        ...
        aspa { table aspa_table; };                 # ASPA only exists on RTR version 2
    }
    ```
 
-   ```
-   rtr 172.30.0.50 {                               # observer2 (OpenBGPD)
+   ```conf @observer2
+   rtr 172.30.0.50 {
        port 3323
        min-version 2                               # without it, no ASPA ever arrives
    }
@@ -904,8 +1121,8 @@ published, and no router is verifying paths.
    **(b) A test on every path**, and **(c) an action on the result**, in this
    stage only marking:
 
-   ```
-   case aspa_check_upstream(aspa_table) {          # observer1 (BIRD)
+   ```conf @observer1
+   case aspa_check_upstream(aspa_table) {
        ASPA_INVALID: {
            bgp_large_community.add((OBSERVER1_ASN,2,0));
            bgp_local_pref = 20;                    # lose to a valid path
@@ -918,8 +1135,8 @@ published, and no router is verifying paths.
    }
    ```
 
-   ```
-   neighbor 10.200.5.10 {                          # observer2 (OpenBGPD)
+   ```conf @observer2
+   neighbor 10.200.5.10 {
        remote-as $provider_a_asn
        role provider                               # <- what turns ASPA verification on
    }
@@ -927,6 +1144,10 @@ published, and no router is verifying paths.
    match from any avs invalid    set { localpref 20 }      # lose to a valid path
    match from any avs valid      set { localpref 200 }     # prefer a proven path
    ```
+
+   Raising Valid paths to 200 is a choice made for this lab, so the effect
+   is easy to see. In production, operators usually act only on Invalid and
+   leave Valid and Unknown paths at the same preference.
 
    > **Why "upstream"?** The observer treats each neighbor as its
    > *customer*. For routes coming from a customer, the strictest algorithm
@@ -941,16 +1162,18 @@ published, and no router is verifying paths.
    > platforms is still arriving. Where it exists, it has the same anatomy as
    > the ROV deployment you saw in Step 3.
 
-3. Look at the routes:
+3. **Before you look:** the ASPA object lists only Provider A. Which path do
+   you expect the observers to select now?
 
-   ```
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+<!-- predict id=s5 answer=3: The forged path, which still ties at 2 hops | Provider B's path, the origin's preferred way in | Provider A's path, the backup, the only one ASPA calls valid -->
+
+4. Look at the routes:
+
+   ```cmd @observer2
+   bgpctl show rib {{ORIGIN_V4}}
    ```
 
-   ```
+   ```output @observer2
    *>    V-V {{ORIGIN_V4}}          10.200.5.10       200     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.8.10        20     0 {{ATTACKER_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.6.10        20     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
@@ -959,17 +1182,19 @@ published, and no router is verifying paths.
    The forged path is now **ASPA Invalid**: the hop `{{ORIGIN_ASN}} → {{ATTACKER_ASN}}` isn't
    authorized, since only {{PROVIDER_A_ASN}} is listed. Still visible, but with a
    `local_pref` of 20 it loses to Provider A's path (`V-V`, 200). The
-   attacker's links turn **red** again, and the badge reads *ROV: marking ·
-   ASPA: marking*.
+   attacker's links turn **red** again.
 
-   Two routes carry `V-!`, though, not one. Look closely at the second one:
-   it's **Provider B**, the origin's own preferred way in from Step 1's
-   traffic engineering. The ASPA object you just created lists only Provider
-   A, so ASPA calls Provider B's path invalid too, and what gets selected
-   instead is Provider A's path, the *backup*, the one the origin deliberately
-   made longer with its prepends. Nothing is dropped yet, so you get to catch
-   this mistake before it costs anything. Hold that thought into the next
-   step.
+   But two routes carry `V-!`. Look closely at the second one: it's **Provider
+   B**, the origin's own preferred way in from Step 1's traffic engineering.
+   The ASPA object you just created lists only Provider A, so ASPA calls
+   Provider B's path invalid too, and what gets selected instead is Provider
+   A's path, the *backup*, the one the origin deliberately made longer with its
+   prepends. Nothing is dropped yet, so you get to catch the mistake before it
+   costs anything. The next step fixes it.
+
+<!-- /predict -->
+
+<!-- checkpoint: step5 -->
 
 **Along the way:** the ASPA verdict ROV could never give (the path itself is
 what's wrong, even though the origin is right), and a reminder of why
@@ -980,42 +1205,49 @@ ASPA object before it took anything down.
 
 ## Step 6: You forgot a provider
 
-> **State:** stage `aspa-mark` · AS{{ATTACKER_ASN}} forging the path · peer silent · ROAs for
-> both prefixes · ASPA listing Provider A only.
+> **State:** stage `aspa-mark` · AS{{ATTACKER_ASN}} forging the path · peer silent · ROAs
+> for both prefixes · ASPA listing Provider A only.
 >
-> **If yours differs:** `./scripts/lab.sh step5-aspa-mark`, and in the Krill
+> **If yours differs:** `./scripts/lab.sh step5-aspa-mark`, and in Krill's
 > terminal `krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}"` (this replaces the
 > object with exactly that list), then `./scripts/lab.sh refresh`.
 
-The route you noticed at the end of the last step, Provider B's, marked
-ASPA Invalid alongside the forged one, is a *legitimate* path, **the very
-one the origin prefers**, demoted for no better reason than an incomplete
-object. The observers are stuck using the backup path, the one the origin
-deliberately made longer with its prepends: the origin's own traffic
-engineering, undone by an incomplete ASPA. Once this stage drops instead of
-marks (Step 8), this is the day traffic that used to arrive through that
-interface stops arriving, and someone starts asking why. This lab has no
-data plane, so you can't watch traffic actually stop, but you can watch the
-route's preference collapse, which is the same story told a different way.
+Provider B's route, flagged ASPA Invalid next to the forged one at the end of
+the last step, is *legitimate*. It's **the very path the origin prefers**,
+demoted only because the ASPA object is incomplete. The observers fall back to
+the backup through Provider A, the path the origin made longer on purpose, so
+the origin's own traffic engineering is undone. Once this stage drops instead
+of marks (Step 8), every network that verifies ASPA rejects the path through
+Provider B, and traffic from those networks moves to the backup. If Provider A
+didn't exist, that traffic would stop reaching the origin at all. This lab has
+no data plane, so you can't watch the traffic move, but you can watch the
+route's preference collapse, which shows the same effect.
 
-1. Fix the object:
+<!-- challenge id=fix check=step6 time=240: Fix the ASPA object so that the origin's preferred path is valid and selected again, without touching anything but the object. -->
+<!-- hint: Which of the origin's two providers is missing from the object? -->
+<!-- hint: Add AS{{PROVIDER_B_ASN}} to the object (ASPAs tab in Krill, or krillc aspas update in its terminal), then run ./scripts/lab.sh refresh. -->
 
+1. Fix the object, in Krill's terminal:
+
+   ```cmd @krill
+   krillc aspas update --customer AS{{ORIGIN_ASN}} --add "AS{{PROVIDER_B_ASN}}"
+   krillc aspas list
    ```
-   #krillc aspas update --customer AS{{ORIGIN_ASN}} --add "AS{{PROVIDER_B_ASN}}"
-   #krillc aspas list
-   #./scripts/lab.sh refresh
+
+   (Or, on Krill's **ASPAs** tab, edit the object and make the provider list
+   `{{PROVIDER_A_ASN}}, {{PROVIDER_B_ASN}}`.) Then:
+
+   ```cmd @lab
+   ./scripts/lab.sh refresh
    ```
 
 2. Check the observers:
 
-   ```
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+   ```cmd @observer2
+   bgpctl show rib {{ORIGIN_V4}}
    ```
 
-   ```
+   ```output @observer2
    *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     V-V {{ORIGIN_V4}}          10.200.5.10       200     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.8.10        20     0 {{ATTACKER_ASN}} {{ORIGIN_ASN}} i
@@ -1033,19 +1265,21 @@ route's preference collapse, which is the same story told a different way.
    command to jump straight to this step's state later, from anywhere in the
    story, without typing the `krillc` command by hand again.)
 
-3. BIRD picked up the change on its own, with nobody touching the router,
-   because its sessions are set up with `import table on` and `rpki reload
-   on`. To force revalidation by hand:
+<!-- /challenge -->
 
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc reload in provider_b_v4
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc reload in provider_b_v4
-   ```
+<!-- checkpoint: step6 -->
+
+BIRD picked up the change on its own, with nobody touching the router,
+because its sessions are set up with `import table on` and `rpki reload
+on`. To force revalidation by hand:
+
+```cmd @observer1
+birdc reload in provider_b_v4
+```
 
 **Along the way:** what happens when an ASPA object forgets a real provider
-(half the Internet starts seeing that provider's routes as invalid), and how
+(every network that verifies ASPA treats paths through that provider as
+invalid), and how
 a fix propagates: republish, revalidate, no router touched by hand.
 
 Leave AS{{ATTACKER_ASN}} running. It's harmless now, and it's a useful reminder on the panel
@@ -1062,36 +1296,35 @@ of what's being kept out.
 > everything this step needs (ASPA listing both providers, peer silent)
 > without the leak.
 
-This one is nobody's attack. The peer, a legitimate network, has a private
+This one isn't an attack. The peer, a legitimate network, has a private
 peering link with the origin, so it *learns* the origin's prefixes. A peering
 link is bilateral: what the peer learns there isn't meant for its own
-provider. Then somebody edits a configuration...
+provider. Then a configuration error makes the peer pass them on to Provider A.
 
 1. Switch the leak on:
 
-   ```
-   #./scripts/lab.sh step7-leak-on
+   ```cmd @lab
+   ./scripts/lab.sh step7-leak-on
    ```
 
    The peer now re-announces to Provider A what it learned from the origin.
    Nothing is forged: the peer is telling the truth about where the route
-   came from. On the panel, the peer's pill reads *leaking*.
+   came from. On the panel, the peer's box reads *leaking*.
 
-2. **Before you look:** Provider A now has two routes for the origin's
-   prefix, the origin's own, and the peer's. Which one does Provider A pass
-   on to the observers? And once it arrives, still only *marking* what looks
-   invalid, will you be able to see it?
+2. **Before you look:** Provider A now has two routes for the origin's prefix,
+   the origin's own, and the peer's. Which one does Provider A pass on to the
+   observers? And since the observers are still only marking, will you be able
+   to see it when it arrives?
+
+<!-- predict id=s7 answer=2: The origin's own route: it comes straight from its customer | The peer's route: it's shorter (2 hops against the prepended 3) | Both: Provider A passes on every route it has -->
 
 3. Look at Provider A first:
 
-   ```
-   # Panel: click the provider-a box, then Shell:
-   #birdc show route {{ORIGIN_V4}} all
-   # Or, from your computer's terminal:
-   #docker exec lab-provider-a birdc show route {{ORIGIN_V4}} all
+   ```cmd @provider-a
+   birdc show route {{ORIGIN_V4}} all
    ```
 
-   ```
+   ```output @provider-a
    {{ORIGIN_V4}}  unicast [customer_peer_v4 ...] * (100) [AS{{ORIGIN_ASN}}i]
         bgp_path: {{PEER_ASN}} {{ORIGIN_ASN}}
         bgp_local_pref: 100
@@ -1101,38 +1334,33 @@ provider. Then somebody edits a configuration...
    ```
 
    Provider A only ever passes on its *best* route, and nothing special was
-   configured to make the peer's win: it's simply **shorter**, 2 hops
-   against the origin's own 3. The prepends that made Provider A the
-   *backup* also made a leak through it irresistible. That's typical: a
-   leaked route wins because someone's traffic engineering made the honest
-   path look worse. (See `bird/provider-a.conf`; there's no policy there at
-   all.)
+   configured to make the peer's win: it's simply **shorter**, 2 hops against
+   the origin's own 3. The prepends that made Provider A the *backup* also made
+   a leak through it the preferred route. This happens a lot in practice: a
+   leaked route wins because someone's traffic engineering made the honest path
+   look worse. (See `bird/provider-a.conf`; there's no policy there at all.)
 
 4. Now the observers:
 
-   ```
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+   ```cmd @observer2
+   bgpctl show rib {{ORIGIN_V4}}
    ```
 
-   ```
+   ```output @observer2
    *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.8.10        20     0 {{ATTACKER_ASN}} {{ORIGIN_ASN}} i
    *     V-! {{ORIGIN_V4}}          10.200.5.10        20     0 {{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}} i
    ```
 
    **Provider A's own path is already gone.** It stopped advertising it the
-   moment it picked the peer's shorter one as best, and that has nothing to
-   do with what the observers do with what they receive. What arrives from
-   Provider A instead is the leaked path, `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}`, and since
-   marking never removes anything from the table, you get to look straight
-   at it. Two things worth noticing:
+   moment it picked the peer's shorter one as best. That happened at Provider
+   A, not at the observers. What arrives from Provider A instead is the leaked
+   path, `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}`, and since marking never removes anything from
+   the table, you get to look straight at it. Two things worth noticing:
 
-   - **ROV Valid.** Of course: the origin really is {{ORIGIN_ASN}}. Nothing is
-     forged. *A leak can never be caught by ROV*: it doesn't lie about who
-     originated the prefix, it lies about the *shape of the path*.
+   - **ROV Valid.** The origin really is {{ORIGIN_ASN}}. Nothing is forged. *ROV can
+     never catch a leak*: the origin is genuine; what's wrong is *where the
+     route went*.
    - **ASPA Invalid.** The hop `{{ORIGIN_ASN}} → {{PEER_ASN}}` was never authorized: the
      origin's ASPA object lists Providers A and B, and the peer is neither.
 
@@ -1142,18 +1370,22 @@ provider. Then somebody edits a configuration...
    its *backup*, and Provider A's other customers are now sending their
    traffic to the origin through the peer.
 
-**Along the way:** a route leak is nobody forging anything. It's a route
-crossing a boundary it was never supposed to cross, and it's a verdict ROV
-structurally cannot give, because the origin at the end of the path is
-telling the truth. ASPA catches it for the same reason it caught Step 4's
-forgery: an unauthorized hop, wherever it happens to sit in the path.
+<!-- /predict -->
+
+<!-- checkpoint: step7 -->
+
+**Along the way:** in a route leak nothing is forged: a route is passed on to
+a neighbor it shouldn't reach. ROV can't detect it, because the origin at the
+end of the path is correct. ASPA catches it for the same reason it caught Step
+4's forgery: an unauthorized hop, wherever it happens to sit in the path.
 
 ---
 
 ## Step 8: Deploying for real (drop)
 
-> **State:** stage `aspa-mark` · AS{{ATTACKER_ASN}} forging the path (marked, losing) · the peer
-> leaking (marked, losing) · ROAs for both prefixes · ASPA listing Providers A and B.
+> **State:** stage `aspa-mark` · AS{{ATTACKER_ASN}} forging the path (marked, losing) ·
+> the peer leaking (marked, losing) · ROAs for both prefixes · ASPA listing
+> Providers A and B.
 >
 > **If yours differs:** `./scripts/lab.sh step7-leak-on`; it sets up
 > everything this step needs, leak included.
@@ -1162,81 +1394,91 @@ Every invalid route you've seen so far has stayed on the table, demoted but
 visible, deliberately, so you could look at exactly what each check decided
 before trusting it with anything. **A real router doesn't stop there.**
 Marking a route invalid and still using it whenever nothing better shows up
-isn't what ROV or ASPA are for; neither protects anything until an invalid
-route is actually rejected. This is the step where that happens, for both
-checks together, the way you'd configure a production router from the
-start.
+isn't what ROV or ASPA are for: a demoted route is still used when it's the
+only one, and a more specific hijack wins regardless of preference. Only
+rejecting invalid routes closes those gaps. This is the step where that
+happens, for both checks together, the way you'd configure a production
+router from the start.
 
 1. Switch both observers to dropping:
 
-   ```
-   #./scripts/lab.sh step8-drop
+   ```cmd @lab
+   ./scripts/lab.sh step8-drop
    ```
 
 2. Compare the stage you just left with this one; the change is one line of
    policy per check, on each router:
 
-   ```
-   #diff bird/observer1-aspa-mark.conf bird/observer1-aspa-drop.conf
-   #diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-aspa-drop.conf
+   ```cmd @lab
+   diff bird/observer1-aspa-mark.conf bird/observer1-aspa-drop.conf
+   diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-aspa-drop.conf
    ```
 
-   ```
+   ```conf @observer1
        if roa_check(roa4_table, net, bgp_path.last) = ROA_INVALID then
-           reject "ROV Invalid: ", net, " origin AS", bgp_path.last;   # observer1 (BIRD)
+           reject "ROV Invalid: ", net, " origin AS", bgp_path.last;
        ...
        ASPA_INVALID: reject "ASPA Invalid: ", net, " AS_PATH ", bgp_path;
    ```
 
-   ```
-   deny from any ovs invalid                               # observer2 (OpenBGPD)
+   ```conf @observer2
+   deny from any ovs invalid
    deny from any avs invalid
    ```
 
-3. Look at the routes again:
+3. **Before you look:** how many routes for {{ORIGIN_V4}} do you expect
+   observer2 to keep now?
 
-   ```
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+<!-- predict id=s8 answer=1: One: Provider B's | Two: Provider B's and Provider A's own path, which comes back | Three: nothing changes until the validators refresh -->
+
+4. Look at the routes again:
+
+   ```cmd @observer2
+   bgpctl show rib {{ORIGIN_V4}}
    ```
 
-   ```
+   ```output @observer2
    *>    V-V {{ORIGIN_V4}}          10.200.6.10       200     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
    ```
 
-   **Two routes disappeared, not one.** AS{{ATTACKER_ASN}}'s forged path is gone, as
+   **Two routes disappeared.** AS{{ATTACKER_ASN}}'s forged path is gone, as
    expected. So is the entry that used to sit under Provider A, the leaked
-   path you just inspected. It isn't lost, though: BIRD keeps what it
-   rejects:
+   path you just inspected.
 
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 filtered {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 filtered {{ORIGIN_V4}}
+<!-- /predict -->
+
+5. The rejected routes aren't lost, though: BIRD keeps what it rejects, in
+   a separate view of its table. Find them on observer1:
+
+<!-- challenge id=filtered time=180: Show the routes for {{ORIGIN_V4}} that observer1 rejected. -->
+<!-- hint: It's the same birdc show route command you've been using, with one more word. -->
+
+   ```cmd @observer1
+   birdc show route table master4 filtered {{ORIGIN_V4}}
    ```
 
-   The badge now reads *ROV + ASPA: dropping*. Notice what dropping did
-   **not** fix: Provider A's own, legitimate path is still nowhere to be
+<!-- /challenge -->
+
+   The stage indicator now reads *ROV + ASPA: dropping*. Notice what dropping
+   did **not** fix: Provider A's own, legitimate path is still nowhere to be
    seen, because Provider A itself is still advertising the leaked route
    *instead of* its own, and no policy on the observers can make Provider A
    propagate something it isn't sending. ASPA protects the observers from
    *using* the leak; only the peer fixing its export policy stops the leak
-   at the source. That's next.
+   at the source. Step 9 does that.
+
+<!-- checkpoint: step8 -->
 
 **Along the way:**
 
 - **Marking versus dropping.** Same verdicts as Steps 3, 5 and 7; the policy
   is what changed. Marking is how you roll a check out without breaking
-  anything; dropping is what the check is *for*, and it's what turns a
-  diagnostic into a defense.
+  anything; dropping is what actually protects the network.
 - **Dropping doesn't repair upstream damage.** It only controls what the
   observers themselves accept. Provider A propagating the leak is a separate
   problem, fixed at the source, not at the observers.
-- **From here on, both checks keep dropping.** A router that has learned to
-  reject invalid routes doesn't go back.
+- **From here on, both checks keep dropping.** Production routers stay in
+  drop mode.
 
 ---
 
@@ -1247,8 +1489,8 @@ start.
 
 1. Stop the leak:
 
-   ```
-   #./scripts/lab.sh step9-leak-off
+   ```cmd @lab
+   ./scripts/lab.sh step9-leak-off
    ```
 
    Provider A's own path returns on both observers.
@@ -1256,9 +1498,11 @@ start.
 2. If you're going on to the extra exercises, silence AS{{ATTACKER_ASN}} too; they'll be
    easier to read without it:
 
+   ```cmd @lab
+   ./scripts/lab.sh step9-hijack-off
    ```
-   #./scripts/lab.sh step9-hijack-off
-   ```
+
+<!-- checkpoint: step9 -->
 
 The observers stay fully deployed, ROV and ASPA both dropping, which is
 where a real router ends up. (`./scripts/lab.sh step1-clean` is the way back
@@ -1275,12 +1519,12 @@ off the observers.)
 | Forged path (AS_PATH `{{ATTACKER_ASN}} {{ORIGIN_ASN}}`) | **fooled** (origin looks right) | **catches it** (the hop `{{ORIGIN_ASN}} → {{ATTACKER_ASN}}` isn't authorized) |
 | Route leak (AS_PATH `{{PROVIDER_A_ASN}} {{PEER_ASN}} {{ORIGIN_ASN}}`) | **can't see it** (origin is genuine) | **catches it** (the hop `{{ORIGIN_ASN}} → {{PEER_ASN}}` isn't authorized) |
 
-Neither is redundant. ROV stops attackers who lie about the origin; ASPA
+You need both. ROV stops attackers who lie about the origin; ASPA
 stops paths that couldn't have happened. And the origin has to do its part
-too: an ASPA object that forgets a real provider (Step 6) is its own outage.
+too: an ASPA object that forgets a real provider (Step 6) diverts traffic by
+itself, and cuts it off entirely if that provider was the only way in.
 
-Along the way, the story quietly answered questions this lab used to ask one
-exercise at a time:
+Along the way, the story also answered these questions:
 
 - **What does "deploying validation" on a router actually consist of?** A
   session to a validator, a test on every route or path, and an action on the
@@ -1325,7 +1569,7 @@ commands move both observers there in one go.
 
 In `bird/observer1-aspa-mark.conf` the ASPA check is:
 
-```
+```conf @observer1
 case aspa_check_upstream(aspa_table) { ... }
 ```
 
@@ -1333,13 +1577,14 @@ The observer treats each neighbor as its **customer**. For routes coming
 from a customer, the *Algorithm for Upstream Paths* applies, and it's the
 strictest one: every hop in the path has to be an authorized
 customer→provider relationship. This is the check that catches route leaks.
-If the session were with a provider or a peer instead, the right call would
-be `aspa_check_downstream()`, which is more permissive. BIRD offers both.
+The same algorithm applies to routes from a lateral peer. Only if the session
+were with a provider would the right call be `aspa_check_downstream()`,
+which is more permissive. BIRD offers both.
 
 OpenBGPD does it with a session **role** (RFC 9234). Look at
 `openbgpd/observer2-aspa-mark.conf`:
 
-```
+```conf @observer2
 neighbor 10.200.5.10 {
     remote-as $provider_a_asn
     role provider
@@ -1353,12 +1598,15 @@ and that selects the *upstream* algorithm, the same one observer1 asks BIRD
 for with `aspa_check_upstream()`.
 
 To see the difference, you need a path that the strict algorithm rejects and
-the permissive one doesn't. Take Provider B back out of the ASPA object (in the
-Krill terminal):
+the permissive one doesn't. Take Provider B back out of the ASPA object, in
+Krill's terminal, and refresh:
 
+```cmd @krill
+krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}"
 ```
-#krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}"
-#./scripts/lab.sh refresh
+
+```cmd @lab
+./scripts/lab.sh refresh
 ```
 
 The path through Provider B now reads Invalid on both observers.
@@ -1370,72 +1618,75 @@ The path through Provider B now reads Invalid on both observers.
 2. `openbgpd/observer2-extra-a-role-customer.conf` is
    `openbgpd/observer2-aspa-mark.conf` with exactly that one word changed:
    `role provider` to `role customer` on the Provider B neighbors
-   (10.200.6.10 and fd00:6::10). Open it and compare (`diff
-   openbgpd/observer2-aspa-mark.conf openbgpd/observer2-extra-a-role-customer.conf`),
-   then apply it by hand, not through `lab.sh`, since this state only exists
+   (10.200.6.10 and fd00:6::10). Compare the two in the Lab terminal:
+
+   ```cmd @lab
+   diff openbgpd/observer2-aspa-mark.conf openbgpd/observer2-extra-a-role-customer.conf
+   ```
+
+   Then apply it by hand, not through `lab.sh`, since this state only exists
    for this exercise:
 
-   ```
-   # Panel: click the observer2 box, then Shell:
-   #cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload
-   #bgpctl show rib {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer2 sh -c "cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload"
-   #docker exec lab-observer2 bgpctl show rib {{ORIGIN_V4}}
+   ```cmd @observer2
+   cp /etc/openbgpd-lab/observer2-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload
+   bgpctl show rib {{ORIGIN_V4}}
    ```
 
    The path through Provider B comes back **Valid**. Same objects, same
-   AS_PATH, a different verdict, and neither implementation is wrong. This
-   is the clearest demonstration in the whole lab that "is this path
-   ASPA-valid?" can't be answered without also saying *from whom* you
-   received it.
+   AS_PATH, a different verdict, and neither implementation is wrong. It shows,
+   more clearly than anything else in the lab, that "is this path ASPA-valid?"
+   can't be answered without also saying *from whom* you received it.
 
 3. Now do the equivalent on BIRD: `bird/observer1-extra-a-downstream.conf` is
    `bird/observer1-aspa-mark.conf` with `aspa_check_upstream` swapped for
-   `aspa_check_downstream` in both filters, open it and compare the same
-   way, then apply it by hand:
+   `aspa_check_downstream` in both filters. Compare it the same way, then
+   apply it by hand (the single quotes matter: BIRD needs the double quotes
+   around the file name to reach it):
 
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc configure "/etc/bird-lab/observer1-extra-a-downstream.conf"
+   ```cmd @observer1
+   birdc 'configure "/etc/bird-lab/observer1-extra-a-downstream.conf"'
    ```
 
    **Before you look:** do you expect observer1's new verdict to match
    observer2's `role customer` result (`Valid`), or its `role provider`
    result (`Invalid`)?
 
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc show route table master4 all {{ORIGIN_V4}}
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show route table master4 all {{ORIGIN_V4}}
+   ```cmd @observer1
+   birdc show route table master4 all {{ORIGIN_V4}}
    ```
 
-   Neither, quite. BIRD reports the Provider B path as **ASPA Unknown**
+   Neither. BIRD reports the Provider B path as **ASPA Unknown**
    (`({{OBSERVER1_ASN}}, 2, 1)`). Both readings are far more permissive than the upstream
-   algorithm, which said `Invalid`, but where OpenBGPD calls the path
-   valid, BIRD just says it can't tell. Two independent implementations,
-   reading the same edge of the same draft differently.
+   algorithm, which said `Invalid`, but where OpenBGPD calls the path valid,
+   BIRD just says it can't tell. The two implementations read the same corner
+   case of the draft differently.
 
 4. Compare the observers side by side, then discuss: if "upstream" and
    "downstream" is fundamentally about *who you received the route from*,
    what should happen in a topology where the same neighbor is a provider for
-   one prefix and a customer for another? (This is why BIRD's choice of
-   algorithm is a per-session `aspa_check_*()` call rather than a lab-wide
-   setting, and why OpenBGPD's `role` is set inside each `neighbor` block.)
+   one prefix and a customer for another? (OpenBGPD ties the algorithm to
+   the `role` inside each `neighbor` block, one per session. BIRD calls
+   `aspa_check_*()` from the import filter, so a filter could even choose
+   the algorithm per prefix. The ASPA drafts call these *complex
+   relationships* and admit that ASPA can't describe them fully.)
 
-5. Undo: restore `role provider` and `aspa_check_upstream`, re-add Provider B
-   to the ASPA (`krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}, AS{{PROVIDER_B_ASN}}"`),
-   run `./scripts/lab.sh step5-aspa-mark` and `./scripts/lab.sh refresh`.
+5. Undo: put Provider B back into the ASPA object and return both observers
+   to the guide's `aspa-mark` configuration:
+
+   ```cmd @krill
+   krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}, AS{{PROVIDER_B_ASN}}"
+   ```
+
+   ```cmd @lab
+   ./scripts/lab.sh step6-add-provider-b
+   ```
 
 6. One more edge case, while you're here: switch AS{{ATTACKER_ASN}} back to its naive
-   hijack (`./scripts/lab.sh step2-hijack-simple`). With **one AS** in the
-   path there's no customer→provider hop to check, so ASPA has nothing to say
-   about *who may originate a prefix*; that was never its job. BIRD calls
-   such a path `Valid` (`({{OBSERVER1_ASN}}, 2, 2)`), OpenBGPD `Unknown` (`?`). Again two
-   readings of an edge. Go back with `./scripts/lab.sh step9-hijack-off`.
+   hijack (`./scripts/lab.sh step2-hijack-simple`). With **one AS** in the path
+   there's no customer→provider hop to check, so ASPA has nothing to say about
+   *who may originate a prefix*; that was never its job. BIRD calls such a path
+   `Valid` (`({{OBSERVER1_ASN}}, 2, 2)`), OpenBGPD `Unknown` (`?`). Another corner case
+   read two ways. Go back with `./scripts/lab.sh step9-hijack-off`.
 
 ### B. Right ASN, prefix too specific
 
@@ -1455,65 +1706,56 @@ announced only to Provider A and the other only to Provider B.
 static routes for `3fff:cafe:1000::/40` and `3fff:cafe:2000::/40` (both
 inside {{ORIGIN_V6}}, both more specific than {{ORIGIN_V6_MAXLEN}} authorizes),
 and each provider's export filter extended to also carry its own sub-block.
-Open it and compare with `bird/origin.conf` (`diff bird/origin.conf
-bird/origin-extra-b.conf`) before applying it by hand:
+Compare it with `bird/origin.conf` (`diff bird/origin.conf
+bird/origin-extra-b.conf` in the Lab terminal) before applying it by hand on
+the origin:
 
-```
-# Panel: click the origin box, then Shell:
-#birdc configure "/etc/bird-lab/origin-extra-b.conf"
-# Or, from your computer's terminal:
-#docker exec lab-origin birdc configure "/etc/bird-lab/origin-extra-b.conf"
+```cmd @origin
+birdc 'configure "/etc/bird-lab/origin-extra-b.conf"'
 ```
 
 Look at what each provider actually received:
 
+```cmd @provider-a
+birdc show route
 ```
-# Panel: click the provider-a box, then Shell:
-#birdc show route
-# Panel: click the provider-b box, then Shell:
-#birdc show route
+
+```cmd @provider-b
+birdc show route
 ```
 
 Provider A has `3fff:cafe:1000::/40`; Provider B has `3fff:cafe:2000::/40`.
 Each only got the one meant for it. Now the observers:
 
-```
-# Panel: click the observer2 box, then Shell:
-#bgpctl show rib 3fff:cafe:1000::/40
-#bgpctl show rib 3fff:cafe:2000::/40
-# Or, from your computer's terminal:
-#docker exec lab-observer2 bgpctl show rib 3fff:cafe:1000::/40
-#docker exec lab-observer2 bgpctl show rib 3fff:cafe:2000::/40
+```cmd @observer2
+bgpctl show rib 3fff:cafe:1000::/40
+bgpctl show rib 3fff:cafe:2000::/40
 ```
 
-```
+```output @observer2
 *>    !-? 3fff:cafe:1000::/40  fd00:5::10         10     0 {{PROVIDER_A_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} {{ORIGIN_ASN}} i
 ```
 
-```
+```output @observer2
 *>    !-? 3fff:cafe:2000::/40  fd00:6::10         10     0 {{PROVIDER_B_ASN}} {{ORIGIN_ASN}} i
 ```
 
-Both paths are **ROV Invalid**, each a perfectly legitimate announcement
-through an authorized provider, rejected for the same reason on both sides.
-The ROA for {{ORIGIN_V6}} only authorizes announcements up to
-`/{{ORIGIN_V6_MAXLEN}}`, and both sub-blocks are more specific than that. It
-isn't about Provider A or Provider B, it's the prefix. In `rov-mark` both
-stay visible, demoted, exactly like the hijack in Step 3. Run `step8-drop`
-and they vanish the same way the hijack later did.
+Both paths are **ROV Invalid**: legitimate announcements, through authorized
+providers, flagged for the same reason. The ROA for {{ORIGIN_V6}} only authorizes
+announcements up to `/{{ORIGIN_V6_MAXLEN}}`, and both sub-blocks are more specific than that.
+The cause is the prefix length, not the provider. In `rov-mark` both stay
+visible, demoted, exactly like the hijack in Step 3. Run `step8-drop` and they
+vanish the same way the hijack later did.
 
-Undo when you're done:
+Undo when you're done (a bare `configure` reloads the origin's normal file):
 
-```
-# Panel: click the origin box, then Shell:
-#birdc configure
-# Or, from your computer's terminal:
-#docker exec lab-origin birdc configure
+```cmd @origin
+birdc configure
 ```
 
 > **The pattern:** ROV checks *what is being announced and by whom*. ASPA
-> checks *whether the path that carried it here is one the origin
-> authorized*. This exercise, and the naive hijack of Step 2, break ROV
+> checks *whether the path that carried it here agrees with the providers each
+> AS in it declared*. This exercise, and the naive hijack of Step 2, break ROV
 > without touching ASPA; the forged path and the leak break ASPA without
 > touching ROV. A real deployment wants both running.
 
@@ -1524,12 +1766,12 @@ Undo when you're done:
 The story only ever looked at the routers' verdicts. This looks at how they
 got there.
 
-1. Open Routinator: **http://routinator.localhost:8080**
+1. Open Routinator: the **Routinator** button at the top of the panel.
 
    It's configured to validate **only** the lab's own trust anchor, not the
    whole Internet:
 
-   ```
+   ```conf @routinator
    --no-rir-tals  --extra-tals-dir=/tals  --enable-aspa
    ```
 
@@ -1538,23 +1780,22 @@ got there.
    from the registry panel); in `MODE=beta`, from
    `https://rpki-test-ta.beta.registro.br/ta/ta.tal`.
 
-2. Look at the validated set, with ROAs and ASPAs:
+2. Look at the validated set, with ROAs and ASPAs, as JSON. From the Lab
+   terminal, Routinator is reached by its name inside the lab's network:
 
+   ```cmd @lab
+   curl -s http://routinator:8323/json
    ```
-   #curl -s http://routinator.localhost:8080/json
-   ```
+
+   (From your own computer's terminal, the same data is at
+   `http://localhost:8080/api/routinator/json`.)
 
 3. See what observer1 received over RTR:
 
-   ```
-   # Panel: click the observer1 box, then Shell:
-   #birdc show protocols all routinator
-   #birdc show route table roa4_table
-   #birdc show route table aspa_table
-   # Or, from your computer's terminal:
-   #docker exec lab-observer1 birdc show protocols all routinator
-   #docker exec lab-observer1 birdc show route table roa4_table
-   #docker exec lab-observer1 birdc show route table aspa_table
+   ```cmd @observer1
+   birdc show protocols all routinator
+   birdc show route table roa4_table
+   birdc show route table aspa_table
    ```
 
    The RTR protocol needs to be `Established`. The ASPA table only gets
@@ -1563,13 +1804,9 @@ got there.
 
 4. And observer2, which gets its objects from FORT instead:
 
-   ```
-   # Panel: click the observer2 box, then Shell:
-   #bgpctl show rtr
-   #bgpctl show sets
-   # Or, from your computer's terminal:
-   #docker exec lab-observer2 bgpctl show rtr
-   #docker exec lab-observer2 bgpctl show sets
+   ```cmd @observer2
+   bgpctl show rtr
+   bgpctl show sets
    ```
 
    `show rtr` has to say `Version: 2`. ASPA only travels in RTR version 2
@@ -1581,32 +1818,27 @@ got there.
 
 *Stage:* `step5-aspa-mark`.
 
-The story only ever showed **Valid** and **Invalid**. The other two verdicts
-- **NotFound** (no ROA covers the prefix at all) and **Unknown** (no ASPA
-object exists for that customer ASN) are actually the *default* state on
+The story only ever showed **Valid** and **Invalid**. The other two verdicts,
+**NotFound** (no ROA covers the prefix at all) and **Unknown** (no ASPA
+object exists for that customer ASN), are actually the *default* state on
 the real Internet, and the most common one: most prefixes still have no RPKI
 coverage at all. They never showed up because every route in the story was
 covered. Make them appear on purpose, by taking objects away:
 
-1. Remove the IPv4 ROA and the ASPA object:
+1. Remove the IPv4 ROA and the ASPA object, in Krill's terminal:
 
-   ```
-   # Panel: click the krill box, then Shell:
-   #krillc roas update --ca acme_ca --remove "{{ORIGIN_V4}}-{{ORIGIN_V4_MAXLEN}} => {{ORIGIN_ASN}}"
-   #krillc aspas remove --ca acme_ca --customer AS{{ORIGIN_ASN}}
-   #krillc bulk publish
-   # Or, from your computer's terminal:
-   #docker exec lab-krill krillc roas update --ca acme_ca --remove "{{ORIGIN_V4}}-{{ORIGIN_V4_MAXLEN}} => {{ORIGIN_ASN}}"
-   #docker exec lab-krill krillc aspas remove --ca acme_ca --customer AS{{ORIGIN_ASN}}
-   #docker exec lab-krill krillc bulk publish
+   ```cmd @krill
+   krillc roas update --remove "{{ORIGIN_V4}}-{{ORIGIN_V4_MAXLEN}} => {{ORIGIN_ASN}}"
+   krillc aspas remove --customer AS{{ORIGIN_ASN}}
+   krillc bulk publish
    ```
 
-2. Confirm they're really gone before moving on (`krillc roas list --ca
-   acme_ca` and `krillc aspas list --ca acme_ca` should both come back
-   without them), then refresh:
+2. Confirm they're really gone before moving on (`krillc roas list` and
+   `krillc aspas list` should both come back without them; the Krill box on
+   the panel shows the same), then refresh:
 
-   ```
-   #./scripts/lab.sh refresh
+   ```cmd @lab
+   ./scripts/lab.sh refresh
    ```
 
 3. Check the verdicts for `{{ORIGIN_V4}}` on both observers: both paths should
@@ -1614,22 +1846,20 @@ covered. Make them appear on purpose, by taking objects away:
    rejection. They stay in the table even though both checks are on. Notice
    that `{{ORIGIN_V6}}` is unaffected: its own ROA is still there, so it
    keeps its normal verdicts. Coverage is per prefix; having none for one
-   says nothing about another. (This is also why deploying ROV protects
-   nothing until the *other* ASes publish ROAs too: a prefix with no ROA
-   can't be caught by anything.)
+   says nothing about another. (This is also why validating only protects
+   the prefixes whose holders published ROAs: a hijack of a prefix with no
+   ROA reads NotFound, and nothing catches it.)
 
 4. Restore both objects and refresh again:
 
+   ```cmd @krill
+   krillc roas update --add "{{ORIGIN_V4}}-{{ORIGIN_V4_MAXLEN}} => {{ORIGIN_ASN}}"
+   krillc aspas add --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}, AS{{PROVIDER_B_ASN}}"
+   krillc bulk publish
    ```
-   # Panel: click the krill box, then Shell:
-   #krillc roas update --ca acme_ca --add "{{ORIGIN_V4}}-{{ORIGIN_V4_MAXLEN}} => {{ORIGIN_ASN}}"
-   #krillc aspas add --ca acme_ca --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}, AS{{PROVIDER_B_ASN}}"
-   #krillc bulk publish
-   # Or, from your computer's terminal:
-   #docker exec lab-krill krillc roas update --ca acme_ca --add "{{ORIGIN_V4}}-{{ORIGIN_V4_MAXLEN}} => {{ORIGIN_ASN}}"
-   #docker exec lab-krill krillc aspas add --ca acme_ca --aspa "AS{{ORIGIN_ASN}} => AS{{PROVIDER_A_ASN}}, AS{{PROVIDER_B_ASN}}"
-   #docker exec lab-krill krillc bulk publish
-   #./scripts/lab.sh refresh
+
+   ```cmd @lab
+   ./scripts/lab.sh refresh
    ```
 
 > If the verdicts in step 4 don't come back after one refresh, it usually
@@ -1639,35 +1869,80 @@ covered. Make them appear on purpose, by taking objects away:
 
 ---
 
+## Exploring on your own
+
+You've followed the story. From here on there's no script: the lab is a
+complete RPKI testbed, and the best way to make what you learned stick is to
+use it to answer your own questions. Some ideas, with no solutions on
+purpose:
+
+- **Make the leak pass ASPA.** What would the peer have to lie about for the
+  leaked path to read `Valid`? Is it still a "leak" at that point, or has it
+  become a forgery?
+- **A loose ROA.** Recreate the IPv6 ROA with a max length of 48 and redo
+  Extra exercise B. What changes? Why do operators advise against loose max
+  lengths (RFC 9319)? Which attack does a loose ROA make easy again?
+- **Someone else's ASPA.** Try to publish an ASPA object for Provider A
+  (customer AS{{PROVIDER_A_ASN}}) from your CA. Krill refuses: why? Who would have to
+  publish it, and would any verdict in this lab change if they did?
+- **Your own router configuration.** Write, from scratch, an observer1
+  configuration with ROV and ASPA both dropping, in `work/`, and load it with
+  `birdc 'configure "/etc/lab-work/<your-file>.conf"'`. Then do the same for
+  observer2 (copy it over `/etc/bgpd.conf` and `bgpctl reload`).
+- **Different numbers.** Change the ASN and the prefixes in `lab.conf`, run
+  `./scripts/lab.sh up`, and redo the preparation and the story.
+- **Your work router.** Write the policy you'd deploy on the vendor you use
+  at work (IOS XR, Junos, ...) for the `rov-mark` and `aspa-drop` stages, using
+  the anatomy from Steps 3 and 5.
+
+The `work/` folder (see `work/README.md`) is where your own files live: it's
+writable from the Lab terminal, where `nano` and `vim` are available, and
+every router reads it at `/etc/lab-work`. Whenever you want to get back on
+track, run the step command for the state you want, or `./scripts/lab.sh
+clean-objects` to start over from a clean CA.
+
+---
+
 ## If something doesn't work
+
+Start with **`./scripts/lab.sh doctor`**, in your own computer's terminal:
+it checks Docker, the ports, the containers and the preparation, and says
+what to do about each problem it finds.
 
 | Symptom | What to check |
 |---|---|
-| What I see doesn't match a step | Read the step's **State** box and run the single command it lists. Every `stepN-*` command sets its whole state (attacker, peer, ROAs, ASPA, observers' stage), not just what changed since the step before it, so it's safe to run from anywhere in the story. |
+| `up` stops with "port taken" / "port is already allocated" | Another program or container is using port 8080 (or, with `EXPOSE_PORTS=yes`, one of the services' own ports). `doctor` says which one; stop it, or set `EXPOSE_PORTS=no` in `lab.conf`. |
+| The panel's terminals or web interfaces don't open | Open the panel at exactly **http://localhost:8080**. Opened by IP address, those names don't resolve; if you really need IP access, set `EXPOSE_PORTS=yes` in `lab.conf` and run `up` again. |
+| What I see doesn't match a step | Read the step's **State** box and run the single command it lists. Every `stepN-*` command sets its whole state (attacker, peer, ROAs, ASPA, observers' stage), not just what changed since the step before it, so it's safe to run from anywhere in the story. The header's *lab ≈ Step N* tells you where the lab is now. |
 | A `stepN-*` command stops with a Krill/CA error | From `step3-rov-mark` on, every `stepN-*` command checks that Preparation actually finished before touching anything; see "How the story is organized". The message says what's missing (no CA, more than one, or one that isn't fully set up yet); fix that in Krill and the panel, then re-run the same command. |
-| AS{{ATTACKER_ASN}}'s route doesn't show up | Once an observer is *dropping* what a check flags (stage `aspa-drop`, from `step8-drop` on), that route is gone from the table on purpose: look under `birdc show route table master4 filtered` on observer1. Before that, `none` has no verdicts and `rov-mark`/`aspa-mark` only demote, so the route should still be there. Otherwise check that you ran the step's command and that the session is up: `docker exec lab-attacker birdc show protocols`. |
-| The two observers disagree, or the stage badge is amber | The badge in the panel's header shows the stage each observer is really running; amber means they differ. Run the step command of the stage you want (e.g. `./scripts/lab.sh step8-drop`) to put both in the same one. Right after a switch, observer2 also needs ten or fifteen seconds to settle (it restarts), so look again before concluding anything. |
+| I can't find my ROAs in Krill | They're in the table on the CA's **ROAs** tab. The box on the right of that page (below *Add ROA* in narrow windows) lists the CA's *resources*, not its ROAs. The Krill box on the panel and `krillc roas list` show them too. |
+| AS{{ATTACKER_ASN}}'s route doesn't show up | Once an observer is *dropping* what a check flags (stage `aspa-drop`, from `step8-drop` on), that route is gone from the table on purpose: look under `birdc show route table master4 filtered` on observer1. Before that, `none` has no verdicts and `rov-mark`/`aspa-mark` only demote, so the route should still be there. Otherwise check that you ran the step's command and that the session is up: `birdc show protocols` on the attacker. |
+| The two observers disagree, or the stage indicator is orange | The indicator in the panel's header shows the stage each observer is really running; orange means they differ. Run the step command of the stage you want (e.g. `./scripts/lab.sh step8-drop`) to put both in the same one. Right after a switch, observer2 also needs ten or fifteen seconds to settle (it restarts), so look again before concluding anything. |
 | I created the ROA/ASPA but nothing changed | `./scripts/lab.sh refresh` forces both validators to revalidate. If it still doesn't change, `refresh` may have run before Krill finished publishing: check `krillc roas list` / `krillc aspas list`, wait a few seconds, refresh again. |
-| I created the ROA but it isn't showing up in Krill | The CA didn't have the parent's certificate yet. `docker exec lab-krill krillc bulk refresh`, redo the ROA, then `krillc bulk publish` |
+| I created the ROA but it isn't showing up in Krill | The CA didn't have the parent's certificate yet. `krillc bulk refresh` in Krill's terminal, redo the ROA, then `krillc bulk publish` |
+| Krill's ASPA form says "The provider ASN list is invalid" | Write the providers as plain numbers separated by commas (`{{PROVIDER_A_ASN}}, {{PROVIDER_B_ASN}}`), with no `AS` in front. |
+| `birdc configure "/etc/..."` says "syntax error, unexpected '/'" | The shell ate the double quotes BIRD needs. Wrap the whole command in single quotes: `birdc 'configure "/etc/bird-lab/file.conf"'`. |
 | Routinator shows no ASPA at all | `--enable-aspa` was missing, or the object hasn't been published/revalidated yet. `./scripts/lab.sh refresh`. |
 | BIRD's `aspa_table` table is empty | RTR negotiated version 1. Check `birdc show protocols all routinator` and whether Routinator came up with `--enable-aspa`. |
-| A BGP session won't come up | `docker compose logs origin provider-a provider-b observer1 observer2 attacker peer` |
+| A BGP session won't come up | `./scripts/lab.sh logs origin provider-a provider-b observer1 observer2 attacker peer` |
 | observer2 shows `avs` as `unknown` everywhere | The RTR session negotiated version 1, or FORT is older than 1.7.0.experimental. Check `bgpctl show rtr` says `Version: 2`. |
 | observer2 shows `avs` as `valid` on BOTH paths | The session lost its RFC 9234 role, usually after a bare `bgpctl reload`. Re-run the stage's step command (`./scripts/lab.sh step5-aspa-mark` or `step8-drop`), which restarts observer2 with the stage's config. |
 | FORT won't start or fetches nothing | `docker logs lab-fort`. It should end with "First validation cycle successfully ended". If TLS fails, the lab CA didn't reach its trust store: check that the `pki` volume is mounted. |
 | Krill can't talk to Registro.br | The container needs outbound Internet access: `docker exec lab-krill ping -c1 beta.registro.br` |
-| I want to start over | `./scripts/lab.sh reset` (deletes Krill's CA, {{RIR_NAME}}'s own registry state, and both validators' caches), then `up`. Don't run a bare `docker compose down -v`: {{RIR_NAME}} and the registry panel only come up under the `local` compose profile, and a bare `docker compose down` silently leaves them running; `lab.sh` sets that up for you. Also run it from your own computer's terminal, not from the panel's in-browser console: `reset` tears down the whole lab, including that console itself, which kills the command halfway through. |
+| I want my ROAs and ASPA gone, but keep my CA | `./scripts/lab.sh clean-objects`, then `step1-clean`. No need to redo the preparation. |
+| I want to start over from scratch | `./scripts/lab.sh reset` (deletes Krill's CA, {{RIR_NAME}}'s own registry state, and both validators' caches), then `up`. Don't run a bare `docker compose down -v`: {{RIR_NAME}} and the registry panel only come up under the `local` compose profile, and a bare `docker compose down` silently leaves them running; `lab.sh` sets that up for you. Also run it from your own computer's terminal, not from the panel: `reset` tears down the whole lab, the panel's terminals included, which kills the command halfway through. |
 | The validators show ROAs/ASPA but Krill's CA looks completely empty | You're looking at two different CAs: your own (freshly created) one in Krill, and stale objects still published under an old CA of the same name at the registry, left over from before a reset that didn't fully clean up. `./scripts/lab.sh reset` (not a bare `docker compose down -v`) clears both sides together. |
-| I changed `lab.conf` and nothing changed | `./scripts/lab.sh up` regenerates `bird/vars.conf` and recreates the routers, and now also resets the story to its clean baseline (stage `none`, AS{{ATTACKER_ASN}} and the peer silent). If you changed the ASN or the prefixes and already have a CA, its certificate still has the *old* resources; redo Preparation 2's delegation step (in local mode, Krill's "Add parent" against the same parent updates the entitlements; `docker exec lab-krill krillc bulk refresh` forces the CA to pick them up) before `step3-rov-mark` and on will work again. |
+| I changed `lab.conf` and nothing changed | `./scripts/lab.sh up` regenerates `bird/vars.conf` and recreates the routers, and also resets the story to its clean baseline (stage `none`, AS{{ATTACKER_ASN}} and the peer silent). If you changed the ASN or the prefixes and already have a CA, its certificate still has the *old* resources; redo Preparation 2's delegation step (in local mode, Krill's "Add parent" against the same parent updates the entitlements; `krillc bulk refresh` forces the CA to pick them up) before `step3-rov-mark` and on will work again. |
 | The registry panel won't open | It only exists in `MODE=local`. Check `lab.conf` and run `./scripts/lab.sh up` |
 | Krill can't talk to {{RIR_NAME}} | Krill needs to trust the lab's internal CA: `docker logs lab-krill` shows a TLS error if `/pki/ca.pem` isn't mounted |
 | I switched MODE and the CA disappeared | That's on purpose: each mode has its own volume, so one doesn't clobber the other's work |
-| The objects are in Routinator but BIRD hasn't changed | BIRD revalidates on its own, but it takes a few seconds. To force it: `docker exec lab-observer1 birdc reload in provider_a_v4` |
+| The objects are in Routinator but BIRD hasn't changed | BIRD revalidates on its own, but it takes a few seconds. To force it: `birdc reload in provider_a_v4` on observer1 |
 
 ## References
 
 - RFC 6811: origin validation for BGP
 - RFC 9582: ROA profile
+- RFC 9319: the use of maxLength in RPKI
 - RFC 7908: problem definition and classification of BGP route leaks
 - RFC 9234: route leak prevention and detection using roles
 - `draft-ietf-sidrops-aspa-profile`: the ASPA object's profile
@@ -1675,6 +1950,9 @@ covered. Make them appear on purpose, by taking objects away:
 - `draft-ietf-sidrops-8210bis`: RTR version 2, which carries the ASPAs
 - Krill documentation: https://krill.docs.nlnetlabs.nl
 - Routinator documentation: https://routinator.docs.nlnetlabs.nl
+- FORT Validator documentation: https://nicmx.github.io/FORT-validator/
 - BIRD documentation: https://bird.network.cz/
+- OpenBGPD documentation: https://www.openbgpd.org/
+- Docker documentation: https://docs.docker.com/
 
 *This guide is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The lab's code is under Apache-2.0. See the `LICENSE` files in the repository.*
