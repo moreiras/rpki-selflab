@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated from dashboard/index.html's topology; the double-brace markers
+     are filled from lab.conf by scripts/generate-config.sh. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 730" width="1000" height="730" role="img" aria-label="Lab topology">
+<title>Lab topology</title>
+<style>
+  text { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .node rect { fill: #ffffff; stroke: #cfd5e8; stroke-width: 1.5; }
+  .node.silent rect { stroke-dasharray: 5 4; }
+  .node.hostile rect { stroke: #d64545; }
+  .ico { fill: none; stroke: #566085; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+  .title { fill: #1a2140; font-size: 15.5px; font-weight: 600; }
+  .role { fill: #566085; font-size: 12.3px; }
+  .asn, .pfx { fill: #2a62d4; font-size: 12.3px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .pfx { font-size: 11px; }
+  .link { stroke-width: 2; fill: none; }
+  .link.bgp { stroke: #7d8fd0; }
+  .link.rpki { stroke: #9a86cf; stroke-dasharray: 6 5; }
+  .link.hostile { stroke: #d64545; stroke-dasharray: 4 4; }
+  .label { fill: #566085; font-size: 10.5px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .org-group { fill: none; stroke: #cfd5e8; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .org-label { fill: #566085; font-size: 11.5px; font-weight: 600; }
+  .legend { fill: #566085; font-size: 12px; }
+</style>
+<rect x="1" y="1" width="998" height="728" rx="12" fill="#ffffff" stroke="#cfd5e8"/>
+          <defs>
+            <symbol id="ico-router" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.3"/><path d="M9.6 6.4L12.5 3.5M9.8 3.5H12.5V6.2M6.4 9.6L3.5 12.5M6.2 12.5H3.5V9.8M3.5 3.5L6.4 6.4M3.8 6.5H6.5V3.8M12.5 12.5L9.6 9.6M9.5 12.2V9.5H12.2"/></symbol>
+            <symbol id="ico-server" viewBox="0 0 16 16"><rect x="1.8" y="2" width="12.4" height="5" rx="1.2"/><rect x="1.8" y="9" width="12.4" height="5" rx="1.2"/><path d="M4.4 4.5H4.5M4.4 11.5H4.5M8 4.5H11.6M8 11.5H11.6"/></symbol>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
+                    markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" style="fill: #7d8fd0"/>
+            </marker>
+          </defs>
+          <path class="link rpki" d="M800,595 L968,595 L968,54 L596,54"/>
+          <path class="link rpki" d="M430,88.5 L430,140 L130,140 L130,190.5"/>
+          <path class="link rpki" d="M550,88.5 L550,140 L850,140 L850,190.5"/>
+          <path class="link rpki" d="M217.9,225 L272.9,225"/>
+          <path class="link rpki" d="M763,225 L710.1,225"/>
+          <text class="label" x="976" y="350" transform="rotate(-90 976 350)">RFC 6492 / 8181</text>
+          <text class="label" x="144" y="133" text-anchor="end">RRDP</text>
+          <text class="label" x="700" y="133">RRDP</text>
+          <text class="label" x="245.4" y="181" text-anchor="middle">RTR :3323</text>
+          <text class="label" x="736.6" y="181" text-anchor="middle">RTR :3323</text>
+          <path class="link bgp" d="M450,554.8 L328,455.2" marker-end="url(#arrow)"/>
+          <path class="link bgp" d="M530,554.8 L652,455.2" marker-end="url(#arrow)"/>
+          <path class="link bgp" d="M288,374.8 L343,265.2" marker-end="url(#arrow)"/>
+          <path class="link bgp" d="M378,374.8 L575,265.2" marker-end="url(#arrow)"/>
+          <path class="link bgp" d="M597,374.8 L403,265.2" marker-end="url(#arrow)"/>
+          <path class="link bgp" d="M692,374.8 L650,265.2" marker-end="url(#arrow)"/>
+          <path class="link bgp" d="M325.1,595 L399.9,595"/>
+          <path class="link bgp" d="M255,554.8 L288,455.2" marker-end="url(#arrow)"/>
+          <text class="label" x="362" y="588" text-anchor="middle">peering</text>
+          <path class="link bgp hostile" d="M462,378 L430,265.2" marker-end="url(#arrow)"/>
+          <path class="link bgp hostile" d="M518,378 L550,265.2" marker-end="url(#arrow)"/>
+          <text class="label" x="380" y="515">eBGP</text>
+          <text class="label" x="590" y="515">eBGP</text>
+          <rect class="org-group" rx="14" x="28" y="169.8" width="440.1" height="110.5"/>
+          <rect class="org-group" rx="14" x="514.9" y="169.8" width="438" height="110.5"/>
+          <rect class="org-group" rx="14" x="384.9" y="539.8" width="445" height="110.5"/>
+          <text class="org-label" x="607" y="532.8" text-anchor="middle">ACME Internet Ltda.</text>
+          <g class="node">
+            <rect x="384" y="19.5" width="212" height="69" rx="10"/>
+            <use class="ico" href="#ico-server" x="390.4" y="25.2" width="23.5" height="23.5"/>
+            <text class="title" x="490" y="42.5" text-anchor="middle">LabNIC</text>
+            <text class="role" x="490" y="58.6" text-anchor="middle">RIR/NIR · TA + repository</text>
+          </g>
+          <g class="node">
+            <rect x="43" y="190.5" width="174.9" height="69" rx="10"/>
+            <use class="ico" href="#ico-server" x="49.4" y="196.2" width="23.5" height="23.5"/>
+            <text class="title" x="130" y="213.5" text-anchor="middle">Routinator</text>
+            <text class="role" x="130" y="229.6" text-anchor="middle">validator · RTR</text>
+          </g>
+          <g class="node">
+            <rect x="272.9" y="184.8" width="180.2" height="80.5" rx="10"/>
+            <use class="ico" href="#ico-router" x="279.3" y="190.5" width="23.5" height="23.5"/>
+            <text class="title" x="363" y="211.2" text-anchor="middle">observer1</text>
+            <text class="asn" x="363" y="228.4" text-anchor="middle">AS64510</text>
+            <text class="role" x="363" y="244.6" text-anchor="middle">BIRD · ROV + ASPA</text>
+          </g>
+          <g class="node">
+            <rect x="529.9" y="184.8" width="180.2" height="80.5" rx="10"/>
+            <use class="ico" href="#ico-router" x="536.3" y="190.5" width="23.5" height="23.5"/>
+            <text class="title" x="620" y="211.2" text-anchor="middle">observer2</text>
+            <text class="asn" x="620" y="228.4" text-anchor="middle">AS64511</text>
+            <text class="role" x="620" y="244.6" text-anchor="middle">OpenBGPD · ROV + ASPA</text>
+          </g>
+          <g class="node">
+            <rect x="763" y="190.5" width="174.9" height="69" rx="10"/>
+            <use class="ico" href="#ico-server" x="769.4" y="196.2" width="23.5" height="23.5"/>
+            <text class="title" x="850" y="213.5" text-anchor="middle">FORT</text>
+            <text class="role" x="850" y="229.6" text-anchor="middle">validator · RTR</text>
+          </g>
+          <g class="node">
+            <rect x="237.9" y="374.8" width="180.2" height="80.5" rx="10"/>
+            <use class="ico" href="#ico-router" x="244.3" y="380.5" width="23.5" height="23.5"/>
+            <text class="title" x="328" y="401.2" text-anchor="middle">Provider A</text>
+            <text class="asn" x="328" y="418.4" text-anchor="middle">AS64501</text>
+            <text class="role" x="328" y="434.6" text-anchor="middle">upstream of the origin</text>
+          </g>
+          <g class="node">
+            <rect x="561.9" y="374.8" width="180.2" height="80.5" rx="10"/>
+            <use class="ico" href="#ico-router" x="568.3" y="380.5" width="23.5" height="23.5"/>
+            <text class="title" x="652" y="401.2" text-anchor="middle">Provider B</text>
+            <text class="asn" x="652" y="418.4" text-anchor="middle">AS64502</text>
+            <text class="role" x="652" y="434.6" text-anchor="middle">upstream of the origin</text>
+          </g>
+          <g class="node">
+            <rect x="399.9" y="554.8" width="180.2" height="80.5" rx="10"/>
+            <use class="ico" href="#ico-router" x="406.3" y="560.5" width="23.5" height="23.5"/>
+            <text class="title" x="490" y="581.2" text-anchor="middle">origin</text>
+            <text class="asn" x="490" y="598.5" text-anchor="middle">AS64500</text>
+            <text class="pfx" x="490" y="614.5" text-anchor="middle">203.0.113.0/24</text>
+            <text class="pfx" x="490" y="629.5" text-anchor="middle">3fff:cafe::/32</text>
+          </g>
+          <g class="node hostile silent">
+            <rect x="425.3" y="378" width="129.3" height="77" rx="10"/>
+            <use class="ico" href="#ico-router" x="431.7" y="383.7" width="23.5" height="23.5"/>
+            <text class="title" x="490" y="399.8" text-anchor="middle">attacker</text>
+            <text class="asn" x="490" y="415.9" text-anchor="middle">AS666</text>
+            <text class="role" x="490" y="432" text-anchor="middle">hijacker</text>
+          </g>
+          <g class="node silent">
+            <rect x="144.9" y="554.8" width="180.2" height="80.5" rx="10"/>
+            <use class="ico" href="#ico-router" x="151.3" y="560.5" width="23.5" height="23.5"/>
+            <text class="title" x="235" y="581.2" text-anchor="middle">peer</text>
+            <text class="asn" x="235" y="598.5" text-anchor="middle">AS64499</text>
+            <text class="role" x="235" y="614.5" text-anchor="middle">peers with the origin</text>
+          </g>
+          <g class="node">
+            <rect x="625" y="560.5" width="174.9" height="69" rx="10"/>
+            <use class="ico" href="#ico-server" x="631.4" y="566.2" width="23.5" height="23.5"/>
+            <text class="title" x="712" y="583.5" text-anchor="middle">Krill</text>
+            <text class="role" x="712" y="599.6" text-anchor="middle">CA · creates ROA and ASPA</text>
+          </g>
+        <g transform="translate(40,690)"><line x1="0" y1="0" x2="34" y2="0" class="link bgp"/><text class="legend" x="42" y="4">BGP (arrow: direction of the announcements)</text><line x1="330" y1="0" x2="364" y2="0" class="link rpki"/><text class="legend" x="372" y="4">RPKI</text><rect x="440" y="-9" width="34" height="18" rx="4" fill="none" stroke="#cfd5e8" stroke-width="1.5" stroke-dasharray="5 4"/><text class="legend" x="482" y="4">silent until the story switches it on</text></g>
+</svg>

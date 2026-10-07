@@ -128,24 +128,7 @@ surjam no roteiro. Passe o mouse sobre um deles para ver a definição.
 
 ## A topologia
 
-```text
-              {{RIR_NAME}}   (RIR/NIR: âncora de confiança + repositório)
-             /                                      \
-         RRDP                                        RRDP
-          v                                            v
-     Routinator                                  FORT Validator
-          |  RTR v2 :3323                              |  RTR v2 :3323
-          v                                            v
-  observer1  AS{{OBSERVER1_ASN}}  (BIRD)            observer2  AS{{OBSERVER2_ASN}}  (OpenBGPD)
-
-       os dois observadores recebem o MESMO prefixo pelos DOIS caminhos:
-
-       Provedor A  AS{{PROVIDER_A_ASN}}                   Provedor B  AS{{PROVIDER_B_ASN}}
-                    \                          /
-                     \                        /
-                      origem  AS{{ORIGIN_ASN}}  --  Krill (a CA do titular)
-                      {{ORIGIN_V4}} , {{ORIGIN_V6}}
-```
+![A topologia do laboratório: o registro e os dois validadores no alto, os observadores logo abaixo, os dois provedores, o AS{{ATTACKER_ASN}} e, embaixo, a origem, a sua CA e o peer](img/topology.pt.svg)
 
 O AS{{ORIGIN_ASN}} é multihomed, e tem uma preferência clara: **o Provedor B é a
 entrada, o Provedor A é o backup.** Para conseguir isso, a origem faz
@@ -165,19 +148,15 @@ vendem trânsito a eles, então os provedores são clientes dos observadores, e
 toda rota chega aos observadores vinda de um cliente. Guarde isso para o Passo
 5: é esse detalhe que decide qual algoritmo ASPA roda.
 
-Mais dois roteadores entram na história. Os dois aparecem no painel, e os
-dois ficam calados até que a história os ligue:
+Mais dois roteadores entram na história, desenhados com borda tracejada na
+figura. Os dois aparecem no painel, e os dois ficam calados até que a história
+os ligue:
 
-```text
-   AS{{ATTACKER_ASN}} (o atacante) ---- sessões BGP diretas ----> observer1, observer2
-                             (um cliente dos observadores: qualquer cliente
-                              pode enviar a eles um anúncio, e ninguém o
-                              confere a menos que os observadores validem)
-
-   peer AS{{PEER_ASN}} ---- peering privado ---- origem AS{{ORIGIN_ASN}}
-        |
-        +---- trânsito ---- Provedor A
-```
+- **O AS{{ATTACKER_ASN}}, o atacante**, tem sessões BGP diretas com os dois observadores,
+  como cliente deles. Qualquer cliente pode enviar um anúncio a eles, e
+  ninguém o confere a menos que os observadores validem.
+- **O peer**, AS{{PEER_ASN}}, tem um link de peering privado com a origem e compra
+  trânsito do Provedor A.
 
 | Componente | ASN | Papel |
 |---|---|---|

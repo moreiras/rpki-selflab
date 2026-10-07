@@ -123,24 +123,7 @@ guide. Hover over one to see its definition.
 
 ## The topology
 
-```text
-              LabNIC   (RIR/NIR: trust anchor + repository)
-             /                                      \
-         RRDP                                        RRDP
-          v                                            v
-     Routinator                                  FORT Validator
-          |  RTR v2 :3323                              |  RTR v2 :3323
-          v                                            v
-  observer1  AS64510  (BIRD)            observer2  AS64511  (OpenBGPD)
-
-       both observers receive the SAME prefix over BOTH paths:
-
-       Provider A  AS64501                   Provider B  AS64502
-                    \                          /
-                     \                        /
-                      origin  AS64500  --  Krill (the holder's CA)
-                      203.0.113.0/24 , 3fff:cafe::/32
-```
+![The lab's topology: the registry and the two validators at the top, the observers below them, the two providers, AS666 and, at the bottom, the origin, its CA and the peer](img/topology.en.svg)
 
 AS64500 is multihomed, and it has a preference: **Provider B is the way in,
 Provider A is the backup.** To get that, the origin *prepends* its own ASN
@@ -158,19 +141,14 @@ transit, so the providers are the observers' customers, and every route
 reaches the observers from a customer. Keep that in mind for Step 5, where
 it decides which ASPA algorithm runs.
 
-Two more routers join the story. Both are on the panel, and both are silent
-until the story switches them on:
+Two more routers join the story, drawn with dashed borders in the figure.
+Both are on the panel, and both are silent until the story switches them on:
 
-```text
-   AS666 (the attacker) ---- direct BGP sessions ----> observer1, observer2
-                             (a customer of the observers: any customer
-                              can send them an announcement, and nobody
-                              checks it unless the observers validate)
-
-   peer AS64499 ---- private peering ---- origin AS64500
-        |
-        +---- transit ---- Provider A
-```
+- **AS666, the attacker**, has direct BGP sessions with both observers, as
+  their customer. Any customer can send them an announcement, and nobody
+  checks it unless the observers validate.
+- **The peer**, AS64499, has a private peering link with the origin, and buys
+  transit from Provider A.
 
 | Component | ASN | Role |
 |---|---|---|

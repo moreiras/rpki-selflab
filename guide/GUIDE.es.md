@@ -127,24 +127,7 @@ surjan en la guía. Pase el mouse sobre uno para ver su definición.
 
 ## La topología
 
-```text
-              LabNIC   (RIR/NIR: ancla de confianza + repositorio)
-             /                                      \
-         RRDP                                        RRDP
-          v                                            v
-     Routinator                                  FORT Validator
-          |  RTR v2 :3323                              |  RTR v2 :3323
-          v                                            v
-  observer1  AS64510  (BIRD)            observer2  AS64511  (OpenBGPD)
-
-       los dos observadores reciben el MISMO prefijo por LOS DOS caminos:
-
-       Proveedor A  AS64501                  Proveedor B  AS64502
-                    \                          /
-                     \                        /
-                      origen  AS64500  --  Krill (la CA del titular)
-                      203.0.113.0/24 , 3fff:cafe::/32
-```
+![La topología del laboratorio: el registro y los dos validadores arriba, los observadores debajo, los dos proveedores, el AS666 y, abajo, el origen, su CA y el peer](img/topology.es.svg)
 
 El AS64500 es multihomed y tiene una preferencia clara: **el Proveedor B es la
 entrada, el Proveedor A es el respaldo.** Para lograrlo, el origen hace
@@ -164,19 +147,15 @@ les venden tránsito, así que los proveedores son clientes de los observadores,
 y toda ruta llega a los observadores desde un cliente. Téngalo en cuenta para
 el Paso 5: es lo que decide qué algoritmo ASPA corre.
 
-Dos routers más se suman a la historia. Los dos están en el panel, y los dos
-se quedan callados hasta que la historia los activa:
+Dos routers más se suman a la historia, dibujados con borde punteado en la
+figura. Los dos están en el panel, y los dos se quedan callados hasta que la
+historia los activa:
 
-```text
-   AS666 (el atacante) ---- sesiones BGP directas ----> observer1, observer2
-                             (un cliente de los observadores: cualquier cliente
-                              puede enviarles un anuncio, y nadie
-                              lo verifica a menos que los observadores validen)
-
-   peer AS64499 ---- peering privado ---- origen AS64500
-        |
-        +---- tránsito ---- Proveedor A
-```
+- **El AS666, el atacante**, tiene sesiones BGP directas con los dos
+  observadores, como cliente de ellos. Cualquier cliente puede enviarles un
+  anuncio, y nadie lo verifica a menos que los observadores validen.
+- **El peer**, AS64499, tiene un enlace de peering privado con el origen, y le
+  compra tránsito al Proveedor A.
 
 | Componente | ASN | Rol |
 |---|---|---|

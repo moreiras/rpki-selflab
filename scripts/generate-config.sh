@@ -58,8 +58,9 @@ for name in $(sed -n 's/^\([A-Z][A-Z0-9_]*\)=.*/\1/p' lab.conf); do
     value="${value//\\/\\\\}"; value="${value//&/\\&}"; value="${value//|/\\|}"
     sedargs+=(-e "s|{{${name}}}|${value}|g")
 done
-for tpl in guide/templates/GUIDE.*.md; do
-    out="guide/$(basename "$tpl")"
+# The same markers also fill the topology figures in guide/templates/img/.
+for tpl in guide/templates/GUIDE.*.md guide/templates/img/*.svg; do
+    out="guide/${tpl#guide/templates/}"
     sed "${sedargs[@]}" "$tpl" > "$out"
     if grep -n '{{[A-Z0-9_]*}}' "$out" >&2; then
         echo "generate-config.sh: unresolved marker(s) in $tpl (see above)" >&2
