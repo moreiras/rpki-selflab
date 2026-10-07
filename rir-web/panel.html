@@ -451,7 +451,13 @@ async function load() {
     return;
   }
 
-  if (!languageSuggested && e.language) { languageSuggested = true; suggestDefaultLanguage(e.language); }
+  if (!languageSuggested && e.language) {
+    languageSuggested = true;
+    const before = currentLanguage();
+    suggestDefaultLanguage(e.language);
+    // lab.conf's language took effect: redraw everything in it
+    if (currentLanguage() !== before) { onLanguageChange(); return; }
+  }
 
   $("m-name").textContent = e.registry.name;
   $("m-desc").textContent = e.registry.description;

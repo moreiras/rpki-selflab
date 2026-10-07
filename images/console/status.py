@@ -314,6 +314,39 @@ def routinator_summary():
     return data
 
 
+def krill_summary():
+    """What the holder's CA holds right now: its certified resources, ROAs
+    and ASPA objects, straight from Krill (krillc -f json). Shown on the
+    Krill box's panel, so students can check their objects without hunting
+    through Krill's own UI, and used by the guide's checkpoints."""
+    out = {"up": running("lab-krill"), "ca": None, "parents": [],
+           "resources": {}, "roas": [], "aspas": []}
+    if not out["up"]:
+        return out
+
+    def krillc(*args):
+        raw = sh(["docker", "exec", "lab-krill", "krillc", "-f", "json", *args])
+        try:
+            return json.loads(raw)
+        except Exception:                                     # noqa: BLE001
+            return None
+
+    cas = (krillc("list") or {}).get("cas", [])
+    if len(cas) != 1:
+        out["ca_count"] = len(cas)
+        return out
+    ca = cas[0].get("handle")
+    out["ca"] = ca
+    show = krillc("show", "--ca", ca) or {}
+    out["parents"] = [p.get("handle") for p in show.get("parents", [])]
+    out["resources"] = show.get("resources") or {}
+    out["roas"] = [{"asn": r.get("asn"), "prefix": r.get("prefix"),
+                    "max_length": r.get("max_length")}
+                   for r in (krillc("roas", "list", "--ca", ca) or [])]
+    out["aspas"] = krillc("aspas", "list", "--ca", ca) or []
+    return out
+
+
 def collect():
     global CONFIG, OBS1_ASN
     CONFIG = read_lab_conf()
@@ -324,7 +357,7 @@ def collect():
         "nodes": {},
         "routinator": routinator_summary(),
         "fort": fort_summary(),
-        "krill": {"up": running("lab-krill")},
+        "krill": krill_summary(),
         "rir": {"up": running("lab-rir")},
         "config": CONFIG,
         "panels": {},

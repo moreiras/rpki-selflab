@@ -42,6 +42,14 @@ t_lab_hint() {
     esac
 }
 
+t_work_hint() {
+    case "$LANGUAGE" in
+      es) echo "   sus propios archivos: work/  (nano, vim; los routers los leen en /etc/lab-work)" ;;
+      en) echo "   your own files: work/  (nano, vim; the routers read them at /etc/lab-work)" ;;
+      *)  echo "   seus próprios arquivos: work/  (nano, vim; os roteadores os leem em /etc/lab-work)" ;;
+    esac
+}
+
 t_lab_reset_warning() {
     case "$LANGUAGE" in
       es) echo "   No ejecute 'lab.sh reset' (ni 'down') desde aquí: tira abajo todo el" ;;
@@ -58,10 +66,22 @@ t_lab_reset_warning() {
 case "$node" in
   lab)
       cd /lab || exec bash
+      # The panel's ▶ buttons open this terminal with one of the lab's own
+      # commands as the second argument: run it, then stay in the shell.
+      # Anything else (reset, down, arbitrary text) is refused on purpose.
+      case "$mode" in
+        refresh|status|doctor|clean-objects|step[1-9]-[a-z-]*)
+            echo "\$ ./scripts/lab.sh $mode"
+            ./scripts/lab.sh "$mode"
+            echo
+            exec bash ;;
+      esac
       banner "$(t_console)  —  ./scripts/lab.sh" "$(t_lab_hint)"
       echo "   $(t_story)step1-clean | step2-hijack-simple | step3-rov-mark"
       echo "                  step4-hijack-posrov | step5-aspa-mark | step6-add-provider-b"
       echo "                  step7-leak-on | step8-drop | step9-leak-off | step9-hijack-off"
+      echo
+      t_work_hint
       echo
       t_lab_reset_warning
       echo

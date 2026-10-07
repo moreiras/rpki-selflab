@@ -35,12 +35,15 @@ function suggestDefaultLanguage(language) {
   window.DEFAULT_LANGUAGE = language;
   let alreadyChosen = false;
   try { alreadyChosen = LANGUAGES.includes(localStorage.getItem(STORAGE_KEY)); } catch (_) {}
-  if (!alreadyChosen) setLanguage(language, /* silent */ true);
+  if (!alreadyChosen) setLanguage(language, /* silent */ true, /* persist */ false);
 }
 
-function setLanguage(language, silent) {
+// persist: false only applies the language to the page, without recording
+// it as this browser's own choice (so lab.conf's default can still win).
+function setLanguage(language, silent, persist = true) {
   if (!LANGUAGES.includes(language)) return;
-  try { localStorage.setItem(STORAGE_KEY, language); } catch (_) {}
+  if (persist) { try { localStorage.setItem(STORAGE_KEY, language); } catch (_) {} }
+  else window.DEFAULT_LANGUAGE = language;
   document.documentElement.lang = HTML_LANG[language];
   document.querySelectorAll(".language-switcher button").forEach(b => {
     b.classList.toggle("active", b.dataset.language === language);
@@ -56,5 +59,5 @@ function buildLanguageSwitcher(container) {
   container.querySelectorAll("button").forEach(b => {
     b.onclick = () => setLanguage(b.dataset.language);
   });
-  setLanguage(currentLanguage(), /* silent */ true);
+  setLanguage(currentLanguage(), /* silent */ true, /* persist */ false);
 }
