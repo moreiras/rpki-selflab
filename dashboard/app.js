@@ -127,7 +127,8 @@ let activeDock = null;
 const WEB = {
   krill:       () => ({ label: "Krill", url: KRILL_URL }),
   routinator:  () => ({ label: "Routinator", url: ROUTINATOR_URL }),
-  registry:    () => ({ label: t("tool_registry"), url: REGISTRY_URL }),
+  // the registry is another origin with its own saved language: tell it ours
+  registry:    () => ({ label: t("tool_registry"), url: `${REGISTRY_URL}/?lang=${currentLanguage()}` }),
 };
 const rirName = () => ((lastState && lastState.config) || {}).RIR_NAME || "LabNIC";
 const isLocalMode = () => (((lastState && lastState.config) || {}).MODE || "local") === "local";
@@ -751,6 +752,9 @@ function onLanguageChange() {
   renderPanel(selected);
   if (lastState) paint(lastState);
   loadGuide();
+  // an open registry tab follows the panel's language (openDock reloads it)
+  const reg = dockTabs.find(x => x.key === "web:registry");
+  if (reg) { const w = WEB.registry(); openDock(reg.key, w.label, w.url, "web"); reg.label = w.label; paintDock(); }
 }
 
 // ----------------------------------------------------------- guide options --

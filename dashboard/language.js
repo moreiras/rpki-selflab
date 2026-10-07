@@ -18,7 +18,15 @@ const LANGUAGE_NAMES = { pt: "Português", es: "Español", en: "English" };
 const HTML_LANG = { pt: "pt-BR", es: "es", en: "en" };
 const STORAGE_KEY = "rpki-selflab-language";
 
+// ?lang=xx in the page's URL (the dashboard passes its own language to the
+// registry panel this way) wins over anything saved or suggested.
+function urlLanguage() {
+  try { const v = new URLSearchParams(location.search).get("lang"); return LANGUAGES.includes(v) ? v : null; }
+  catch (_) { return null; }
+}
+
 function currentLanguage() {
+  if (urlLanguage()) return urlLanguage();
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     if (LANGUAGES.includes(v)) return v;
@@ -33,8 +41,8 @@ function currentLanguage() {
 function suggestDefaultLanguage(language) {
   if (!LANGUAGES.includes(language)) return;
   window.DEFAULT_LANGUAGE = language;
-  let alreadyChosen = false;
-  try { alreadyChosen = LANGUAGES.includes(localStorage.getItem(STORAGE_KEY)); } catch (_) {}
+  let alreadyChosen = !!urlLanguage();
+  try { alreadyChosen = alreadyChosen || LANGUAGES.includes(localStorage.getItem(STORAGE_KEY)); } catch (_) {}
   if (!alreadyChosen) setLanguage(language, /* silent */ true, /* persist */ false);
 }
 
@@ -43,6 +51,10 @@ function suggestDefaultLanguage(language) {
 function setLanguage(language, silent, persist = true) {
   if (!LANGUAGES.includes(language)) return;
   if (persist) { try { localStorage.setItem(STORAGE_KEY, language); } catch (_) {} }
+  // a choice made on this page also replaces a ?lang= that came in the URL
+  if (persist && urlLanguage() && urlLanguage() !== language) {
+    try { const u = new URL(location.href); u.searchParams.set("lang", language); history.replaceState(null, "", u); } catch (_) {}
+  }
   else window.DEFAULT_LANGUAGE = language;
   document.documentElement.lang = HTML_LANG[language];
   document.querySelectorAll(".language-switcher button").forEach(b => {
