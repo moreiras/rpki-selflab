@@ -384,7 +384,12 @@ function t(key, subst) {
 }
 
 function translateStatic() {
-  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  // a few strings carry inline markup (<b>, <code>); they're constants from
+  // this file, never user data, so they can go in as HTML
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const v = t(el.dataset.i18n);
+    if (/<(b|i|code|em|strong)>/.test(v)) el.innerHTML = v; else el.textContent = v;
+  });
   document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
 }
 
