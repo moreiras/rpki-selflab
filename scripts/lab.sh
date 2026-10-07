@@ -94,36 +94,31 @@ check_ports() {
 # where you were - which is what makes every command safe to repeat.
 #
 # observer1 (BIRD) just points the running daemon at the stage's file.
-# observer2 (OpenBGPD) is restarted with the stage's file: the stage name is
-# written to /etc/lab-stage (which survives a container restart) and the
-# entrypoint installs that stage's config on the way up. A reload is not
-# enough: OpenBGPD negotiates the RFC 9234 role when a session opens, and an
-# RTR session that's already up keeps the version it negotiated - so moving to
-# a stage that adds ASPA (roles + RTR version 2) needs the sessions to start
-# over, and starting over is a restart.
-observer2_stage() {
-    docker exec lab-observer2 sh -c "echo $1 > /etc/lab-stage" >/dev/null 2>&1 || true
-    docker restart lab-observer2 >/dev/null 2>&1 || true
+# observer2 and observer3 (OpenBGPD) are restarted with the stage's file: the
+# stage name is written to /etc/lab-stage (which survives a container
+# restart) and the entrypoint installs that stage's config on the way up. A
+# reload is not enough: OpenBGPD negotiates the RFC 9234 role when a session
+# opens, and observer3's RTR session keeps the version it negotiated - so
+# moving to a stage that adds ASPA (roles + RTR version 2) needs the sessions
+# to start over, and starting over is a restart. observer2's entrypoint also
+# runs rpki-client before bgpd starts, so it comes back with fresh data.
+# openbgpd_stage <container> <stage>
+openbgpd_stage() {
+    docker exec "$1" sh -c "echo $2 > /etc/lab-stage" >/dev/null 2>&1 || true
+    docker restart "$1" >/dev/null 2>&1 || true
     # wait for bgpd to answer before handing control back
     for _ in 1 2 3 4 5 6 7 8 9 10; do
-        docker exec lab-observer2 bgpctl show summary >/dev/null 2>&1 && break
+        docker exec "$1" bgpctl show summary >/dev/null 2>&1 && break
         sleep 2
     done
 }
 
 stage() {
-    docker exec lab-observer2 sh -c \
-        "echo $1 > /etc/lab-stage && cp /etc/openbgpd-lab/observer2-$1.conf /etc/bgpd.conf && bgpctl reload" \
-        >/dev/null 2>&1 || true
-    docker exec lab-observer2 sh -c \
-        'bgpctl show summary | awk "NR>1 {print \$1}" \
-           | while read -r n; do bgpctl neighbor "$n" clear >/dev/null 2>&1; done' \
-        >/dev/null 2>&1 || true
-}
-
-stage() {
     docker exec lab-observer1 birdc "configure \"/etc/bird-lab/observer1-$1.conf\"" >/dev/null 2>&1 || true
-    observer2_stage "$1"
+    # the two OpenBGPD observers restart side by side
+    openbgpd_stage lab-observer2 "$1" &
+    openbgpd_stage lab-observer3 "$1" &
+    wait
 }
 
 # ---------------------------------------------------------------------------
@@ -208,7 +203,8 @@ set_aspa() {
         --aspa "${ORIGIN_ASN} => ${list}" >/dev/null 2>&1 || true
 }
 
-# Restarts Routinator and FORT so a just-published ROA/ASPA reaches them
+# Restarts Routinator and FORT (and runs rpki-client on observer2) so a
+# just-published ROA/ASPA reaches them
 # immediately, instead of waiting for their next poll (up to a couple of
 # minutes). Every step from step3-rov-mark on calls this right after
 # touching RPKI objects, before switching the observers' stage.
@@ -216,10 +212,12 @@ set_aspa() {
 # Restarting Routinator drops observer1's RTR session, and BIRD then sits in
 # Transport-Error until its retry timer fires (up to 10 minutes), validating
 # with the old objects meanwhile - so restart BIRD's RTR protocol too, the
-# same way "refresh" does. observer2 needs nothing here: every step command
-# restarts it when it sets the stage.
+# same way "refresh" does. observer2 runs rpki-client now (rpki-refresh
+# reloads bgpd if the data changed). observer3 needs nothing here: every step
+# command restarts it when it sets the stage.
 refresh_validators() {
     docker compose restart routinator fort >/dev/null 2>&1 || true
+    docker exec lab-observer2 rpki-refresh >/dev/null 2>&1 || true
     sleep 8
     docker exec lab-observer1 birdc restart routinator >/dev/null 2>&1 || true
 }
@@ -330,6 +328,19 @@ doctor() {
     else
         echo "${warn}$(msg doc_vhost_bad)"
     fi
+    if docker exec lab-observer2 true >/dev/null 2>&1; then
+        local rc counts
+        rc="$(docker exec lab-observer2 cat /run/rpki-client.status 2>/dev/null | cut -d' ' -f1)"
+        # VRPs and ASPAs in the file bgpd includes
+        counts="$(docker exec lab-observer2 sh -c \
+            'f=/var/db/rpki-client/openbgpd; echo "$(grep -c source-as $f) VRP, $(grep -c customer-as $f) ASPA"' \
+            2>/dev/null)"
+        if [ "$rc" = ok ]; then
+            echo "${ok}$(msg doc_rpki_client_ok) ($counts)"
+        else
+            echo "${warn}$(msg doc_rpki_client_bad)"
+        fi
+    fi
     if ca="$(krill_ca 2>/dev/null)"; then
         echo "${ok}$(msg doc_prep_ok) ($ca)"
     else
@@ -397,15 +408,17 @@ case "${1:-help}" in
       # (see wait_published); give Krill a few seconds before restarting
       sleep 3
       docker compose restart routinator fort
+      # observer2 validates on its own host: run rpki-client now
+      docker exec lab-observer2 rpki-refresh >/dev/null 2>&1 || true
       # Neither router recovers quickly on its own when its RTR cache restarts.
       # BIRD gets stuck in Transport-Error, and OpenBGPD leaves the session
       # closed until its retry timer fires. BIRD can restart just the RTR
       # protocol; bgpctl has no equivalent (its commands are fib/flowspec/log/
       # neighbor/network/reload/show), and "reload" does not re-open RTR, so
-      # observer2 gets a daemon restart instead.
+      # observer3 gets a daemon restart instead.
       sleep 8
       docker exec lab-observer1 birdc restart routinator >/dev/null 2>&1 || true
-      docker restart lab-observer2 >/dev/null 2>&1 || true
+      docker restart lab-observer3 >/dev/null 2>&1 || true
       echo "$(msg refreshed_ok)" ;;
 
   # ------------------------------------------------------- the guide's story -

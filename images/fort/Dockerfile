@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 The rpki-selflab authors
-# FORT Validator - the second RPKI validator in the lab (feeds observer2).
+# FORT Validator - the second RPKI validator in the lab (feeds observer3).
 #
 # Built from source rather than pulled from nicmx/fort-validator because the
 # published image is amd64-only; building here keeps the lab native on arm64

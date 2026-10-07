@@ -169,8 +169,8 @@ services:
       mgmt: { ipv4_address: 172.30.0.20 }
     restart: unless-stopped
 
-  # FORT Validator: feeds observer2. Same job as Routinator, different
-  # implementation - that's the whole point of having both.
+  # FORT Validator: feeds observer3. Same job as Routinator, different
+  # implementation - that's the whole point of having more than one.
   #
   # --server.max-rtr-version=2 is mandatory here: ASPA is only carried by RTR
   # version 2, and FORT defaults this to 0 (i.e. RTR version 1, ROAs only).
@@ -194,12 +194,12 @@ services:
       - "--server.port=3323"
       - "--server.max-rtr-version=2"
       - "--server.interval.validation=120"
-      # what FORT tells observer2 to use as its RTR refresh timer. The default
+      # what FORT tells observer3 to use as its RTR refresh timer. The default
       # is 3600, which in a classroom means a new ASPA takes an hour to show up
-      # on observer2 while observer1 already changed.
+      # on observer3 while observer1 already changed.
       - "--server.interval.refresh=120"
       # and how long it waits before retrying a failed poll - the 600s default
-      # means observer2 sits disconnected for 10 minutes after "lab.sh refresh"
+      # means observer3 sits disconnected for 10 minutes after "lab.sh refresh"
       - "--server.interval.retry=60"
       - "--rsync.enabled=false"
       # FORT has no HTTP API of its own, but --output.* is honored in server
@@ -243,7 +243,8 @@ services:
       l-org-a:  { ipv4_address: 10.200.1.20, ipv6_address: "fd00:1::20" }
       l-a-obs1: { ipv4_address: 10.200.3.10, ipv6_address: "fd00:3::10" }
       l-peer-a: { ipv4_address: 10.200.10.20, ipv6_address: "fd00:10::20" }
-      l-a-obs2: { ipv4_address: 10.200.5.10, ipv6_address: "fd00:5::10" }
+      l-a-obs2: { ipv4_address: 10.200.11.10, ipv6_address: "fd00:11::10" }
+      l-a-obs3: { ipv4_address: 10.200.5.10, ipv6_address: "fd00:5::10" }
 
   provider-b:
     <<: *bird
@@ -256,7 +257,8 @@ services:
     networks:
       l-org-b:  { ipv4_address: 10.200.2.20, ipv6_address: "fd00:2::20" }
       l-b-obs1: { ipv4_address: 10.200.4.10, ipv6_address: "fd00:4::10" }
-      l-b-obs2: { ipv4_address: 10.200.6.10, ipv6_address: "fd00:6::10" }
+      l-b-obs2: { ipv4_address: 10.200.12.10, ipv6_address: "fd00:12::10" }
+      l-b-obs3: { ipv4_address: 10.200.6.10, ipv6_address: "fd00:6::10" }
 
   # observer1: BIRD + Routinator
   observer1:
@@ -276,12 +278,48 @@ services:
       l-666-obs1: { ipv4_address: 10.200.7.20, ipv6_address: "fd00:7::20" }
       mgmt:       { ipv4_address: 172.30.0.30 }
 
-  # observer2: OpenBGPD + FORT Validator
+  # observer2: OpenBGPD + rpki-client, on the same host. rpki-client writes
+  # the validated ROAs and ASPAs into a file that bgpd includes, and re-runs
+  # every RPKI_CLIENT_INTERVAL seconds (no RTR, no separate validator).
   observer2:
-    image: rpki-selflab/openbgpd
-    build: ./images/openbgpd
+    image: rpki-selflab/openbgpd-rpki-client
+    build: ./images/openbgpd-rpki-client
     container_name: lab-observer2
     hostname: observer2
+    cap_add: [NET_ADMIN, SYS_ADMIN]
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv4.ip_forward: 1
+      net.ipv6.conf.all.forwarding: 1
+    depends_on:
+      pki-init: { condition: service_completed_successfully }
+      tal-init: { condition: service_completed_successfully }
+    environment:
+      # deployment stage at first start: none | rov-mark | rov-drop |
+      # aspa-mark | aspa-drop (./scripts/lab.sh switches it at runtime)
+      STAGE: "none"
+      # the same two minutes Routinator and FORT use (a real deployment runs
+      # rpki-client from cron, typically hourly)
+      RPKI_CLIENT_INTERVAL: "120"
+    volumes:
+      - ./openbgpd:/etc/openbgpd-lab:ro
+      - ./work:/etc/lab-work:ro
+      - tals:/tals:ro
+      - pki:/pki:ro
+      - rpki-client-cache:/var/cache/rpki-client
+    networks:
+      l-a-obs2:   { ipv4_address: 10.200.11.20, ipv6_address: "fd00:11::20" }
+      l-b-obs2:   { ipv4_address: 10.200.12.20, ipv6_address: "fd00:12::20" }
+      l-666-obs2: { ipv4_address: 10.200.13.20, ipv6_address: "fd00:13::20" }
+      mgmt:       { ipv4_address: 172.30.0.36 }
+    restart: unless-stopped
+
+  # observer3: OpenBGPD + FORT Validator
+  observer3:
+    image: rpki-selflab/openbgpd
+    build: ./images/openbgpd
+    container_name: lab-observer3
+    hostname: observer3
     cap_add: [NET_ADMIN, SYS_ADMIN]
     sysctls:
       net.ipv6.conf.all.disable_ipv6: 0
@@ -296,14 +334,14 @@ services:
       - ./openbgpd:/etc/openbgpd-lab:ro
       - ./work:/etc/lab-work:ro
     networks:
-      l-a-obs2:   { ipv4_address: 10.200.5.20, ipv6_address: "fd00:5::20" }
-      l-b-obs2:   { ipv4_address: 10.200.6.20, ipv6_address: "fd00:6::20" }
-      l-666-obs2: { ipv4_address: 10.200.8.20, ipv6_address: "fd00:8::20" }
+      l-a-obs3:   { ipv4_address: 10.200.5.20, ipv6_address: "fd00:5::20" }
+      l-b-obs3:   { ipv4_address: 10.200.6.20, ipv6_address: "fd00:6::20" }
+      l-666-obs3: { ipv4_address: 10.200.8.20, ipv6_address: "fd00:8::20" }
       mgmt:       { ipv4_address: 172.30.0.35 }
     restart: unless-stopped
 
   # AS666: the "attacker" from the guide's route-hijack experiment. A customer
-  # of both observers - direct sessions with them, and nothing else.
+  # of the three observers - direct sessions with them, and nothing else.
   # See bird/attacker-*.conf and ./scripts/lab.sh step1-clean /
   # step2-hijack-simple / step4-hijack-posrov.
   attacker:
@@ -318,7 +356,8 @@ services:
       - ./work:/etc/lab-work:ro
     networks:
       l-666-obs1: { ipv4_address: 10.200.7.10, ipv6_address: "fd00:7::10" }
-      l-666-obs2: { ipv4_address: 10.200.8.10, ipv6_address: "fd00:8::10" }
+      l-666-obs2: { ipv4_address: 10.200.13.10, ipv6_address: "fd00:13::10" }
+      l-666-obs3: { ipv4_address: 10.200.8.10, ipv6_address: "fd00:8::10" }
 
   # peer (AS64499): a legitimate peer of the origin (private peering, not
   # transit) that also has its own transit from Provider A. See the guide's
@@ -396,6 +435,7 @@ volumes:
   pki:
   routinator-cache:
   fort-cache:
+  rpki-client-cache:
   tals:
   status:
 
@@ -435,15 +475,15 @@ networks:
       config:
         - subnet: 10.200.4.0/24
         - subnet: "fd00:4::/64"
-  l-a-obs2:
-    name: lab-l-a-obs2
+  l-a-obs3:
+    name: lab-l-a-obs3
     enable_ipv6: true
     ipam:
       config:
         - subnet: 10.200.5.0/24
         - subnet: "fd00:5::/64"
-  l-b-obs2:
-    name: lab-l-b-obs2
+  l-b-obs3:
+    name: lab-l-b-obs3
     enable_ipv6: true
     ipam:
       config:
@@ -456,13 +496,34 @@ networks:
       config:
         - subnet: 10.200.7.0/24
         - subnet: "fd00:7::/64"
-  l-666-obs2:
-    name: lab-l-666-obs2
+  l-666-obs3:
+    name: lab-l-666-obs3
     enable_ipv6: true
     ipam:
       config:
         - subnet: 10.200.8.0/24
         - subnet: "fd00:8::/64"
+  l-a-obs2:
+    name: lab-l-a-obs2
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.11.0/24
+        - subnet: "fd00:11::/64"
+  l-b-obs2:
+    name: lab-l-b-obs2
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.12.0/24
+        - subnet: "fd00:12::/64"
+  l-666-obs2:
+    name: lab-l-666-obs2
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.200.13.0/24
+        - subnet: "fd00:13::/64"
   l-peer-org:
     name: lab-l-peer-org
     enable_ipv6: true

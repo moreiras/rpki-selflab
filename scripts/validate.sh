@@ -61,7 +61,7 @@ docker exec lab-observer1 birdc -r show protocols 2>/dev/null | tail -n +3
 
 # The large communities are marked with OBSERVER1_ASN (see bird/observer1-*.conf);
 # pass it into awk instead of hardcoding it, since lab.conf can change it.
-OBS1_ASN="${OBSERVER1_ASN:-64510}"
+OBS1_ASN="${OBSERVER1_ASN:-64509}"
 
 verdicts_bird() {
     docker exec lab-observer1 birdc -r show route table "$1" all 2>/dev/null \
@@ -87,24 +87,21 @@ verdicts_bird master4
 title "$(msg t_verdicts6)"
 verdicts_bird master6
 
-# observer2 needs no community decoding: OpenBGPD carries the verdicts in the
-# route itself, and bgpctl hands them over as JSON.
-title "$(msg t_obs2_sessions)"
-docker exec lab-observer2 bgpctl show rtr 2>/dev/null | head -5
-docker exec lab-observer2 bgpctl show summary 2>/dev/null
-
-title "$(msg t_obs2_verdicts)"
-docker exec lab-observer2 bgpctl -j show rib 2>/dev/null \
-  | python3 -c '
-import json, sys
+# observer2 and observer3 need no community decoding: OpenBGPD carries the
+# verdicts in the route itself, and bgpctl hands them over as JSON.
+verdicts_openbgpd() {
+    docker exec "lab-$1" bgpctl -j show rib 2>/dev/null \
+      | NODE="$1" python3 -c '
+import json, os, sys
 
 OVS = {"valid": "Valid", "invalid": "Invalid", "not-found": "NotFound"}
 AVS = {"valid": "Valid", "invalid": "Invalid", "unknown": "Unknown"}
+node = os.environ["NODE"]
 
 try:
     d = json.load(sys.stdin)
 except Exception:
-    print("  (observer2 unavailable)"); raise SystemExit
+    print("  (%s unavailable)" % node); raise SystemExit
 
 for r in d.get("rib", []):
     print("  {:<20} via {:<14} AS_PATH {:<18} ROV {:<9} ASPA {}".format(
@@ -113,5 +110,26 @@ for r in d.get("rib", []):
         r.get("aspath", ""),
         OVS.get(str(r.get("ovs", "")).lower(), "?"),
         AVS.get(str(r.get("avs", "")).lower(), "?")))
-' 2>/dev/null || echo "  (observer2 unavailable)"
+' 2>/dev/null || echo "  ($1 unavailable)"
+}
+
+# observer2: what rpki-client wrote into the file bgpd includes, then the
+# sets bgpd loaded from it (no RTR session here)
+title "$(msg t_obs2_rpki)"
+docker exec lab-observer2 sh -c 'grep -v "^#" /var/db/rpki-client/openbgpd | sed "/^$/d; s/^/  /"' 2>/dev/null \
+    || echo "  (observer2 unavailable)"
+docker exec lab-observer2 bgpctl show sets 2>/dev/null
+
+title "$(msg t_obs2_sessions)"
+docker exec lab-observer2 bgpctl show summary 2>/dev/null
+
+title "$(msg t_obs2_verdicts)"
+verdicts_openbgpd observer2
+
+title "$(msg t_obs3_sessions)"
+docker exec lab-observer3 bgpctl show rtr 2>/dev/null | head -5
+docker exec lab-observer3 bgpctl show summary 2>/dev/null
+
+title "$(msg t_obs3_verdicts)"
+verdicts_openbgpd observer3
 echo

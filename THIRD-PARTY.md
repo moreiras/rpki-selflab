@@ -6,16 +6,19 @@ repositories while building the lab's images). Each keeps its own license,
 which applies to it, not to the lab's own files (see [LICENSE](LICENSE) and
 [LICENSE-docs](LICENSE-docs)).
 
-Names such as Krill, Routinator, FORT, BIRD, OpenBGPD, nginx and Alpine belong
+Names such as Krill, Routinator, FORT, rpki-client, RTRTR, BIRD, OpenBGPD, nginx
+and Alpine belong
 to their respective projects. Using them here doesn't imply their endorsement.
 
 | Component | Used for | Version | License |
 |---|---|---|---|
 | [Krill](https://github.com/NLnetLabs/krill) | the student's CA and the simulated registry (LabNIC) | 0.16.0 | MPL-2.0 |
 | [Routinator](https://github.com/NLnetLabs/routinator) | observer1's validator | 0.15.2 | BSD-3-Clause |
-| [FORT Validator](https://github.com/NICMx/FORT-validator) | observer2's validator | 1.7.0.experimental | MIT |
+| [FORT Validator](https://github.com/NICMx/FORT-validator) | observer3's validator | 1.7.0.experimental | MIT |
 | [BIRD](https://bird.network.cz/) | origin, providers, peer, attacker and observer1 | 3.1.4 | GPL-2.0-or-later |
-| [OpenBGPD](https://www.openbgpd.org/) | observer2 | 8.8 | ISC |
+| [OpenBGPD](https://www.openbgpd.org/) | observer2 and observer3 | 8.8 | ISC |
+| [rpki-client](https://www.rpki-client.org/) | observer2's validator, on the same host | 9.5 (Alpine package) | ISC |
+| [RTRTR](https://github.com/NLnetLabs/rtrtr) | serves rpki-client's output over RTR (extra exercise E) | 0.3.3 | BSD-3-Clause |
 | [nginx](https://nginx.org/) | serves the panel and the guide | 1.29 | BSD-2-Clause |
 | [ttyd](https://github.com/tsl0922/ttyd) | terminals in the browser | Alpine package | MIT |
 | [Alpine Linux](https://alpinelinux.org/) | base of most of the lab's own images | 3.22 | various, per package |

@@ -3,7 +3,8 @@
 # Copyright 2026 The rpki-selflab authors
 # Installs the current deployment stage's configuration and starts OpenBGPD.
 #
-# Stages (one file each, openbgpd/observer2-<stage>.conf):
+# Stages (one file each, openbgpd/<observer>-<stage>.conf, where <observer>
+# is LAB_NODE, the container's hostname by default):
 #   none        plain BGP, no validation deployed
 #   rov-mark    ROV deployed, marking only
 #   rov-drop    ROV dropping the invalid ones
@@ -19,7 +20,8 @@ set -e
 
 STAGE="${STAGE:-none}"
 [ -f /etc/lab-stage ] && STAGE="$(cat /etc/lab-stage)"
-cp "/etc/openbgpd-lab/observer2-${STAGE}.conf" /etc/bgpd.conf
+NODE="${LAB_NODE:-$(hostname)}"
+cp "/etc/openbgpd-lab/${NODE}-${STAGE}.conf" /etc/bgpd.conf
 
 # bgpd needs its privilege-separation home to exist
 mkdir -p /var/empty

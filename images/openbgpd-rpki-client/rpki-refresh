@@ -1,0 +1,44 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 The rpki-selflab authors
+# Runs rpki-client now and, if the validated data changed, reloads bgpd so
+# the routes are tested against it right away.
+#
+#   rpki-refresh              what the periodic loop and "lab.sh" run
+#   rpki-refresh --no-reload  validate only (the entrypoint, before bgpd starts)
+#
+# In production this is a cron job, typically hourly; the lab runs it every
+# RPKI_CLIENT_INTERVAL seconds (see entrypoint.sh) and on every step command.
+#
+# Output (rpki-client's default directory, /var/db/rpki-client):
+#   openbgpd   roa-set + aspa-set, included by /etc/bgpd.conf
+#   json       the same data as JSON (read by the panel and by RTRTR)
+OUT=/var/db/rpki-client
+reload=yes
+[ "${1:-}" = "--no-reload" ] && reload=no
+
+# every TAL in /tals: the lab's own (local mode) or the registry's (beta)
+set --
+for tal in /tals/*.tal; do
+    [ -f "$tal" ] && set -- "$@" -t "$tal"
+done
+if [ $# -eq 0 ]; then
+    echo "rpki-refresh: no TAL in /tals yet" >&2
+    exit 1
+fi
+
+before="$(grep -v '^#' "$OUT/openbgpd" 2>/dev/null)"
+# -o: the bgpd.conf fragment, -j: JSON.  -s 60: never hang a step command
+# for long when the repository is unreachable (the default is one hour).
+if rpki-client -o -j -s 60 "$@" >/run/rpki-client.log 2>&1; then
+    echo "ok $(date +%s)" > /run/rpki-client.status
+else
+    echo "fail $(date +%s)" > /run/rpki-client.status
+    tail -5 /run/rpki-client.log >&2
+fi
+after="$(grep -v '^#' "$OUT/openbgpd" 2>/dev/null)"
+
+if [ "$reload" = yes ] && [ "$before" != "$after" ]; then
+    bgpctl reload >/dev/null 2>&1 || true
+fi
+exit 0

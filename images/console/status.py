@@ -7,15 +7,16 @@ The panel (dashboard/index.html) reads this file to color the topology and
 show command output that's already prepared, without the instructor having
 to open a terminal for each thing.
 
-There are two observers, and they expose their verdicts very differently:
+There are three observers, and they expose their verdicts in two ways:
 
   observer1  BIRD + Routinator. BIRD has no per-route validation attribute,
              so the lab's filters record the verdicts in large communities
-             (see bird/observer1.conf) and we decode them back here.
-  observer2  OpenBGPD + FORT. OpenBGPD computes the verdicts natively into
+             (see bird/observer1-*.conf) and we decode them back here.
+  observer2  OpenBGPD + rpki-client (by file, same host) and
+  observer3  OpenBGPD + FORT. OpenBGPD computes the verdicts natively into
              the "ovs" and "avs" fields, which bgpctl -j hands over as JSON.
 
-Both are normalised into the same route shape so the panel can show them
+All are normalised into the same route shape so the panel can show them
 side by side.
 """
 import json
@@ -30,7 +31,12 @@ OUTPUT = "/srv/status/status.json"
 LAB_CONF = "/lab/lab.conf"
 
 BIRD_ROUTERS = ["origin", "provider-a", "provider-b", "observer1", "attacker", "peer"]
-ALL_ROUTERS = BIRD_ROUTERS + ["observer2"]
+OPENBGPD_ROUTERS = ["observer2", "observer3"]
+ALL_ROUTERS = BIRD_ROUTERS + OPENBGPD_ROUTERS
+# where each OpenBGPD observer gets its RPKI data over RTR, if it does: FORT
+# for observer3; observer2 reads a file and only has an RTR session in the
+# guide's extra exercise E (RTRTR on its own host)
+RTR_CACHE_NAME = {"observer2": "rtrtr", "observer3": "fort"}
 
 
 def read_lab_conf():
@@ -50,7 +56,7 @@ def read_lab_conf():
 
 # re-read on every cycle: editing lab.conf shows up in the panel with no restart
 CONFIG = read_lab_conf()
-OBS1_ASN = int(CONFIG.get("OBSERVER1_ASN", "64510"))
+OBS1_ASN = int(CONFIG.get("OBSERVER1_ASN", "64509"))
 
 
 def sh(args, timeout=15):
@@ -65,9 +71,10 @@ def birdc(node, command):
     return sh(["docker", "exec", f"lab-{node}", "birdc", "-r", *command.split()])
 
 
-def bgpctl_json(command):
-    """Runs bgpctl -j on observer2 and returns the parsed object, or None."""
-    raw = sh(["docker", "exec", "lab-observer2", "bgpctl", "-j", *command.split()])
+def bgpctl_json(node, command):
+    """Runs bgpctl -j on an OpenBGPD observer and returns the parsed object,
+    or None."""
+    raw = sh(["docker", "exec", f"lab-{node}", "bgpctl", "-j", *command.split()])
     try:
         return json.loads(raw)
     except Exception:                                         # noqa: BLE001
@@ -183,18 +190,20 @@ def observer_stages():
     """Which deployment stage each observer is in, None if unknown.
 
     observer1 (BIRD): each stage's config defines a marker filter named
-    stage_<name>_marker. observer2 (OpenBGPD): lab.sh writes the stage name
-    to /etc/lab-stage (a fresh container falls back to its STAGE variable).
+    stage_<name>_marker. observer2 and observer3 (OpenBGPD): lab.sh writes
+    the stage name to /etc/lab-stage (a fresh container falls back to its
+    STAGE variable).
     """
-    stages = {"observer1": None, "observer2": None}
+    stages = {"observer1": None, "observer2": None, "observer3": None}
     out = sh(["docker", "exec", "lab-observer1", "birdc", "-r", "show", "symbols", "filter"])
     for st in DEPLOYMENT_STAGES:
         if "stage_%s_marker" % st.replace("-", "_") in out:
             stages["observer1"] = st
-    name = sh(["docker", "exec", "lab-observer2", "sh", "-c",
-               "cat /etc/lab-stage 2>/dev/null || echo ${STAGE:-none}"]).strip()
-    if name in DEPLOYMENT_STAGES:
-        stages["observer2"] = name
+    for node in OPENBGPD_ROUTERS:
+        name = sh(["docker", "exec", f"lab-{node}", "sh", "-c",
+                   "cat /etc/lab-stage 2>/dev/null || echo ${STAGE:-none}"]).strip()
+        if name in DEPLOYMENT_STAGES:
+            stages[node] = name
     return stages
 
 
@@ -205,16 +214,16 @@ def count_table(node, table):
 
 
 # --------------------------------------------------------------------------
-# observer2 (OpenBGPD)
+# observer2 and observer3 (OpenBGPD)
 # --------------------------------------------------------------------------
 OVS = {"valid": "Valid", "invalid": "Invalid", "not-found": "NotFound"}
 AVS = {"valid": "Valid", "invalid": "Invalid", "unknown": "Unknown"}
 
 
-def openbgpd_protocols():
+def openbgpd_protocols(node):
     """BGP sessions plus the RTR session, in the same shape as BIRD's."""
     res = []
-    data = bgpctl_json("show neighbor")
+    data = bgpctl_json(node, "show neighbor")
     for n in (data or {}).get("neighbors", []):
         state = str(n.get("state", "")).lower()
         res.append({
@@ -225,11 +234,11 @@ def openbgpd_protocols():
             "since": n.get("last_updown", ""),
             "info": f"AS{n.get('remote_as', '?')} {n.get('state', '')}",
         })
-    rtr = bgpctl_json("show rtr")
+    rtr = bgpctl_json(node, "show rtr")
     for s in (rtr or {}).get("rtrs", []) or []:
         state = str(s.get("state", "")).lower()
         res.append({
-            "name": "fort",
+            "name": RTR_CACHE_NAME.get(node, "rtr"),
             "type": "RTR",
             "table": "-",
             "state": "up" if state == "established" else "down",
@@ -239,8 +248,9 @@ def openbgpd_protocols():
     return res
 
 
-def openbgpd_routes(family, stage=None):
-    """observer2's routes, normalised to the same shape as observer1's.
+def openbgpd_routes(node, family, stage=None):
+    """An OpenBGPD observer's routes, normalised to the same shape as
+    observer1's.
 
     OpenBGPD always computes ovs/avs natively, even on a router with no
     validation deployed (they read "not-found" / "unknown" against empty
@@ -249,7 +259,7 @@ def openbgpd_routes(family, stage=None):
     what observer1 shows, since BIRD only records a verdict once its filter
     has computed it.
     """
-    data = bgpctl_json("show rib")
+    data = bgpctl_json(node, "show rib")
     res = []
     for r in (data or {}).get("rib", []):
         prefix = r.get("prefix", "")
@@ -272,7 +282,7 @@ def openbgpd_routes(family, stage=None):
 def fort_summary():
     """FORT's own validated set, read directly from the files it rewrites
     after every validation cycle (--output.roa/--output.aspa in
-    docker-compose.yml) - not what observer2 happens to have over RTR, which
+    docker-compose.yml) - not what observer3 happens to have over RTR, which
     depends on the deployment stage and can lag or be empty on its own."""
     out = {"up": running("lab-fort"), "roas": None, "aspas": None, "aspa_list": []}
     raw = sh(["docker", "exec", "lab-fort", "cat", "/var/lib/fort/vrps.json"])
@@ -288,6 +298,33 @@ def fort_summary():
         out["aspas"] = len(out["aspa_list"])
     except Exception:                                         # noqa: BLE001
         pass
+    return out
+
+
+def rpki_client_summary():
+    """What rpki-client validated on observer2: the counts and lists from its
+    JSON output, and how its last run went (written by rpki-refresh). The
+    same data is in /var/db/rpki-client/openbgpd, the file bgpd includes."""
+    out = {"vrps": None, "aspas": None, "last_run": None, "ok": None,
+           "vrp_list": [], "aspa_list": [],
+           "file": "/var/db/rpki-client/openbgpd"}
+    raw = sh(["docker", "exec", "lab-observer2", "cat", "/var/db/rpki-client/json"])
+    try:
+        j = json.loads(raw)
+        out["vrp_list"] = [{"asn": r.get("asn"), "prefix": r.get("prefix"),
+                            "maxLength": r.get("maxLength")}
+                           for r in j.get("roas", [])][:50]
+        out["aspa_list"] = [{"customer": a.get("customer_asid"),
+                             "providers": a.get("providers", [])}
+                            for a in j.get("aspas", [])][:50]
+        out["vrps"] = len(j.get("roas", []))
+        out["aspas"] = len(j.get("aspas", []))
+        out["last_run"] = (j.get("metadata") or {}).get("buildtime")
+    except Exception:                                         # noqa: BLE001
+        pass
+    status = sh(["docker", "exec", "lab-observer2", "cat", "/run/rpki-client.status"]).split()
+    if status and status[0] in ("ok", "fail"):
+        out["ok"] = status[0] == "ok"
     return out
 
 
@@ -350,7 +387,7 @@ def krill_summary():
 def collect():
     global CONFIG, OBS1_ASN
     CONFIG = read_lab_conf()
-    OBS1_ASN = int(CONFIG.get("OBSERVER1_ASN", "64510"))
+    OBS1_ASN = int(CONFIG.get("OBSERVER1_ASN", "64509"))
 
     state = {
         "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -361,7 +398,7 @@ def collect():
         "rir": {"up": running("lab-rir")},
         "config": CONFIG,
         "panels": {},
-        "stage": {"observer1": None, "observer2": None},
+        "stage": {"observer1": None, "observer2": None, "observer3": None},
     }
 
     for node in ALL_ROUTERS:
@@ -380,7 +417,7 @@ def collect():
     if state["nodes"]["peer"]["up"]:
         state["nodes"]["peer"]["leaking"] = exported_routes("peer", "provider_a_v4") > 0
 
-    if state["nodes"]["observer1"]["up"] and state["nodes"]["observer2"]["up"]:
+    if any(state["nodes"][n]["up"] for n in ["observer1"] + OPENBGPD_ROUTERS):
         state["stage"] = observer_stages()
 
     obs1 = state["nodes"]["observer1"]
@@ -393,11 +430,15 @@ def collect():
             "aspa": count_table("observer1", "aspa_table"),
         }
 
-    obs2 = state["nodes"]["observer2"]
-    if obs2["up"]:
-        obs2["protocols"] = openbgpd_protocols()
-        obs2["routes4"] = openbgpd_routes(4, state["stage"]["observer2"])
-        obs2["routes6"] = openbgpd_routes(6, state["stage"]["observer2"])
+    for node in OPENBGPD_ROUTERS:
+        obs = state["nodes"][node]
+        if obs["up"]:
+            obs["protocols"] = openbgpd_protocols(node)
+            obs["routes4"] = openbgpd_routes(node, 4, state["stage"][node])
+            obs["routes6"] = openbgpd_routes(node, 6, state["stage"][node])
+    # observer2's validator lives inside it: its counters go in the same node
+    if state["nodes"]["observer2"]["up"]:
+        state["nodes"]["observer2"]["rpki"] = rpki_client_summary()
 
     state["panels"] = {
         "observer1/routes v4": sh(["docker", "exec", "lab-observer1", "birdc", "-r",
@@ -409,7 +450,11 @@ def collect():
                                     "show", "route", "table", "aspa_table"]),
         "observer2/rib": sh(["docker", "exec", "lab-observer2", "bgpctl",
                              "show", "rib", "detail"]),
-        "observer2/RTR session": sh(["docker", "exec", "lab-observer2", "bgpctl",
+        "observer2/sets": sh(["docker", "exec", "lab-observer2", "bgpctl",
+                              "show", "sets"]),
+        "observer3/rib": sh(["docker", "exec", "lab-observer3", "bgpctl",
+                             "show", "rib", "detail"]),
+        "observer3/RTR session": sh(["docker", "exec", "lab-observer3", "bgpctl",
                                      "show", "rtr"]),
         "routinator/status": state["routinator"]["text"],
     }

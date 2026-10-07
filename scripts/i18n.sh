@@ -55,25 +55,25 @@ msg() {
       en:refreshed_ok)      echo "done - check the panel (it may take a few seconds)." ;;
 
       # The guide's story
-      pt:step1_clean_ok)          echo "passo 1: AS666 e peer calados, e os dois observadores voltaram a ser roteadores BGP comuns (sem validação)." ;;
-      es:step1_clean_ok)          echo "paso 1: AS666 y peer callados, y los dos observers vuelven a ser routers BGP comunes (sin validación)." ;;
-      en:step1_clean_ok)          echo "step 1: AS666 and peer are silent, and both observers are plain BGP routers again (no validation)." ;;
+      pt:step1_clean_ok)          echo "passo 1: AS666 e peer calados, e os três observadores voltaram a ser roteadores BGP comuns (sem validação)." ;;
+      es:step1_clean_ok)          echo "paso 1: AS666 y peer callados, y los tres observers vuelven a ser routers BGP comunes (sin validación)." ;;
+      en:step1_clean_ok)          echo "step 1: AS666 and peer are silent, and all three observers are plain BGP routers again (no validation)." ;;
 
       pt:step2_hijack_simple_ok)  echo "passo 2: AS666 anuncia os prefixos da origem como se fossem seus (AS_PATH: 666)." ;;
       es:step2_hijack_simple_ok)  echo "paso 2: AS666 anuncia los prefijos del origen como propios (AS_PATH: 666)." ;;
       en:step2_hijack_simple_ok)  echo "step 2: AS666 is announcing the origin's prefixes as its own (AS_PATH: 666)." ;;
 
-      pt:step3_rov_mark_ok)       echo "passo 3: os dois observadores agora rodam ROV e só MARCAM as rotas inválidas (community + local-pref)." ;;
-      es:step3_rov_mark_ok)       echo "paso 3: los dos observers ahora ejecutan ROV y solo MARCAN las rutas inválidas (community + local-pref)." ;;
-      en:step3_rov_mark_ok)       echo "step 3: both observers now run ROV and only MARK invalid routes (community + local-pref)." ;;
+      pt:step3_rov_mark_ok)       echo "passo 3: os três observadores agora rodam ROV e só MARCAM as rotas inválidas (community + local-pref)." ;;
+      es:step3_rov_mark_ok)       echo "paso 3: los tres observers ahora ejecutan ROV y solo MARCAN las rutas inválidas (community + local-pref)." ;;
+      en:step3_rov_mark_ok)       echo "step 3: all three observers now run ROV and only MARK invalid routes (community + local-pref)." ;;
 
       pt:step4_hijack_posrov_ok)  echo "passo 4: AS666 anuncia com um caminho forjado (AS_PATH: 666 <origem>)." ;;
       es:step4_hijack_posrov_ok)  echo "paso 4: AS666 anuncia con un camino falsificado (AS_PATH: 666 <origen>)." ;;
       en:step4_hijack_posrov_ok)  echo "step 4: AS666 is announcing with a forged path (AS_PATH: 666 <origin>)." ;;
 
-      pt:step5_aspa_mark_ok)      echo "passo 5: os dois observadores agora também verificam ASPA, só MARCANDO o que ela acusa (o ROV continua só marcando). ASPA lista só o Provedor A." ;;
-      es:step5_aspa_mark_ok)      echo "paso 5: los dos observers ahora también verifican ASPA, solo MARCANDO lo que esta señala (ROV sigue solo marcando). ASPA lista solo al Proveedor A." ;;
-      en:step5_aspa_mark_ok)      echo "step 5: both observers now also verify ASPA, only MARKING what it flags (ROV keeps only marking too). ASPA lists Provider A only." ;;
+      pt:step5_aspa_mark_ok)      echo "passo 5: os três observadores agora também verificam ASPA, só MARCANDO o que ela acusa (o ROV continua só marcando). ASPA lista só o Provedor A." ;;
+      es:step5_aspa_mark_ok)      echo "paso 5: los tres observers ahora también verifican ASPA, solo MARCANDO lo que esta señala (ROV sigue solo marcando). ASPA lista solo al Proveedor A." ;;
+      en:step5_aspa_mark_ok)      echo "step 5: all three observers now also verify ASPA, only MARKING what it flags (ROV keeps only marking too). ASPA lists Provider A only." ;;
 
       pt:step6_add_provider_b_ok) echo "passo 6: o objeto ASPA agora lista os Provedores A e B." ;;
       es:step6_add_provider_b_ok) echo "paso 6: el objeto ASPA ahora lista a los Proveedores A y B." ;;
@@ -83,9 +83,9 @@ msg() {
       es:step7_leak_on_ok)        echo "paso 7: el peer ahora filtra los prefijos del origen hacia el Proveedor A." ;;
       en:step7_leak_on_ok)        echo "step 7: peer is now leaking the origin's prefixes to Provider A." ;;
 
-      pt:step8_drop_ok)           echo "passo 8: os dois observadores agora DESCARTAM rotas inválidas pelo ROV E pelo ASPA - o que um roteador de verdade faz." ;;
-      es:step8_drop_ok)           echo "paso 8: los dos observers ahora DESCARTAN rutas inválidas según ROV Y según ASPA - lo que hace un router de verdad." ;;
-      en:step8_drop_ok)           echo "step 8: both observers now DROP ROV-invalid AND ASPA-invalid routes - what a real router does." ;;
+      pt:step8_drop_ok)           echo "passo 8: os três observadores agora DESCARTAM rotas inválidas pelo ROV E pelo ASPA - o que um roteador de verdade faz." ;;
+      es:step8_drop_ok)           echo "paso 8: los tres observers ahora DESCARTAN rutas inválidas según ROV Y según ASPA - lo que hace un router de verdad." ;;
+      en:step8_drop_ok)           echo "step 8: all three observers now DROP ROV-invalid AND ASPA-invalid routes - what a real router does." ;;
 
       pt:step9_leak_off_ok)       echo "passo 9: o peer parou de vazar." ;;
       es:step9_leak_off_ok)       echo "paso 9: el peer dejó de filtrar." ;;
@@ -180,6 +180,12 @@ msg() {
       es:doc_vhost_bad)        echo "krill.localhost no respondió desde esta terminal. Los navegadores resuelven *.localhost solos; si el navegador también falla, abra el panel en http://localhost:${PANEL_PORT} y use sus botones." ;;
       en:doc_vhost_bad)        echo "krill.localhost didn't answer from this terminal. Browsers resolve *.localhost on their own; if the browser fails too, open the panel at http://localhost:${PANEL_PORT} and use its buttons." ;;
 
+      pt:doc_rpki_client_ok)   echo "observer2: o rpki-client validou o repositório" ;;
+      es:doc_rpki_client_ok)   echo "observer2: rpki-client validó el repositorio" ;;
+      en:doc_rpki_client_ok)   echo "observer2: rpki-client validated the repository" ;;
+      pt:doc_rpki_client_bad)  echo "observer2: a última execução do rpki-client falhou (docker exec lab-observer2 cat /run/rpki-client.log)" ;;
+      es:doc_rpki_client_bad)  echo "observer2: la última ejecución de rpki-client falló (docker exec lab-observer2 cat /run/rpki-client.log)" ;;
+      en:doc_rpki_client_bad)  echo "observer2: rpki-client's last run failed (docker exec lab-observer2 cat /run/rpki-client.log)" ;;
       pt:doc_prep_ok)          echo "Preparação concluída: a CA tem pai, recursos e repositório" ;;
       es:doc_prep_ok)          echo "Preparación terminada: la CA tiene padre, recursos y repositorio" ;;
       en:doc_prep_ok)          echo "Preparation done: the CA has a parent, resources and a repository" ;;
@@ -213,13 +219,25 @@ msg() {
       es:t_verdicts6)       echo "observer1 — veredictos (IPv6)" ;;
       en:t_verdicts6)       echo "observer1 — verdicts (IPv6)" ;;
 
-      pt:t_obs2_sessions)   echo "Sessões do observer2 (OpenBGPD)" ;;
-      es:t_obs2_sessions)   echo "Sesiones del observer2 (OpenBGPD)" ;;
-      en:t_obs2_sessions)   echo "observer2's sessions (OpenBGPD)" ;;
+      pt:t_obs2_rpki)       echo "observer2 — o que o rpki-client gravou (/var/db/rpki-client/openbgpd)" ;;
+      es:t_obs2_rpki)       echo "observer2 — lo que rpki-client escribió (/var/db/rpki-client/openbgpd)" ;;
+      en:t_obs2_rpki)       echo "observer2 — what rpki-client wrote (/var/db/rpki-client/openbgpd)" ;;
+
+      pt:t_obs2_sessions)   echo "Sessões do observer2 (OpenBGPD + rpki-client)" ;;
+      es:t_obs2_sessions)   echo "Sesiones del observer2 (OpenBGPD + rpki-client)" ;;
+      en:t_obs2_sessions)   echo "observer2's sessions (OpenBGPD + rpki-client)" ;;
 
       pt:t_obs2_verdicts)   echo "observer2 — vereditos (ovs / avs, nativos do OpenBGPD)" ;;
       es:t_obs2_verdicts)   echo "observer2 — veredictos (ovs / avs, nativos de OpenBGPD)" ;;
       en:t_obs2_verdicts)   echo "observer2 — verdicts (ovs / avs, native to OpenBGPD)" ;;
+
+      pt:t_obs3_sessions)   echo "Sessões do observer3 (OpenBGPD + FORT)" ;;
+      es:t_obs3_sessions)   echo "Sesiones del observer3 (OpenBGPD + FORT)" ;;
+      en:t_obs3_sessions)   echo "observer3's sessions (OpenBGPD + FORT)" ;;
+
+      pt:t_obs3_verdicts)   echo "observer3 — vereditos (ovs / avs, nativos do OpenBGPD)" ;;
+      es:t_obs3_verdicts)   echo "observer3 — veredictos (ovs / avs, nativos de OpenBGPD)" ;;
+      en:t_obs3_verdicts)   echo "observer3 — verdicts (ovs / avs, native to OpenBGPD)" ;;
 
       pt:routinator_off)    echo "  (Routinator indisponível)" ;;
       es:routinator_off)    echo "  (Routinator no disponible)" ;;
@@ -278,7 +296,7 @@ uso: ./scripts/lab.sh <comando>
   la historia de la guía - AS666 (secuestrador) y peer (con fuga) - pasos 1 a 9:
   step1-clean          AS666 y peer callados; observers sin validación alguna
   step2-hijack-simple  AS666 anuncia los prefijos del origen como propios
-  step3-rov-mark       ROV en los dos observers, solo MARCANDO los inválidos
+  step3-rov-mark       ROV en los tres observers, solo MARCANDO los inválidos
   step4-hijack-posrov  AS666 falsifica el camino para que termine en el origen real
   step5-aspa-mark      ROV y ASPA, los dos solo MARCANDO
   step6-add-provider-b agrega al Proveedor B al objeto ASPA
@@ -313,7 +331,7 @@ usage: ./scripts/lab.sh <command>
   the guide's story - AS666 (hijacker) and peer (leaky) - steps 1 to 9:
   step1-clean          AS666 and peer silent; observers with no validation at all
   step2-hijack-simple  AS666 announces the origin's prefixes as its own
-  step3-rov-mark       ROV on both observers, only MARKING invalid routes
+  step3-rov-mark       ROV on all three observers, only MARKING invalid routes
   step4-hijack-posrov  AS666 forges the path so it ends in the real origin
   step5-aspa-mark      ROV and ASPA, both only MARKING
   step6-add-provider-b adds Provider B to the ASPA object
@@ -348,7 +366,7 @@ uso: ./scripts/lab.sh <comando>
   a história do roteiro - AS666 (sequestrador) e peer (vazando) - passos 1 a 9:
   step1-clean          AS666 e peer calados; observadores sem validação nenhuma
   step2-hijack-simple  AS666 anuncia os prefixos da origem como se fossem seus
-  step3-rov-mark       ROV nos dois observadores, só MARCANDO os inválidos
+  step3-rov-mark       ROV nos três observadores, só MARCANDO os inválidos
   step4-hijack-posrov  AS666 forja o caminho para terminar na origem verdadeira
   step5-aspa-mark      ROV e ASPA, os dois só MARCANDO
   step6-add-provider-b acrescenta o Provedor B ao objeto ASPA

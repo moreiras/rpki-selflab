@@ -98,9 +98,17 @@ case "$node" in
       if [ "$mode" = "bgpctl" ]; then
           exec docker exec -it lab-observer2 bgpctl show rib detail
       fi
-      banner "lab-observer2  (OpenBGPD)" \
-             "bgpctl show neighbor  |  bgpctl show rib detail  |  bgpctl show rtr"
+      banner "lab-observer2  (OpenBGPD + rpki-client)" \
+             "bgpctl show sets  |  bgpctl show rib detail  |  cat /var/db/rpki-client/openbgpd  |  rpki-refresh"
       exec docker exec -it lab-observer2 bash
+      ;;
+  observer3)
+      if [ "$mode" = "bgpctl" ]; then
+          exec docker exec -it lab-observer3 bgpctl show rib detail
+      fi
+      banner "lab-observer3  (OpenBGPD + FORT)" \
+             "bgpctl show neighbor  |  bgpctl show rib detail  |  bgpctl show rtr"
+      exec docker exec -it lab-observer3 bash
       ;;
   krill)
       banner "lab-krill  (Krill $(docker exec lab-krill krill --version 2>/dev/null | head -1))" \
