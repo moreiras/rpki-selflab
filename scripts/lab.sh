@@ -8,6 +8,8 @@ cd "$(dirname "$0")/.."
 # shellcheck source=../lab.conf
 . ./lab.conf
 export MODE="${MODE:-local}"
+# the panel's host port; docker-compose.yml reads it from the environment
+export PANEL_PORT="${PANEL_PORT:-8080}"
 LANGUAGE="${LANGUAGE:-pt}"
 . ./scripts/i18n.sh
 
@@ -25,7 +27,7 @@ if [ "$EXPOSE_PORTS" = "yes" ]; then
     export COMPOSE_FILE="docker-compose.yml:docker-compose.ports.yml"
 fi
 
-PANEL="http://localhost:8080"
+PANEL="http://localhost:${PANEL_PORT}"
 
 # Cross-platform "open a URL in the browser": macOS has "open", most Linux
 # desktops have "xdg-open", and Windows (Git Bash/MSYS) has "start". If none
@@ -44,9 +46,9 @@ open_url() {
 # Host ports the lab publishes, given EXPOSE_PORTS.
 lab_ports() {
     if [ "$EXPOSE_PORTS" = "yes" ]; then
-        echo "8080 3000 3001 3323 3324 7681 8081 8323"
+        echo "$PANEL_PORT 3000 3001 3323 3324 7681 8081 8323"
     else
-        echo "8080"
+        echo "$PANEL_PORT"
     fi
 }
 
@@ -318,13 +320,13 @@ doctor() {
     else
         echo "${ok}$(msg doc_all_up) ($running/$expected)"
     fi
-    if curl -s -o /dev/null -m 5 http://localhost:8080/; then
+    if curl -s -o /dev/null -m 5 http://localhost:${PANEL_PORT}/; then
         echo "${ok}$(msg doc_panel_ok) $PANEL"
     else
         echo "${bad}$(msg doc_panel_bad) $PANEL"
     fi
-    if curl -s -o /dev/null -m 5 http://krill.localhost:8080/; then
-        echo "${ok}http://krill.localhost:8080"
+    if curl -s -o /dev/null -m 5 http://krill.localhost:${PANEL_PORT}/; then
+        echo "${ok}http://krill.localhost:${PANEL_PORT}"
     else
         echo "${warn}$(msg doc_vhost_bad)"
     fi
@@ -371,12 +373,12 @@ case "${1:-help}" in
       echo
       echo "MODE=$MODE  LANGUAGE=$LANGUAGE"
       if [ "$MODE" = "local" ]; then
-          printf '%-13s%s   %s\n' "$(msg lbl_registry)" "http://registry.localhost:8080" "$(msg note_registry)"
+          printf '%-13s%s   %s\n' "$(msg lbl_registry)" "http://registry.localhost:${PANEL_PORT}" "$(msg note_registry)"
       fi
       printf '%-13s%s\n' "$(msg lbl_panel)" "$PANEL"
-      printf '%-13s%s   %s\n' "$(msg lbl_krill)" "http://krill.localhost:8080" "$(msg note_krill)"
-      printf '%-13s%s\n' "$(msg lbl_routinator)" "http://routinator.localhost:8080"
-      printf '%-13s%s\n' "$(msg lbl_console)" "http://console.localhost:8080"
+      printf '%-13s%s   %s\n' "$(msg lbl_krill)" "http://krill.localhost:${PANEL_PORT}" "$(msg note_krill)"
+      printf '%-13s%s\n' "$(msg lbl_routinator)" "http://routinator.localhost:${PANEL_PORT}"
+      printf '%-13s%s\n' "$(msg lbl_console)" "http://console.localhost:${PANEL_PORT}"
       ;;
   down)     docker compose down ;;
   reset)    docker compose down -v ;;         # also removes Krill's CA
@@ -385,7 +387,7 @@ case "${1:-help}" in
   panel)    open_url "$PANEL" ;;
   registry)
       if [ "$MODE" = "local" ]; then
-          open_url "http://registry.localhost:8080"
+          open_url "http://registry.localhost:${PANEL_PORT}"
       else
           open_url "https://beta.registro.br/login/"
       fi ;;

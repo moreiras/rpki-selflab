@@ -78,12 +78,14 @@ contenedores y la preparación, y dice qué hacer con cada problema.
 Todo se accede por un solo puerto, el 8080: el panel en `localhost`, y cada
 una de las otras aplicaciones web bajo su propio `<nombre>.localhost` (los
 navegadores resuelven `*.localhost` a su máquina, y nginx enruta según el nombre).
-En el panel, la barra de **Herramientas** los abre a todos, y a las terminales,
+En el panel, la barra de arriba los abre a todos, y a las terminales,
 dentro del propio panel, en pestañas. Ábralo exactamente en `localhost`: por
 dirección IP, esos nombres no resuelven.
 
 Solo el 8080 se publica en su computadora, así que el laboratorio no choca
-con otros programas. `EXPOSE_PORTS=yes` en `lab.conf` publica además el
+con otros programas. Si el 8080 ya está ocupado, elija otro puerto en
+`PANEL_PORT` en `lab.conf` y ejecute `./scripts/lab.sh up`; todas las
+direcciones de arriba pasan a usar ese puerto. `EXPOSE_PORTS=yes` en `lab.conf` publica además el
 puerto propio de cada servicio (Krill 3000, Krill de LabNIC 3001, Routinator
 3323/8323, FORT 3324, ttyd 7681, registro 8081; vea
 `docker-compose.ports.yml`), para conectar herramientas de afuera

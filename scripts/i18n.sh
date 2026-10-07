@@ -104,9 +104,9 @@ msg() {
       es:port_busy_container)  echo "puerto ocupado por otro contenedor (fuera del laboratorio)," ;;
       en:port_busy_container)  echo "port taken by another container (not part of the lab)," ;;
 
-      pt:port_busy_hint)       echo "Libere a porta (pare o outro programa ou contêiner: 'docker ps' mostra os contêineres, 'lsof -i :<porta>' os programas) e rode 'up' de novo. Se for uma das portas extras, deixe EXPOSE_PORTS=no no lab.conf." ;;
-      es:port_busy_hint)       echo "Libere el puerto (detenga el otro programa o contenedor: 'docker ps' muestra los contenedores, 'lsof -i :<puerto>' los programas) y vuelva a ejecutar 'up'. Si es uno de los puertos extra, deje EXPOSE_PORTS=no en lab.conf." ;;
-      en:port_busy_hint)       echo "Free the port (stop the other program or container: 'docker ps' lists containers, 'lsof -i :<port>' lists programs) and run 'up' again. If it's one of the extra ports, set EXPOSE_PORTS=no in lab.conf." ;;
+      pt:port_busy_hint)       echo "Libere a porta (pare o outro programa ou contêiner: 'docker ps' mostra os contêineres, 'lsof -i :<porta>' os programas) e rode 'up' de novo. Se for a porta do painel (${PANEL_PORT}), você também pode escolher outra em PANEL_PORT no lab.conf; se for uma das portas extras, deixe EXPOSE_PORTS=no." ;;
+      es:port_busy_hint)       echo "Libere el puerto (detenga el otro programa o contenedor: 'docker ps' muestra los contenedores, 'lsof -i :<puerto>' los programas) y vuelva a ejecutar 'up'. Si es el puerto del panel (${PANEL_PORT}), también puede elegir otro en PANEL_PORT en lab.conf; si es uno de los puertos extra, deje EXPOSE_PORTS=no." ;;
+      en:port_busy_hint)       echo "Free the port (stop the other program or container: 'docker ps' lists containers, 'lsof -i :<port>' lists programs) and run 'up' again. If it's the panel's port (${PANEL_PORT}), you can also pick another one with PANEL_PORT in lab.conf; if it's one of the extra ports, set EXPOSE_PORTS=no." ;;
 
       pt:beta_warning)         echo "o laboratório vai usar o beta.registro.br, e você vai precisar de acesso à Internet e de um login lá. Para o laboratório autocontido, use MODE=local no lab.conf." ;;
       es:beta_warning)         echo "el laboratorio va a usar beta.registro.br, y necesitará acceso a Internet y un usuario allí. Para el laboratorio autocontenido, use MODE=local en lab.conf." ;;
@@ -176,9 +176,9 @@ msg() {
       es:doc_panel_bad)        echo "el panel no responde en" ;;
       en:doc_panel_bad)        echo "the panel doesn't answer at" ;;
 
-      pt:doc_vhost_bad)        echo "krill.localhost não respondeu deste terminal. Os navegadores resolvem *.localhost sozinhos; se o navegador também falhar, abra o painel em http://localhost:8080 e use os botões dele." ;;
-      es:doc_vhost_bad)        echo "krill.localhost no respondió desde esta terminal. Los navegadores resuelven *.localhost solos; si el navegador también falla, abra el panel en http://localhost:8080 y use sus botones." ;;
-      en:doc_vhost_bad)        echo "krill.localhost didn't answer from this terminal. Browsers resolve *.localhost on their own; if the browser fails too, open the panel at http://localhost:8080 and use its buttons." ;;
+      pt:doc_vhost_bad)        echo "krill.localhost não respondeu deste terminal. Os navegadores resolvem *.localhost sozinhos; se o navegador também falhar, abra o painel em http://localhost:${PANEL_PORT} e use os botões dele." ;;
+      es:doc_vhost_bad)        echo "krill.localhost no respondió desde esta terminal. Los navegadores resuelven *.localhost solos; si el navegador también falla, abra el panel en http://localhost:${PANEL_PORT} y use sus botones." ;;
+      en:doc_vhost_bad)        echo "krill.localhost didn't answer from this terminal. Browsers resolve *.localhost on their own; if the browser fails too, open the panel at http://localhost:${PANEL_PORT} and use its buttons." ;;
 
       pt:doc_prep_ok)          echo "Preparação concluída: a CA tem pai, recursos e repositório" ;;
       es:doc_prep_ok)          echo "Preparación terminada: la CA tiene padre, recursos y repositorio" ;;

@@ -360,15 +360,16 @@ introducción oficial vale veinte minutos: https://docs.docker.com/get-started/
    la preparación, y dice qué hacer con cada problema.
 
    > [!WARNING]
-   > El laboratorio solo necesita el **puerto 8080** libre en su
+   > El laboratorio solo necesita el **puerto {{PANEL_PORT}}** libre en su
    > computadora. Si otro programa lo está usando, `up` se detiene y dice
-   > cuál. (Con `EXPOSE_PORTS=yes` en `lab.conf`, también publica el puerto
+   > cuál; libérelo, o elija otro puerto en `PANEL_PORT` en `lab.conf`. (Con
+   > `EXPOSE_PORTS=yes` en `lab.conf`, también publica el puerto
    > propio de cada servicio, 3000, 3323, 8081..., lo que solo hace falta para
    > conectar herramientas de afuera directamente a un servicio.)
 
 2. Abra el panel del laboratorio en el navegador:
 
-   **http://localhost:8080**
+   **http://localhost:{{PANEL_PORT}}**
 
    Use exactamente `localhost`: el panel llega a todos los demás servicios
    con nombres como `krill.localhost`, que los navegadores dirigen a su
@@ -432,7 +433,7 @@ entre un operador de red y su RIR.
 ### Su lado: la CA en Krill
 
 1. Abra Krill: botón **Krill** arriba del panel (o
-   **http://krill.localhost:8080** en una pestaña propia).
+   **http://krill.localhost:{{PANEL_PORT}}** en una pestaña propia).
 
 2. Inicie sesión con el token **`labpass`**.
 
@@ -443,7 +444,7 @@ entre un operador de red y su RIR.
 ### El lado del registro: el panel de {{RIR_NAME}}
 
 4. Abra el panel del registro: botón **Registro** de arriba (o
-   **http://registry.localhost:8080**).
+   **http://registry.localhost:{{PANEL_PORT}}**).
 
    Fíjese en la sección *Recursos asignados*: lista el ASN y los bloques de su
    `lab.conf`, y el certificado que el registro está por emitir va a cubrir
@@ -1863,7 +1864,7 @@ llegaron hasta ahí.
    ```
 
    (Desde la terminal de su propia computadora, los mismos datos están en
-   `http://localhost:8080/api/routinator/json`.)
+   `http://localhost:{{PANEL_PORT}}/api/routinator/json`.)
 
 3. Vea qué recibió observer1 por RTR:
 
@@ -1991,8 +1992,8 @@ dice qué hacer con cada problema que encuentra.
 
 | Síntoma | Qué verificar |
 |---|---|
-| `up` se detiene con "puerto ocupado" / "port is already allocated" | Otro programa o contenedor está usando el puerto 8080 (o, con `EXPOSE_PORTS=yes`, uno de los puertos propios de los servicios). `doctor` dice cuál; deténgalo, o deje `EXPOSE_PORTS=no` en `lab.conf`. |
-| Las terminales o las interfaces web del panel no abren | Abra el panel exactamente en **http://localhost:8080**. Abierto por dirección IP, esos nombres no resuelven; si de verdad necesita acceso por IP, ponga `EXPOSE_PORTS=yes` en `lab.conf` y vuelva a ejecutar `up`. |
+| `up` se detiene con "puerto ocupado" / "port is already allocated" | Otro programa o contenedor está usando el puerto {{PANEL_PORT}} (o, con `EXPOSE_PORTS=yes`, uno de los puertos propios de los servicios). `doctor` dice cuál; deténgalo, elija otro puerto para el panel en `PANEL_PORT` en `lab.conf`, o deje `EXPOSE_PORTS=no` ahí. |
+| Las terminales o las interfaces web del panel no abren | Abra el panel exactamente en **http://localhost:{{PANEL_PORT}}**. Abierto por dirección IP, esos nombres no resuelven; si de verdad necesita acceso por IP, ponga `EXPOSE_PORTS=yes` en `lab.conf` y vuelva a ejecutar `up`. |
 | Lo que veo no coincide con un paso | Lea el cuadro de **Estado** del paso y ejecute el único comando que lista: cada comando `stepN-*` fija todo su estado (atacante, peer, ROAs, ASPA, etapa de los observadores), no solo lo que cambió desde el paso anterior, así que es seguro ejecutarlo desde cualquier punto de la historia. El *laboratorio ≈ Paso N* del encabezado le dice dónde está el laboratorio ahora. |
 | Un comando `stepN-*` se detiene con un error de Krill/CA | Desde `step3-rov-mark` en adelante, todo comando `stepN-*` verifica que la Preparación realmente haya terminado antes de tocar nada; vea "Cómo está organizada la historia". El mensaje dice qué falta (ninguna CA, más de una, o una que todavía no está completamente configurada); arregle eso en Krill y en el panel, y vuelva a ejecutar el mismo comando. |
 | No encuentro mis ROAs en Krill | Están en la tabla de la pestaña **ROAs** de la CA. El recuadro de la derecha de esa página (debajo de *Add ROA* en ventanas angostas) lista los *recursos* de la CA, no sus ROAs. El recuadro de Krill en el panel y `krillc roas list` también las muestran. |

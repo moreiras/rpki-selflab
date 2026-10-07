@@ -362,7 +362,8 @@ introducción oficial vale veinte minutos: https://docs.docker.com/get-started/
    > [!WARNING]
    > El laboratorio solo necesita el **puerto 8080** libre en su
    > computadora. Si otro programa lo está usando, `up` se detiene y dice
-   > cuál. (Con `EXPOSE_PORTS=yes` en `lab.conf`, también publica el puerto
+   > cuál; libérelo, o elija otro puerto en `PANEL_PORT` en `lab.conf`. (Con
+   > `EXPOSE_PORTS=yes` en `lab.conf`, también publica el puerto
    > propio de cada servicio, 3000, 3323, 8081..., lo que solo hace falta para
    > conectar herramientas de afuera directamente a un servicio.)
 
@@ -1991,7 +1992,7 @@ dice qué hacer con cada problema que encuentra.
 
 | Síntoma | Qué verificar |
 |---|---|
-| `up` se detiene con "puerto ocupado" / "port is already allocated" | Otro programa o contenedor está usando el puerto 8080 (o, con `EXPOSE_PORTS=yes`, uno de los puertos propios de los servicios). `doctor` dice cuál; deténgalo, o deje `EXPOSE_PORTS=no` en `lab.conf`. |
+| `up` se detiene con "puerto ocupado" / "port is already allocated" | Otro programa o contenedor está usando el puerto 8080 (o, con `EXPOSE_PORTS=yes`, uno de los puertos propios de los servicios). `doctor` dice cuál; deténgalo, elija otro puerto para el panel en `PANEL_PORT` en `lab.conf`, o deje `EXPOSE_PORTS=no` ahí. |
 | Las terminales o las interfaces web del panel no abren | Abra el panel exactamente en **http://localhost:8080**. Abierto por dirección IP, esos nombres no resuelven; si de verdad necesita acceso por IP, ponga `EXPOSE_PORTS=yes` en `lab.conf` y vuelva a ejecutar `up`. |
 | Lo que veo no coincide con un paso | Lea el cuadro de **Estado** del paso y ejecute el único comando que lista: cada comando `stepN-*` fija todo su estado (atacante, peer, ROAs, ASPA, etapa de los observadores), no solo lo que cambió desde el paso anterior, así que es seguro ejecutarlo desde cualquier punto de la historia. El *laboratorio ≈ Paso N* del encabezado le dice dónde está el laboratorio ahora. |
 | Un comando `stepN-*` se detiene con un error de Krill/CA | Desde `step3-rov-mark` en adelante, todo comando `stepN-*` verifica que la Preparación realmente haya terminado antes de tocar nada; vea "Cómo está organizada la historia". El mensaje dice qué falta (ninguna CA, más de una, o una que todavía no está completamente configurada); arregle eso en Krill y en el panel, y vuelva a ejecutar el mismo comando. |

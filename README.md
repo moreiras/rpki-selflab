@@ -76,12 +76,14 @@ the containers and the preparation, and says what to do about each problem.
 Everything is reachable through one port, 8080: the panel at `localhost`,
 and each of the other web apps under its own `<name>.localhost` (browsers
 resolve `*.localhost` to your machine, and nginx routes by name). On the
-panel, the **Tools** bar opens all of them, and the terminals, inside the
+panel, the bar at the top opens all of them, and the terminals, inside the
 panel itself, in tabs. Open it at exactly `localhost`: by IP address those
 names don't resolve.
 
 Only 8080 is published on your computer, so the lab doesn't collide with
-other software. `EXPOSE_PORTS=yes` in `lab.conf` also publishes each
+other software. If 8080 is already taken, set another port with `PANEL_PORT`
+in `lab.conf` and run `./scripts/lab.sh up`; every address above then uses
+that port. `EXPOSE_PORTS=yes` in `lab.conf` also publishes each
 service's own port (Krill 3000, LabNIC's Krill 3001, Routinator 3323/8323,
 FORT 3324, ttyd 7681, registry 8081; see `docker-compose.ports.yml`), for
 connecting outside tools straight to a service.

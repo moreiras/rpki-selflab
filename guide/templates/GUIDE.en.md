@@ -343,15 +343,16 @@ introduction is worth twenty minutes: https://docs.docker.com/get-started/
    the preparation, and says what to do about each problem.
 
    > [!WARNING]
-   > The lab only needs **port 8080** free on your computer. If another
-   > program is using it, `up` stops and says which one. (`EXPOSE_PORTS=yes`
+   > The lab only needs **port {{PANEL_PORT}}** free on your computer. If another
+   > program is using it, `up` stops and says which one; free it, or pick
+   > another port with `PANEL_PORT` in `lab.conf`. (`EXPOSE_PORTS=yes`
    > in `lab.conf` also publishes each service's own port, 3000, 3323,
    > 8081..., which you only need to connect outside tools straight to a
    > service.)
 
 2. Open the lab's panel in your browser:
 
-   **http://localhost:8080**
+   **http://localhost:{{PANEL_PORT}}**
 
    Use exactly `localhost`: the panel reaches every other service through
    names like `krill.localhost`, which browsers send to your own computer.
@@ -411,7 +412,7 @@ between a network operator and its RIR.
 ### Your side: the CA in Krill
 
 1. Open Krill: the **Krill** button at the top of the panel (or
-   **http://krill.localhost:8080** in a tab of its own).
+   **http://krill.localhost:{{PANEL_PORT}}** in a tab of its own).
 
 2. Log in with the token **`labpass`**.
 
@@ -422,7 +423,7 @@ between a network operator and its RIR.
 ### The registry's side: the {{RIR_NAME}} panel
 
 4. Open the registry panel: the **Registry** button at the top (or
-   **http://registry.localhost:8080**).
+   **http://registry.localhost:{{PANEL_PORT}}**).
 
    Notice the *Allocated resources* section: it lists the ASN and blocks from
    your `lab.conf`, and the certificate the registry is about to issue will
@@ -1788,7 +1789,7 @@ got there.
    ```
 
    (From your own computer's terminal, the same data is at
-   `http://localhost:8080/api/routinator/json`.)
+   `http://localhost:{{PANEL_PORT}}/api/routinator/json`.)
 
 3. See what observer1 received over RTR:
 
@@ -1911,8 +1912,8 @@ what to do about each problem it finds.
 
 | Symptom | What to check |
 |---|---|
-| `up` stops with "port taken" / "port is already allocated" | Another program or container is using port 8080 (or, with `EXPOSE_PORTS=yes`, one of the services' own ports). `doctor` says which one; stop it, or set `EXPOSE_PORTS=no` in `lab.conf`. |
-| The panel's terminals or web interfaces don't open | Open the panel at exactly **http://localhost:8080**. Opened by IP address, those names don't resolve; if you really need IP access, set `EXPOSE_PORTS=yes` in `lab.conf` and run `up` again. |
+| `up` stops with "port taken" / "port is already allocated" | Another program or container is using port {{PANEL_PORT}} (or, with `EXPOSE_PORTS=yes`, one of the services' own ports). `doctor` says which one; stop it, choose another panel port with `PANEL_PORT` in `lab.conf`, or set `EXPOSE_PORTS=no` there. |
+| The panel's terminals or web interfaces don't open | Open the panel at exactly **http://localhost:{{PANEL_PORT}}**. Opened by IP address, those names don't resolve; if you really need IP access, set `EXPOSE_PORTS=yes` in `lab.conf` and run `up` again. |
 | What I see doesn't match a step | Read the step's **State** box and run the single command it lists. Every `stepN-*` command sets its whole state (attacker, peer, ROAs, ASPA, observers' stage), not just what changed since the step before it, so it's safe to run from anywhere in the story. The header's *lab ≈ Step N* tells you where the lab is now. |
 | A `stepN-*` command stops with a Krill/CA error | From `step3-rov-mark` on, every `stepN-*` command checks that Preparation actually finished before touching anything; see "How the story is organized". The message says what's missing (no CA, more than one, or one that isn't fully set up yet); fix that in Krill and the panel, then re-run the same command. |
 | I can't find my ROAs in Krill | They're in the table on the CA's **ROAs** tab. The box on the right of that page (below *Add ROA* in narrow windows) lists the CA's *resources*, not its ROAs. The Krill box on the panel and `krillc roas list` show them too. |
@@ -1955,4 +1956,6 @@ what to do about each problem it finds.
 - OpenBGPD documentation: https://www.openbgpd.org/
 - Docker documentation: https://docs.docker.com/
 
-*This guide is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The lab's code is under Apache-2.0. See the `LICENSE` files in the repository.*
+*This guide is licensed under [CC BY
+4.0](https://creativecommons.org/licenses/by/4.0/). The lab's code is under
+Apache-2.0. See the `LICENSE` files in the repository.*

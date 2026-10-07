@@ -77,12 +77,14 @@ contêineres e a preparação, e diz o que fazer a respeito de cada problema.
 Tudo passa por uma porta só, a 8080: o painel fica em `localhost`, e cada um
 dos outros aplicativos web no seu próprio `<nome>.localhost` (os navegadores
 resolvem `*.localhost` para a sua máquina, e o nginx roteia pelo nome). No
-painel, a barra de **Ferramentas** abre todos eles, e os terminais, dentro do
+painel, a barra no alto abre todos eles, e os terminais, dentro do
 próprio painel, em abas. Abra-o em exatamente `localhost`: pelo endereço IP,
 esses nomes não resolvem.
 
 Só a 8080 é publicada no seu computador, então o laboratório não briga com
-outros programas. `EXPOSE_PORTS=yes` no `lab.conf` publica também a porta
+outros programas. Se a 8080 já estiver ocupada, escolha outra porta em
+`PANEL_PORT` no `lab.conf` e rode `./scripts/lab.sh up`; todos os endereços
+acima passam a usar essa porta. `EXPOSE_PORTS=yes` no `lab.conf` publica também a porta
 própria de cada serviço (Krill 3000, Krill do LabNIC 3001, Routinator
 3323/8323, FORT 3324, ttyd 7681, registro 8081; veja
 `docker-compose.ports.yml`), para ligar ferramentas de fora direto a um

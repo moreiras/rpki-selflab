@@ -4,7 +4,7 @@
 # RPKI SelfLab
 #
 #   start:  ./scripts/lab.sh up
-#   panel:  http://localhost:8080
+#   panel:  http://localhost:8080 (PANEL_PORT in lab.conf)
 #
 # Pinned versions live here and in images/*/Dockerfile - see the "Versions"
 # section of the README before changing any of them.
@@ -385,7 +385,7 @@ services:
       - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - status:/srv/status:ro
     ports:
-      - "8080:80"
+      - "${PANEL_PORT:-8080}:80"     # PANEL_PORT in lab.conf
     networks: [mgmt]
     restart: unless-stopped
 

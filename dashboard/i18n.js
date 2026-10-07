@@ -25,9 +25,9 @@ const I18N = {
   theme_to_light:    { en: "Light theme", es: "Tema claro", pt: "Tema claro" },
   theme_to_dark:     { en: "Dark theme", es: "Tema oscuro", pt: "Tema escuro" },
   banner_ip: {
-    en: "You opened the panel by IP address. Its terminals and web interfaces are only reachable at <b>http://localhost:8080</b> (or set <code>EXPOSE_PORTS=yes</code> in <code>lab.conf</code> and run <code>./scripts/lab.sh up</code> again).",
-    es: "Abrió el panel por dirección IP. Sus terminales e interfaces web solo se alcanzan en <b>http://localhost:8080</b> (o ponga <code>EXPOSE_PORTS=yes</code> en <code>lab.conf</code> y vuelva a ejecutar <code>./scripts/lab.sh up</code>).",
-    pt: "Você abriu o painel pelo endereço IP. Os terminais e as interfaces web dele só funcionam em <b>http://localhost:8080</b> (ou defina <code>EXPOSE_PORTS=yes</code> no <code>lab.conf</code> e rode <code>./scripts/lab.sh up</code> de novo).",
+    en: "You opened the panel by IP address. Its terminals and web interfaces are only reachable at <b>http://localhost{port}</b> (or set <code>EXPOSE_PORTS=yes</code> in <code>lab.conf</code> and run <code>./scripts/lab.sh up</code> again).",
+    es: "Abrió el panel por dirección IP. Sus terminales e interfaces web solo se alcanzan en <b>http://localhost{port}</b> (o ponga <code>EXPOSE_PORTS=yes</code> en <code>lab.conf</code> y vuelva a ejecutar <code>./scripts/lab.sh up</code>).",
+    pt: "Você abriu o painel pelo endereço IP. Os terminais e as interfaces web dele só funcionam em <b>http://localhost{port}</b> (ou defina <code>EXPOSE_PORTS=yes</code> no <code>lab.conf</code> e rode <code>./scripts/lab.sh up</code> de novo).",
   },
 
   // ---- tools bar (always in the same place) ----

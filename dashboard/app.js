@@ -711,7 +711,7 @@ function translateStatic() {
     $(`n-${id}-role`).textContent = t(`svg_role_${key}`);
   }
   for (const id of ["krill", "routinator", "fort", "registry"]) $(`n-${id}-role`).textContent = t(`svg_role_${id}`);
-  $("banner").innerHTML = t("banner_ip");
+  $("banner").innerHTML = t("banner_ip", { port: PANEL_PORT });
   $("banner").classList.toggle("show", !VHOST);
   document.querySelectorAll("#mode-switch button").forEach(b => b.classList.toggle("active", b.dataset.mode === guideMode()));
   document.querySelectorAll("#run-switch button").forEach(b => b.classList.toggle("active", b.dataset.run === runMode()));
