@@ -9,10 +9,53 @@ computador com Docker (Mac, Windows ou Linux, testado com OrbStack e Docker
 Desktop). Ele publica ROAs e um objeto ASPA, e depois mostra o que **dois
 validadores diferentes e dois roteadores diferentes** fazem com exatamente os
 mesmos objetos, enquanto um sequestrador (AS666) e um peer que vaza rotas
-tentam atrapalhar. O guia é uma história só: três ataques, e o momento em que
-cada um para de funcionar.
+tentam atrapalhar. O guia é uma história só: três ataques, e qual verificação
+barra cada um.
 
-Ele tem dois modos, escolhidos com a variável `MODE` no `lab.conf`:
+O guia está em **[guide/GUIDE.en.md](guide/GUIDE.en.md)** (também em
+[espanhol](guide/GUIDE.es.md) e [português](guide/GUIDE.pt.md)). No painel web,
+o mesmo conteúdo aparece passo a passo ao lado da topologia ao vivo, no idioma
+selecionado ali, e cada bloco de comandos diz onde roda, com um botão que abre
+o terminal certo.
+
+**Como usar.** O painel controla um laboratório completo, e seguir o roteiro é
+o caminho recomendado: cada passo prepara o seguinte, e os pontos de controle
+se marcam sozinhos quando o laboratório chega lá. Alguns passos são desafios,
+com a solução escondida atrás de dicas e de um cronômetro. Depois de terminar,
+use o laboratório como quiser: a última seção do roteiro tem ideias em aberto,
+a pasta `work/` guarda as suas próprias configurações, e qualquer comando de
+passo põe o laboratório de volta nos trilhos.
+
+## Início rápido
+
+1. **Instale o Docker** com o Compose v2 (o que instalar em cada sistema está
+   em [Antes de começar: o Docker](#antes-de-começar-o-docker)). No Windows,
+   faça tudo dentro do terminal do Ubuntu do WSL 2.
+2. **Baixe o laboratório.** Clone o repositório:
+
+   ```sh
+   git clone https://github.com/moreiras/rpki-selflab.git
+   cd rpki-selflab
+   ```
+
+   ou baixe o código-fonte (`.zip` ou `.tar.gz`) da versão mais recente em
+   [Releases](https://github.com/moreiras/rpki-selflab/releases) e descompacte.
+3. **Suba o laboratório**, dentro da pasta dele:
+
+   ```sh
+   ./scripts/lab.sh up
+   ```
+
+   Depois abra **http://localhost:8080** no navegador e siga o roteiro na
+   coluna da esquerda do painel.
+
+O primeiro `up` baixa e constrói as imagens, o que leva alguns minutos.
+Prefere não instalar o Docker? Também há uma máquina virtual pronta: veja
+[Como máquina virtual](#como-máquina-virtual).
+
+## Modos local e beta
+
+O laboratório tem dois modos, escolhidos com a variável `MODE` no `lab.conf`:
 
 | MODE | Quem certifica os recursos | Internet |
 |---|---|---|
@@ -24,20 +67,9 @@ confiança, o seu próprio repositório, e um painel de registro onde acontecem 
 delegação da CA e a autorização de publicação, com as mesmas trocas de XML das
 RFC 6492 e 8183.
 
-O guia está em **[guide/GUIDE.en.md](guide/GUIDE.en.md)** (também em
-[espanhol](guide/GUIDE.es.md) e [português](guide/GUIDE.pt.md)). No painel web,
-o mesmo conteúdo aparece passo a passo ao lado da topologia ao vivo, no idioma
-selecionado ali, e cada bloco de comandos diz onde roda, com um botão que abre
-o terminal certo.
-
-**Como usar.** O painel emula um laboratório completo, e seguir o roteiro é o
-caminho recomendado: cada passo prepara o seguinte, e os pontos de controle
-se marcam sozinhos quando o laboratório chega lá. Um modo *Desafio* esconde
-as soluções atrás de dicas e de um cronômetro, para uma segunda passada.
-Depois de terminar, use o laboratório como quiser: a última seção do roteiro
-tem ideias
-em aberto, a pasta `work/` guarda as suas próprias configurações, e qualquer
-comando de passo põe o laboratório de volta nos trilhos.
+O modo `beta` foi criado só para alguns cursos do NIC.br. O modo `local`, em
+que o laboratório é autocontido, é o padrão e quase certamente o que você
+deve usar.
 
 ## Antes de começar: o Docker
 
@@ -49,18 +81,13 @@ disco. Depois de no ar, o laboratório usa por volta de 300 MB de memória.
 |---|---|
 | Linux | Docker Engine + o plugin do Compose: https://docs.docker.com/engine/install/ (depois https://docs.docker.com/engine/install/linux-postinstall/ para usá-lo sem `sudo`) |
 | macOS | OrbStack (https://docs.orbstack.dev/quick-start, com o qual o laboratório é testado) ou Docker Desktop (https://docs.docker.com/desktop/setup/install/mac-install/) |
-| Windows | WSL 2 (`wsl --install`, https://learn.microsoft.com/windows/wsl/install) mais o Docker Desktop com a integração WSL (https://docs.docker.com/desktop/features/wsl/). Clone e rode o laboratório **dentro** do terminal do Ubuntu, numa pasta do Linux como `~/lab-aspa`, e não em `/mnt/c` |
+| Windows | WSL 2 (`wsl --install`, https://learn.microsoft.com/windows/wsl/install) mais o Docker Desktop com a integração WSL (https://docs.docker.com/desktop/features/wsl/). Clone e rode o laboratório **dentro** do terminal do Ubuntu, numa pasta do Linux como `~/rpki-selflab`, e não em `/mnt/c` |
 
 Confira com `docker version`, `docker compose version` e
 `docker run --rm hello-world`. A *Preparação 1* do roteiro explica tudo isso
 com mais detalhes.
 
-## Primeiros passos
-
-```sh
-./scripts/lab.sh up
-open http://localhost:8080
-```
+## Serviços e portas
 
 Se algo der errado, `./scripts/lab.sh doctor` confere o Docker, as portas, os
 contêineres e a preparação, e diz o que fazer a respeito de cada problema.
@@ -84,8 +111,8 @@ esses nomes não resolvem.
 Só a 8080 é publicada no seu computador, então o laboratório não briga com
 outros programas. Se a 8080 já estiver ocupada, escolha outra porta em
 `PANEL_PORT` no `lab.conf` e rode `./scripts/lab.sh up`; todos os endereços
-acima passam a usar essa porta. `EXPOSE_PORTS=yes` no `lab.conf` publica também a porta
-própria de cada serviço (Krill 3000, Krill do LabNIC 3001, Routinator
+acima passam a usar essa porta. `EXPOSE_PORTS=yes` no `lab.conf` publica também
+a porta própria de cada serviço (Krill 3000, Krill do LabNIC 3001, Routinator
 3323/8323, FORT 3324, ttyd 7681, registro 8081; veja
 `docker-compose.ports.yml`), para ligar ferramentas de fora direto a um
 serviço.
@@ -99,40 +126,14 @@ Internet. Veja [vm/README.pt.md](vm/README.pt.md).
 
 ## Topologia
 
-```
-                 LabNIC   (RIR/NIR: âncora de confiança + repositório)
-                /                                      \
-            RRDP                                        RRDP
-             v                                            v
-        Routinator                                  FORT Validator
-             |  RTR v2 :3323                             |  RTR v2 :3323
-             v                                            v
-   observer1  AS64510  (BIRD)                observer2  AS64511  (OpenBGPD)
-
-        os dois observadores recebem o MESMO prefixo pelos DOIS caminhos:
-
-        Provedor A  AS64501                    Provedor B  AS64502
-                     \                          /
-                      \                        /
-                       origem  AS64500  --  Krill (a CA do titular)
-                       203.0.113.0/24 , 3fff:cafe::/32
-```
+![A topologia do laboratório: o registro e os dois validadores no alto, os observadores logo abaixo, os dois provedores, o AS666 e, embaixo, a origem, a sua CA e o peer](guide/img/topology.pt.svg)
 
 O AS64500 é multihomed e anuncia `203.0.113.0/24` e `3fff:cafe::/32`. Cada
 observador recebe o mesmo prefixo pelos dois provedores. A origem prefere o
 Provedor B: repete o próprio ASN duas vezes (prepend) ao anunciar para o
 Provedor A, o backup, então o caminho por A fica dois saltos mais longo. Mais
-dois roteadores entram na topologia, e ficam calados até a história do guia
-ligá-los:
-
-```
-   AS666 (atacante) ---- sessões BGP diretas ----> observer1, observer2
-                         (um cliente dos observadores)
-
-   peer  AS64499 ---- peering privado ---- origem AS64500
-        |
-        +---- trânsito ---- Provedor A
-```
+dois roteadores entram na topologia, desenhados com borda tracejada, e ficam
+calados até a história do guia ligá-los:
 
 - **AS666** sequestra os prefixos da origem: primeiro anunciando-os como seus
   (`step2-hijack-simple`), depois forjando o AS_PATH para terminar na origem
@@ -244,7 +245,7 @@ qualquer coisa, e avisa o que está faltando quando não terminou.
 Além desses: `refresh` (faz os validadores revalidarem agora), `doctor`
 (confere o ambiente), `clean-objects` (apaga as ROAs e o ASPA da CA, mantendo
 a CA, para recomeçar a história sem refazer a preparação), `status`, `logs`,
-`down` e `reset`. A ferramenta **Comandos do laboratório** do painel lista
+`down` e `reset`. O botão **Comandos** do painel lista
 todos, com um botão para rodar cada um.
 
 ## Arquivos
@@ -419,4 +420,5 @@ para nada. Nenhum dos dois toca a Internet real de qualquer forma.
 
 - O código e as configurações do laboratório: [Apache-2.0](LICENSE).
 - O guia, os READMEs e suas traduções: [CC BY 4.0](LICENSE-docs).
-- Os softwares que o laboratório executa mantêm suas próprias licenças: veja [THIRD-PARTY.md](THIRD-PARTY.md).
+- Os softwares que o laboratório executa mantêm suas próprias licenças: veja
+  [THIRD-PARTY.md](THIRD-PARTY.md).

@@ -4,15 +4,56 @@
 
 *[English](README.md) · [Español](README.es.md) · [Português](README.pt.md)*
 
-A lab for RPKI (ROAs, ROV and ASPA) in containers, meant to run on any
-computer with Docker (Mac, Windows, or Linux, tested with OrbStack and
-Docker Desktop). It publishes ROAs and an ASPA object, then shows what
-**two different validators and two different routers** make of exactly the
-same objects, while a hijacker (AS666) and a leaky peer try to get in the
-way. The guide tells it as one story: three attacks, and the moment each
-one stops working.
+A lab for RPKI (ROAs, ROV and ASPA) in containers, meant to run on any computer
+with Docker (Mac, Windows, or Linux, tested with OrbStack and Docker Desktop).
+It publishes ROAs and an ASPA object, then shows what **two different
+validators and two different routers** make of exactly the same objects, while
+a hijacker (AS666) and a leaky peer try to get in the way. The guide tells it
+as one story: three attacks, and which check stops each one.
 
-It has two modes, chosen with the `MODE` variable in `lab.conf`:
+The guide is at **[guide/GUIDE.en.md](guide/GUIDE.en.md)** (also in
+[Spanish](guide/GUIDE.es.md) and [Portuguese](guide/GUIDE.pt.md)). In the web
+panel, the same content shows up step by step next to the live topology, in
+whichever language is selected there, with every command block saying where
+it runs and a button that opens that terminal.
+
+**How to use it.** The panel controls a complete lab, and following the guide
+is the recommended way in: each step sets up the next, and checkpoints tick
+themselves as your lab gets there. Some steps are challenges, with the solution
+hidden behind hints and a timer. Once you're through, use the lab freely: the
+guide's last section has open-ended ideas, the `work/` folder holds your own
+configurations, and any step command puts the lab back on track.
+
+## Quick start
+
+1. **Install Docker** with Compose v2 (what to install on each system is in
+   [Before you start: Docker](#before-you-start-docker)). On Windows, do
+   everything inside the Ubuntu terminal of WSL 2.
+2. **Get the lab.** Clone the repository:
+
+   ```sh
+   git clone https://github.com/moreiras/rpki-selflab.git
+   cd rpki-selflab
+   ```
+
+   or download the source code (`.zip` or `.tar.gz`) of the latest version from
+   [Releases](https://github.com/moreiras/rpki-selflab/releases) and unpack it.
+3. **Bring it up**, inside the lab's folder:
+
+   ```sh
+   ./scripts/lab.sh up
+   ```
+
+   Then open **http://localhost:8080** in your browser and follow the guide
+   in the panel's left column.
+
+The first `up` downloads and builds the images, which takes a few minutes.
+Would rather not install Docker? There's a ready-made virtual machine too:
+see [As a virtual machine](#as-a-virtual-machine).
+
+## Local and beta modes
+
+The lab has two modes, chosen with the `MODE` variable in `lab.conf`:
 
 | MODE | Who certifies the resources | Internet |
 |---|---|---|
@@ -21,22 +62,12 @@ It has two modes, chosen with the `MODE` variable in `lab.conf`:
 
 In local mode the lab is **self-contained**: its own trust anchor, its own
 repository, and a registry panel where CA delegation and publication
-authorization happen, using the same RFC 6492 and 8183 XML exchanges you'd
-see with a real RIR.
+authorization happen, using the same RFC 6492 and 8183 XML exchanges you'd see
+with a real RIR.
 
-The guide is at **[guide/GUIDE.en.md](guide/GUIDE.en.md)** (also in
-[Spanish](guide/GUIDE.es.md) and [Portuguese](guide/GUIDE.pt.md)). In the web
-panel, the same content shows up step by step next to the live topology, in
-whichever language is selected there, with every command block saying where
-it runs and a button that opens that terminal.
-
-**How to use it.** The panel emulates a complete lab, and following the
-guide is the recommended way in: each step sets up the next, and checkpoints
-tick themselves as your lab gets there. A *Challenge* mode hides the
-solutions behind hints and a timer, for a second pass. Once you're through,
-use the lab freely: the guide's last section has open-ended ideas, the `work/`
-folder holds your own configurations, and any step command puts the lab back
-on track.
+The `beta` mode was created only for some of NIC.br's courses. The `local`
+mode, where the lab is self-contained, is the default and almost certainly
+the one you want.
 
 ## Before you start: Docker
 
@@ -48,18 +79,13 @@ You need Docker with Compose v2, a 64-bit computer (amd64 or arm64), about
 |---|---|
 | Linux | Docker Engine + the Compose plugin: https://docs.docker.com/engine/install/ (then https://docs.docker.com/engine/install/linux-postinstall/ to run it without `sudo`) |
 | macOS | OrbStack (https://docs.orbstack.dev/quick-start, the one the lab is tested with) or Docker Desktop (https://docs.docker.com/desktop/setup/install/mac-install/) |
-| Windows | WSL 2 (`wsl --install`, https://learn.microsoft.com/windows/wsl/install) plus Docker Desktop with WSL integration (https://docs.docker.com/desktop/features/wsl/). Clone and run the lab **inside** the Ubuntu terminal, in a Linux folder such as `~/lab-aspa`, not under `/mnt/c` |
+| Windows | WSL 2 (`wsl --install`, https://learn.microsoft.com/windows/wsl/install) plus Docker Desktop with WSL integration (https://docs.docker.com/desktop/features/wsl/). Clone and run the lab **inside** the Ubuntu terminal, in a Linux folder such as `~/rpki-selflab`, not under `/mnt/c` |
 
 Check it with `docker version`, `docker compose version` and
 `docker run --rm hello-world`. The guide's *Preparation 1* walks through all
 of this in more detail.
 
-## Getting started
-
-```sh
-./scripts/lab.sh up
-open http://localhost:8080
-```
+## Services and ports
 
 If anything goes wrong, `./scripts/lab.sh doctor` checks Docker, the ports,
 the containers and the preparation, and says what to do about each problem.
@@ -97,39 +123,14 @@ with no Internet access. See [vm/README.md](vm/README.md).
 
 ## Topology
 
-```
-                 LabNIC   (RIR/NIR: trust anchor + repository)
-                /                                      \
-            RRDP                                        RRDP
-             v                                            v
-        Routinator                                  FORT Validator
-             |  RTR v2 :3323                             |  RTR v2 :3323
-             v                                            v
-   observer1  AS64510  (BIRD)                observer2  AS64511  (OpenBGPD)
+![The lab's topology: the registry and the two validators at the top, the observers below them, the two providers, AS666 and, at the bottom, the origin, its CA and the peer](guide/img/topology.en.svg)
 
-        both observers receive the SAME prefix over BOTH paths:
-
-        Provider A  AS64501                     Provider B  AS64502
-                     \                          /
-                      \                        /
-                       origin  AS64500  --  Krill (the holder's CA)
-                       203.0.113.0/24 , 3fff:cafe::/32
-```
-
-AS64500 is multihomed and announces `203.0.113.0/24` and `3fff:cafe::/32`.
-Each observer receives the same prefix over both providers. The origin
-prefers Provider B: it prepends its ASN twice when announcing to Provider A
-(the backup), so A's path comes out two hops longer. Two more routers sit
-on the topology, silent until the guide's story switches them on:
-
-```
-   AS666 (attacker) ---- direct BGP sessions ----> observer1, observer2
-                         (a customer of the observers)
-
-   peer  AS64499 ---- private peering ---- origin AS64500
-        |
-        +---- transit ---- Provider A
-```
+AS64500 is multihomed and announces `203.0.113.0/24` and `3fff:cafe::/32`. Each
+observer receives the same prefix over both providers. The origin prefers
+Provider B: it prepends its ASN twice when announcing to Provider A (the
+backup), so A's path comes out two hops longer. Two more routers sit on the
+topology, drawn with dashed borders, silent until the guide's story switches
+them on:
 
 - **AS666** hijacks the origin's prefixes: first announcing them as its own
   (`step2-hijack-simple`), then forging the AS_PATH so it ends in the real
@@ -237,11 +238,11 @@ anything, and says what's missing if it didn't.
 | `step9-leak-off` | peer stops leaking |
 | `step9-hijack-off` | AS666 goes silent |
 
-Besides those: `refresh` (make the validators revalidate now), `doctor`
-(check the environment), `clean-objects` (remove the CA's ROAs and ASPA,
-keeping the CA, to restart the story without redoing the preparation),
-`status`, `logs`, `down` and `reset`. The panel's **Lab commands** tool lists
-them all, with a button to run each one.
+Besides those: `refresh` (make the validators revalidate now), `doctor` (check
+the environment), `clean-objects` (remove the CA's ROAs and ASPA, keeping the
+CA, to restart the story without redoing the preparation), `status`, `logs`,
+`down` and `reset`. The panel's **Commands** button lists them all, with a
+button to run each one.
 
 ## Files
 
@@ -413,4 +414,5 @@ remember. None of this ever touches the real Internet.
 
 - The lab's code and configuration: [Apache-2.0](LICENSE).
 - The guide, the READMEs and their translations: [CC BY 4.0](LICENSE-docs).
-- The software the lab runs keeps its own licenses: see [THIRD-PARTY.md](THIRD-PARTY.md).
+- The software the lab runs keeps its own licenses: see
+  [THIRD-PARTY.md](THIRD-PARTY.md).

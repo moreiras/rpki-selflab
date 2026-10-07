@@ -289,7 +289,7 @@ The lab's scripts are bash scripts, so on Windows they run inside **WSL 2**
 3. In Docker Desktop, under *Settings → Resources → WSL integration*, turn on
    your Ubuntu distribution (https://docs.docker.com/desktop/features/wsl/).
 4. Open the **Ubuntu** terminal and do everything from there. Keep the lab's
-   folder inside Linux (for example `~/lab-aspa`), not under `/mnt/c/...`:
+   folder inside Linux (for example `~/rpki-selflab`), not under `/mnt/c/...`:
    it's much faster, and it avoids line-ending and permission problems.
 
 Can't or don't want to install anything? The lab also comes as a ready-made

@@ -304,7 +304,7 @@ Desktop fornecendo os contêineres:
 3. No Docker Desktop, em *Settings → Resources → WSL integration*, ligue a
    sua distribuição Ubuntu (https://docs.docker.com/desktop/features/wsl/).
 4. Abra o terminal do **Ubuntu** e faça tudo a partir dele. Deixe a pasta do
-   laboratório dentro do Linux (por exemplo, `~/lab-aspa`), e não em
+   laboratório dentro do Linux (por exemplo, `~/rpki-selflab`), e não em
    `/mnt/c/...`: é muito mais rápido, e evita problemas de fim de linha e de
    permissão.
 

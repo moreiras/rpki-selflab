@@ -9,20 +9,8 @@ computadora con Docker (Mac, Windows o Linux, probado con OrbStack y Docker
 Desktop). Publica ROAs y un objeto ASPA, y después muestra qué hacen **dos
 validadores distintos y dos routers distintos** con exactamente los mismos
 objetos, mientras un secuestrador (AS666) y un peer que filtra rutas intentan
-meterse en el medio. La guía del laboratorio cuenta una sola historia: tres ataques, y el
-momento en que cada uno deja de funcionar.
-
-Tiene dos modos, elegidos con la variable `MODE` en `lab.conf`:
-
-| MODE | Quién certifica los recursos | Internet |
-|---|---|---|
-| `local` (por defecto) | **LabNIC**, un RIR/NIR simulado que corre dentro del laboratorio | no hace falta |
-| `beta` | el sistema de pruebas de Registro.br | hace falta, y un login en beta.registro.br |
-
-En modo local el laboratorio es **autocontenido**: tiene su propia ancla de confianza,
-su propio repositorio, y un panel de registro donde ocurren la delegación de la CA
-y la autorización de publicación, con los mismos intercambios de XML de las
-RFC 6492 y 8183.
+meterse en el medio. La guía del laboratorio cuenta una sola historia: tres
+ataques, y qué verificación detiene a cada uno.
 
 La guía está en **[guide/GUIDE.es.md](guide/GUIDE.es.md)** (también en
 [inglés](guide/GUIDE.en.md) y [portugués](guide/GUIDE.pt.md)). En el panel web
@@ -30,15 +18,59 @@ aparece el mismo contenido, paso a paso, al lado de la topología en vivo, en el
 idioma que elija ahí, y cada bloque de comandos dice dónde se ejecuta, con un
 botón que abre la terminal correcta.
 
-**Cómo usarlo.** El panel emula un laboratorio completo, y seguir la guía es
-el camino recomendado: cada paso prepara el siguiente, y los puntos de
-control se marcan solos cuando el laboratorio llega ahí. Un modo *Desafío*
-esconde las soluciones detrás de pistas y un cronómetro, para una segunda
-pasada. Una vez que termine, use el laboratorio como quiera: la última sección
-de la
-guía tiene ideas abiertas, la carpeta `work/` guarda sus propias
-configuraciones, y cualquier comando de paso vuelve a encaminar el
-laboratorio.
+**Cómo usarlo.** El panel controla un laboratorio completo, y seguir la guía es
+el camino recomendado: cada paso prepara el siguiente, y los puntos de control
+se marcan solos cuando el laboratorio llega ahí. Algunos pasos son desafíos,
+con la solución oculta detrás de pistas y un cronómetro. Una vez que termine,
+use el laboratorio como quiera: la última sección de la guía tiene ideas
+abiertas, la carpeta `work/` guarda sus propias configuraciones, y cualquier
+comando de paso vuelve a encaminar el laboratorio.
+
+## Inicio rápido
+
+1. **Instale Docker** con Compose v2 (qué instalar en cada sistema está en
+   [Antes de empezar: Docker](#antes-de-empezar-docker)). En Windows, haga
+   todo dentro de la terminal de Ubuntu de WSL 2.
+2. **Descargue el laboratorio.** Clone el repositorio:
+
+   ```sh
+   git clone https://github.com/moreiras/rpki-selflab.git
+   cd rpki-selflab
+   ```
+
+   o descargue el código fuente (`.zip` o `.tar.gz`) de la versión más reciente
+   en [Releases](https://github.com/moreiras/rpki-selflab/releases) y
+   descomprímalo.
+3. **Levante el laboratorio**, dentro de su carpeta:
+
+   ```sh
+   ./scripts/lab.sh up
+   ```
+
+   Después abra **http://localhost:8080** en el navegador y siga la guía en
+   la columna izquierda del panel.
+
+El primer `up` descarga y construye las imágenes, lo que tarda unos minutos.
+¿Prefiere no instalar Docker? También hay una máquina virtual lista: vea
+[Como máquina virtual](#como-máquina-virtual).
+
+## Modos local y beta
+
+El laboratorio tiene dos modos, elegidos con la variable `MODE` en `lab.conf`:
+
+| MODE | Quién certifica los recursos | Internet |
+|---|---|---|
+| `local` (por defecto) | **LabNIC**, un RIR/NIR simulado que corre dentro del laboratorio | no hace falta |
+| `beta` | el sistema de pruebas de Registro.br | hace falta, y un login en beta.registro.br |
+
+En modo local el laboratorio es **autocontenido**: tiene su propia ancla de
+confianza, su propio repositorio, y un panel de registro donde ocurren la
+delegación de la CA y la autorización de publicación, con los mismos
+intercambios de XML de las RFC 6492 y 8183.
+
+El modo `beta` se creó solo para algunos cursos de NIC.br. El modo `local`,
+en el que el laboratorio es autocontenido, es el valor por defecto y casi
+seguro el que conviene usar.
 
 ## Antes de empezar: Docker
 
@@ -50,18 +82,13 @@ el laboratorio usa alrededor de 300 MB de memoria.
 |---|---|
 | Linux | Docker Engine + el plugin de Compose: https://docs.docker.com/engine/install/ (después https://docs.docker.com/engine/install/linux-postinstall/ para usarlo sin `sudo`) |
 | macOS | OrbStack (https://docs.orbstack.dev/quick-start, con el que se prueba el laboratorio) o Docker Desktop (https://docs.docker.com/desktop/setup/install/mac-install/) |
-| Windows | WSL 2 (`wsl --install`, https://learn.microsoft.com/windows/wsl/install) más Docker Desktop con la integración WSL (https://docs.docker.com/desktop/features/wsl/). Clone y ejecute el laboratorio **dentro** de la terminal de Ubuntu, en una carpeta de Linux como `~/lab-aspa`, no en `/mnt/c` |
+| Windows | WSL 2 (`wsl --install`, https://learn.microsoft.com/windows/wsl/install) más Docker Desktop con la integración WSL (https://docs.docker.com/desktop/features/wsl/). Clone y ejecute el laboratorio **dentro** de la terminal de Ubuntu, en una carpeta de Linux como `~/rpki-selflab`, no en `/mnt/c` |
 
 Verifíquelo con `docker version`, `docker compose version` y
 `docker run --rm hello-world`. La *Preparación 1* de la guía explica todo
 esto con más detalle.
 
-## Primeros pasos
-
-```sh
-./scripts/lab.sh up
-open http://localhost:8080
-```
+## Servicios y puertos
 
 Si algo sale mal, `./scripts/lab.sh doctor` revisa Docker, los puertos, los
 contenedores y la preparación, y dice qué hacer con cada problema.
@@ -82,65 +109,40 @@ En el panel, la barra de arriba los abre a todos, y a las terminales,
 dentro del propio panel, en pestañas. Ábralo exactamente en `localhost`: por
 dirección IP, esos nombres no resuelven.
 
-Solo el 8080 se publica en su computadora, así que el laboratorio no choca
-con otros programas. Si el 8080 ya está ocupado, elija otro puerto en
-`PANEL_PORT` en `lab.conf` y ejecute `./scripts/lab.sh up`; todas las
-direcciones de arriba pasan a usar ese puerto. `EXPOSE_PORTS=yes` en `lab.conf` publica además el
+Solo el 8080 se publica en su computadora, así que el laboratorio no choca con
+otros programas. Si el 8080 ya está ocupado, elija otro puerto en `PANEL_PORT`
+en `lab.conf` y ejecute `./scripts/lab.sh up`; todas las direcciones de arriba
+pasan a usar ese puerto. `EXPOSE_PORTS=yes` en `lab.conf` publica además el
 puerto propio de cada servicio (Krill 3000, Krill de LabNIC 3001, Routinator
 3323/8323, FORT 3324, ttyd 7681, registro 8081; vea
-`docker-compose.ports.yml`), para conectar herramientas de afuera
-directamente a un servicio.
+`docker-compose.ports.yml`), para conectar herramientas de afuera directamente
+a un servicio.
 
 ## Como máquina virtual
 
 Si prefiere no instalar Docker, el laboratorio también viene como una pequeña
-máquina virtual con escritorio propio (navegador y terminal) que ya trae
-todo adentro, imágenes incluidas. No hay nada que configurar, y funciona sin acceso a Internet.
-Vea [vm/README.es.md](vm/README.es.md).
+máquina virtual con escritorio propio (navegador y terminal) que ya trae todo
+adentro, imágenes incluidas. No hay nada que configurar, y funciona sin acceso
+a Internet. Vea [vm/README.es.md](vm/README.es.md).
 
 ## Topología
 
-```
-                 LabNIC   (RIR/NIR: trust anchor + repository)
-                /                                      \
-            RRDP                                        RRDP
-             v                                            v
-        Routinator                                  FORT Validator
-             |  RTR v2 :3323                             |  RTR v2 :3323
-             v                                            v
-   observer1  AS64510  (BIRD)                observer2  AS64511  (OpenBGPD)
-
-        both observers receive the SAME prefix over BOTH paths:
-
-        Provider A  AS64501                     Provider B  AS64502
-                     \                          /
-                      \                        /
-                       origin  AS64500  --  Krill (the holder's CA)
-                       203.0.113.0/24 , 3fff:cafe::/32
-```
+![La topología del laboratorio: el registro y los dos validadores arriba, los observadores debajo, los dos proveedores, el AS666 y, abajo, el origen, su CA y el peer](guide/img/topology.es.svg)
 
 El AS64500 es multihomed y anuncia `203.0.113.0/24` y `3fff:cafe::/32`. Cada
 observador recibe el mismo prefijo por los dos proveedores. El origen prefiere
-al Proveedor B, y para lograrlo antepone su ASN dos veces al anunciar al Proveedor A (el
-respaldo), de modo que el camino por A queda dos saltos más largo. Hay dos routers
-más en la topología, callados hasta que la historia de la guía los pone en marcha:
-
-```
-   AS666 (attacker) ---- direct BGP sessions ----> observer1, observer2
-                         (a customer of the observers)
-
-   peer  AS64499 ---- private peering ---- origin AS64500
-        |
-        +---- transit ---- Provider A
-```
+al Proveedor B, y para lograrlo antepone su ASN dos veces al anunciar al
+Proveedor A (el respaldo), de modo que el camino por A queda dos saltos más
+largo. Hay dos routers más en la topología, dibujados con borde punteado,
+callados hasta que la historia de la guía los pone en marcha:
 
 - **AS666** secuestra los prefijos del origen: primero anunciándolos como
   propios (`step2-hijack-simple`), y después falsificando el AS_PATH para que
   termine en el origen real (`step4-hijack-posrov`).
 - **peer** es una red legítima que hace peering privado con el origen y compra
-  tránsito al Proveedor A. Cuando la guía lo indica (`step7-leak-on`) filtra las rutas del origen
-  hacia el Proveedor A: una fuga de ruta, que el ROV
-  nunca puede ver pero el ASPA sí.
+  tránsito al Proveedor A. Cuando la guía lo indica (`step7-leak-on`) filtra
+  las rutas del origen hacia el Proveedor A: una fuga de ruta, que el ROV nunca
+  puede ver pero el ASPA sí.
 
 | Red Docker | IPv4 | IPv6 | entre |
 |---|---|---|---|
@@ -184,24 +186,26 @@ observador es el upstream de los proveedores, y las rutas le llegan desde un
 cliente. Eso selecciona el algoritmo *upstream*, el mismo que
 `bird/observer1-*.conf` pide con `aspa_check_upstream()`.
 
-Ponga `role customer` en cambio y corre el algoritmo *downstream*: el camino por el
-Proveedor B vuelve como **Valid**. Mismos objetos, mismo AS_PATH, veredicto
-distinto. Es probablemente lo más sorprendente de este laboratorio, y no es un bug de ninguna
-de las dos implementaciones: las dos están leyendo el draft correctamente, solo que desde ángulos distintos.
+Ponga `role customer` en cambio y corre el algoritmo *downstream*: el camino
+por el Proveedor B vuelve como **Valid**. Mismos objetos, mismo AS_PATH,
+veredicto distinto. Es probablemente lo más sorprendente de este laboratorio, y
+no es un bug de ninguna de las dos implementaciones: las dos están leyendo el
+draft correctamente, solo que desde ángulos distintos.
 
-Una consecuencia de esto: cambiar de etapa en observer2 tiene que reiniciarlo, porque
-el rol se negocia al abrir la sesión, y una sesión RTR ya establecida
-conserva la versión que negoció al principio. Tras un `bgpctl reload` a secas, todo `avs`
-vuelve a `unknown`. Los comandos `step*` que cambian de etapa ya hacen ese
-reinicio por usted (el nombre de la etapa queda guardado en `/etc/lab-stage` dentro
-del contenedor, así que un reinicio posterior vuelve exactamente a la misma etapa).
+Una consecuencia de esto: cambiar de etapa en observer2 tiene que reiniciarlo,
+porque el rol se negocia al abrir la sesión, y una sesión RTR ya establecida
+conserva la versión que negoció al principio. Tras un `bgpctl reload` a secas,
+todo `avs` vuelve a `unknown`. Los comandos `step*` que cambian de etapa ya
+hacen ese reinicio por usted (el nombre de la etapa queda guardado en
+`/etc/lab-stage` dentro del contenedor, así que un reinicio posterior vuelve
+exactamente a la misma etapa).
 
 ### Etapas de despliegue
 
-Los observadores no arrancan validando nada. Empiezan como routers BGP
-comunes, y la guía despliega la validación en ellos por etapas, como se haría
-en un router real: primero *marcando* lo que una verificación señala (una
-community y una preferencia menor, sin descartar nada todavía), y después *descartándolo*.
+Los observadores no arrancan validando nada. Empiezan como routers BGP comunes,
+y la guía despliega la validación en ellos por etapas, como se haría en un
+router real: primero *marcando* lo que una verificación señala (una community y
+una preferencia menor, sin descartar nada todavía), y después *descartándolo*.
 Cada etapa es un archivo de configuración completo por observador:
 
 | Etapa | observer1 (BIRD) | observer2 (OpenBGPD) | Qué hace |
@@ -243,9 +247,8 @@ terminado antes de tocar nada, y avisa qué falta si todavía no terminó.
 Además de esos: `refresh` (hace que los validadores revaliden ya), `doctor`
 (revisa el entorno), `clean-objects` (borra las ROAs y el ASPA de la CA,
 conservando la CA, para recomenzar la historia sin rehacer la preparación),
-`status`, `logs`, `down` y `reset`. La herramienta **Comandos del
-laboratorio** del panel los lista a todos, con un botón para ejecutar cada
-uno.
+`status`, `logs`, `down` y `reset`. El botón **Comandos** del panel los lista a
+todos, con un botón para ejecutar cada uno.
 
 ## Archivos
 
@@ -336,11 +339,11 @@ confirmar que los dos observadores siguen produciendo veredictos, y no puros `?`
 
 ### La PKI interna (MODE=local)
 
-Toda URI de RPKI es HTTPS, y los validadores y Krill validan TLS de verdad: no tienen el
-botón "continuar de todos modos" del navegador. Así que el laboratorio genera
-su propia autoridad certificadora (el contenedor `pki-init`), que firma el
-certificado de `rir.lab`. El certificado de esa CA se entrega a quien necesite
-confiar en ella:
+Toda URI de RPKI es HTTPS, y los validadores y Krill validan TLS de verdad: no
+tienen el botón "continuar de todos modos" del navegador. Así que el
+laboratorio genera su propia autoridad certificadora (el contenedor
+`pki-init`), que firma el certificado de `rir.lab`. El certificado de esa CA se
+entrega a quien necesite confiar en ella:
 
 | Quién | Cómo |
 |---|---|
@@ -354,13 +357,13 @@ con hashes de OpenSSL, no un archivo único, e instalar la CA en el trust store
 del sistema resulta menos frágil que mantener ese directorio a mano.
 
 Routinator también corre con `--allow-dubious-hosts`, porque `rir.lab` no es un
-nombre público, y con `--disable-rsync`, ya que el único transporte que se usa aquí es
-RRDP.
+nombre público, y con `--disable-rsync`, ya que el único transporte que se usa
+aquí es RRDP.
 
 Todas las imágenes (Alpine, Debian, nginx, Krill, Routinator) son
-multi-arquitectura (amd64/arm64), y FORT y OpenBGPD se compilan o empaquetan
-de forma nativa, así que nada corre bajo emulación, ni en Apple Silicon, ni en Intel/AMD,
-ni en Windows.
+multi-arquitectura (amd64/arm64), y FORT y OpenBGPD se compilan o empaquetan de
+forma nativa, así que nada corre bajo emulación, ni en Apple Silicon, ni en
+Intel/AMD, ni en Windows.
 
 ## Idioma
 
@@ -410,13 +413,14 @@ compila la guía desde `guide/templates/` con sus valores.
 Los ASN de los proveedores y de los observadores, 64501/64502/64510/64511,
 también están ahí, pero no hace falta tocarlos: son ASN de documentación (RFC
 5398) y funcionan con cualquier ASN de origen. Lo mismo vale para `PEER_ASN`
-(64499), que también cae dentro de ese mismo bloque de documentación. El único que
-queda afuera es `ATTACKER_ASN` (666): pertenece a la historia de la guía igual
-que los demás, pero no está en ningún rango reservado. De todos modos, ninguno de estos ASN
-toca jamás la Internet real.
+(64499), que también cae dentro de ese mismo bloque de documentación. El único
+que queda afuera es `ATTACKER_ASN` (666): pertenece a la historia de la guía
+igual que los demás, pero no está en ningún rango reservado. De todos modos,
+ninguno de estos ASN toca jamás la Internet real.
 
 ## Licencia
 
 - El código y la configuración del laboratorio: [Apache-2.0](LICENSE).
 - La guía, los README y sus traducciones: [CC BY 4.0](LICENSE-docs).
-- El software que ejecuta el laboratorio conserva sus propias licencias: vea [THIRD-PARTY.md](THIRD-PARTY.md).
+- El software que ejecuta el laboratorio conserva sus propias licencias: vea
+  [THIRD-PARTY.md](THIRD-PARTY.md).
