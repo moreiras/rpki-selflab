@@ -5,9 +5,10 @@
 *[English](GUIDE.en.md) · [Español](GUIDE.es.md) · [Português](GUIDE.pt.md)*
 
 **Objetivo:** seguir a un atacante y a un peer con fuga de rutas por un
-laboratorio que corre en su propia máquina, y ver qué detecta la validación
-de origen (ROV), qué deja pasar, y qué suma el ASPA. Cada veredicto queda
-verificado por dos pilas independientes: BIRD + Routinator, y OpenBGPD + FORT.
+laboratorio que corre en su propia máquina, y ver qué detecta la validación de
+origen (ROV), qué deja pasar, y qué suma el ASPA. Cada veredicto sale de dos
+implementaciones: observer1 corre BIRD con Routinator, observer2 corre OpenBGPD
+con FORT.
 
 Todo corre en contenedores en su computadora. La guía asume que usted ya conoce
 lo básico de RPKI, ROAs, ROV y ASPA. Puede certificar sus recursos de forma
@@ -137,10 +138,9 @@ así que cualquier camino que pase por A parece dos saltos más largo que el
 que pasa por B. Es una forma muy común de ingeniería de tráfico entrante.
 
 Los dos proveedores pasan el **mismo prefijo** a los dos observadores, con el
-mismo AS de origen, y el laboratorio corre toda la historia **dos veces, en
-paralelo**, sobre dos pilas independientes: observer1 y observer2 ven
-exactamente los mismos anuncios y los mismos objetos RPKI, pero cada uno con su
-propio router y su propio validador.
+mismo AS de origen; observer1 y observer2 ven exactamente los mismos anuncios y
+los mismos objetos RPKI, pero cada uno tiene un router y un validador
+distintos, así que cada paso se puede comparar entre dos implementaciones.
 
 En términos de BGP, los observadores están *por encima* de los dos proveedores:
 les venden tránsito, así que los proveedores son clientes de los observadores,
@@ -1584,7 +1584,7 @@ De paso, la historia también respondió estas preguntas:
 - **¿Se propaga un arreglo por sí solo?** BIRD revalida por su cuenta; los
   objetos necesitan una republicación y una revalidación para llegar (Pasos
   3, 5 y 6).
-- **¿Coinciden las dos pilas independientes?** Cada paso muestra las dos, y
+- **¿Coinciden las dos implementaciones?** Cada paso muestra las dos, y
   coinciden en todo lo que la historia mira; el Ejercicio extra A muestra
   dónde dejan de coincidir.
 - **¿Qué es una fuga de ruta, y por qué el ROV no la puede ver?** El Paso 7 la

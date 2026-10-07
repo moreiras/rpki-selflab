@@ -4,7 +4,8 @@
 
 *[English](README.md) · [Español](README.es.md) · [Português](README.pt.md)*
 
-**Project site, with the lab's story illustrated step by step: https://moreiras.github.io/rpki-selflab/**
+**Project site, with the lab's story illustrated step by step:
+https://moreiras.github.io/rpki-selflab/**
 
 A lab for RPKI (ROAs, ROV and ASPA) in containers, meant to run on any computer
 with Docker (Mac, Windows, or Linux, tested with OrbStack and Docker Desktop).
@@ -158,7 +159,8 @@ them on:
 
 ## The two observers
 
-The lab deliberately runs the same experiment twice, on two independent stacks:
+Both observers receive the same announcements and RPKI objects, but each uses a
+different router and validator:
 
 | | observer1 | observer2 |
 |---|---|---|

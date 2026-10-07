@@ -4,7 +4,8 @@
 
 *[English](README.md) · [Español](README.es.md) · [Português](README.pt.md)*
 
-**Site do projeto, com a história do laboratório ilustrada passo a passo: https://moreiras.github.io/rpki-selflab/pt/**
+**Site do projeto, com a história do laboratório ilustrada passo a passo:
+https://moreiras.github.io/rpki-selflab/pt/**
 
 Laboratório de RPKI (ROA, ROV e ASPA) em contêineres. Roda em qualquer
 computador com Docker (Mac, Windows ou Linux, testado com OrbStack e Docker
@@ -161,8 +162,8 @@ calados até a história do guia ligá-los:
 
 ## Os dois observadores
 
-O laboratório roda o mesmo experimento duas vezes, de propósito, em duas
-pilhas independentes:
+Os dois observadores recebem os mesmos anúncios e objetos RPKI, mas cada um usa
+um roteador e um validador diferentes:
 
 | | observer1 | observer2 |
 |---|---|---|

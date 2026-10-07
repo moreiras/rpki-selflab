@@ -6,9 +6,9 @@
 
 **Objetivo:** acompanhar um sequestrador e um peer que vaza rotas por um
 laboratório rodando na sua própria máquina. Ver o que a validação de origem
-(ROV) pega, o que ela deixa passar, e o que o ASPA acrescenta, com cada
-veredito conferido por duas pilhas independentes (BIRD + Routinator, e
-OpenBGPD + FORT).
+(ROV) pega, o que ela deixa passar, e o que o ASPA acrescenta. Cada veredito
+vem de duas implementações: o observer1 roda BIRD com Routinator, o observer2
+roda OpenBGPD com FORT.
 
 Tudo roda em contêineres no seu computador. O roteiro presume que você já
 conhece o básico de RPKI, ROAs, ROV e ASPA. Você pode certificar seus recursos
@@ -138,10 +138,9 @@ todo caminho por A parece dois saltos mais longo que o caminho por B, uma
 engenharia de tráfego de entrada bem comum.
 
 Os dois provedores repassam o **mesmo prefixo** aos dois observadores, com o
-mesmo AS de origem. O laboratório roda a história inteira **duas vezes, em
-paralelo**, sobre duas pilhas independentes: o observer1 e o observer2 veem
-exatamente os mesmos anúncios e os mesmos objetos RPKI, mas cada um com o seu
-próprio roteador e o seu próprio validador.
+mesmo AS de origem. O observer1 e o observer2 veem exatamente os mesmos
+anúncios e os mesmos objetos RPKI, mas cada um tem um roteador e um validador
+diferentes, então cada passo pode ser comparado entre duas implementações.
 
 Em termos de BGP, os observadores ficam *acima* dos dois provedores: eles
 vendem trânsito a eles, então os provedores são clientes dos observadores, e
@@ -1571,7 +1570,7 @@ No caminho, a história também respondeu a estas perguntas:
 - **Uma correção se propaga sozinha?** O BIRD revalida por conta própria; os
   objetos levam uma republicação e uma revalidação para chegar (Passos 3, 5
   e 6).
-- **As duas pilhas independentes concordam?** Todo passo mostra as duas, e elas
+- **As duas implementações concordam?** Todo passo mostra as duas, e elas
   concordam em tudo o que a história examina; o Exercício extra A mostra onde
   não concordam.
 - **O que é um vazamento de rota, e por que o ROV não o enxerga?** O Passo 7

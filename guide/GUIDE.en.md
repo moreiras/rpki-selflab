@@ -5,9 +5,9 @@
 *[English](GUIDE.en.md) · [Español](GUIDE.es.md) · [Português](GUIDE.pt.md)*
 
 **Goal:** follow a hijacker and a leaky peer through a lab that runs on your
-own machine. See what origin validation (ROV) catches, what slips past it,
-and what ASPA adds on top, with every verdict checked twice, by two
-independent stacks (BIRD + Routinator, and OpenBGPD + FORT).
+own machine. See what origin validation (ROV) catches, what slips past it, and
+what ASPA adds on top. Every verdict comes from two implementations: observer1
+runs BIRD with Routinator, observer2 runs OpenBGPD with FORT.
 
 Everything runs in containers on your computer. The guide assumes you already
 know the basics of RPKI, ROAs, ROV and ASPA. You can certify your resources
@@ -132,9 +132,9 @@ twice when it announces to Provider A (`64500 64500 64500` instead of just
 B. This is common inbound traffic engineering.
 
 The two providers pass the **same prefix** on to both observers, with the same
-origin AS. The lab runs the whole story **twice, in parallel**, on two
-independent stacks: observer1 and observer2 see exactly the same announcements
-and the same RPKI objects, but each has its own router and its own validator.
+origin AS. observer1 and observer2 see exactly the same announcements and the
+same RPKI objects, but each has a different router and a different validator,
+so every step can be compared across two implementations.
 
 In BGP terms, the observers sit *above* the two providers: they sell them
 transit, so the providers are the observers' customers, and every route
@@ -1521,7 +1521,7 @@ Along the way, the story also answered these questions:
 - **What happens when an ASPA forgets a real provider?** Step 6.
 - **Does a fix propagate on its own?** BIRD revalidates by itself; the objects
   take a republish and a revalidation to arrive (Steps 3, 5 and 6).
-- **Do the two independent stacks agree?** Every step shows both, and they
+- **Do the two implementations agree?** Every step shows both, and they
   agree everywhere the story looks; Extra exercise A shows where they don't.
 - **What's a route leak, and why can't ROV see it?** Step 7 shows it; Step 8
   shows what dropping does, and doesn't, fix about it.
