@@ -1,0 +1,102 @@
+/* SPDX-License-Identifier: Apache-2.0
+   Copyright 2026 The rpki-selflab authors
+   Project site (GitHub Pages). Plain CSS, no build step. */
+:root {
+  --bg: #f6f7fb; --surface: #ffffff; --ink: #1a2140; --weak: #566085; --line: #dde2f0;
+  --accent: #6d4fd6; --accent-soft: #efeafe; --ok: #0e9467; --ok-soft: #dff3ea;
+  --bad: #d63a3a; --bad-soft: #fbe3e3; --warn: #c2560c; --warn-soft: #fdebd9;
+  --code: #eef1f8; --shadow: 0 2px 14px rgba(30, 40, 80, .08);
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1328; --surface: #151c38; --ink: #e8ecf8; --weak: #a3acd0; --line: #2a3560;
+    --accent: #a78bfa; --accent-soft: #241d45; --ok: #34d399; --ok-soft: #10342a;
+    --bad: #f87171; --bad-soft: #3a1a1f; --warn: #fb923c; --warn-soft: #3a2615;
+    --code: #1d2547; --shadow: 0 2px 14px rgba(0, 0, 0, .35);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--sans); }
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: .88em; background: var(--code); padding: 1px 6px; border-radius: 5px; }
+img { max-width: 100%; height: auto; display: block; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+/* top bar */
+.topbar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--surface) 92%, transparent);
+          backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.topbar .wrap { display: flex; align-items: center; gap: 18px; min-height: 56px; flex-wrap: wrap; }
+.brand { font-weight: 700; font-size: 18px; color: var(--ink); text-decoration: none; }
+.topbar nav { display: flex; gap: 16px; flex-wrap: wrap; font-size: 15px; }
+.topbar nav a { color: var(--weak); text-decoration: none; }
+.topbar nav a:hover { color: var(--ink); }
+.langs { margin-left: auto; display: flex; gap: 4px; }
+.langs a { font: 600 13px var(--mono); padding: 4px 9px; border-radius: 6px; text-decoration: none; color: var(--weak);
+           border: 1px solid var(--line); }
+.langs a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* hero */
+.hero { padding: 56px 0 28px; }
+.hero .kicker { text-transform: uppercase; letter-spacing: .12em; font-size: 13px; font-weight: 700; color: var(--accent); }
+.hero h1 { font-size: clamp(32px, 5vw, 50px); line-height: 1.1; margin: 10px 0 14px; letter-spacing: -.5px; }
+.hero p.lead { font-size: clamp(18px, 2.2vw, 21px); color: var(--weak); max-width: 780px; margin: 0 0 24px; }
+.buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 10px 18px; border-radius: 9px; font-weight: 600; text-decoration: none;
+       border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hero-shot { margin-top: 34px; }
+
+/* sections */
+section.block { padding: 44px 0; border-top: 1px solid var(--line); }
+section.block h2 { font-size: clamp(26px, 3.4vw, 34px); margin: 0 0 10px; letter-spacing: -.3px; }
+section.block > .wrap > p.intro { color: var(--weak); max-width: 800px; margin: 0 0 22px; }
+.shot { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+.shot a { display: block; cursor: zoom-in; }
+figcaption { font-size: 14px; color: var(--weak); padding: 8px 4px 0; }
+
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.card h3 { margin: 0 0 6px; font-size: 18px; }
+.card p { margin: 0; color: var(--weak); font-size: 16px; }
+ul.ticks { padding-left: 20px; margin: 0; }
+ul.ticks li { margin: 6px 0; }
+
+/* the story */
+.step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 30px; padding: 30px 0;
+        border-bottom: 1px dashed var(--line); align-items: start; }
+.step:last-child { border-bottom: none; }
+.step .num { font: 700 13px var(--mono); color: var(--accent); letter-spacing: .08em; text-transform: uppercase; }
+.step h3 { font-size: 23px; margin: 4px 0 10px; line-height: 1.25; }
+.step p { margin: 0 0 10px; }
+.lesson { margin-top: 12px; padding: 10px 14px; border-left: 4px solid var(--accent); background: var(--accent-soft);
+          border-radius: 0 8px 8px 0; font-size: 16px; }
+.tag { display: inline-block; font: 600 13px var(--mono); padding: 1px 8px; border-radius: 6px; white-space: nowrap; }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+
+table.recap { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line);
+              border-radius: 12px; overflow: hidden; font-size: 16px; }
+table.recap th, table.recap td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.recap th { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--weak); }
+table.recap tr:last-child td { border-bottom: none; }
+.scroll-x { overflow-x: auto; }
+
+ol.start { padding-left: 22px; margin: 0; }
+ol.start li { margin: 0 0 14px; }
+pre { background: var(--code); border-radius: 9px; padding: 12px 14px; overflow-x: auto; font: 14px/1.5 var(--mono); margin: 8px 0 0; }
+
+footer { padding: 34px 0 48px; border-top: 1px solid var(--line); color: var(--weak); font-size: 15px; }
+footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-between; }
+
+@media (max-width: 860px) {
+  .grid2, .step { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .cards { grid-template-columns: 1fr; }
+  .topbar nav { display: none; }
+  .hero { padding-top: 36px; }
+}

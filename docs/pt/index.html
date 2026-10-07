@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPKI SelfLab: laboratório prático de ROA, ROV e ASPA</title>
+<meta name="description" content="Um laboratório de RPKI autocontido que roda no seu computador: roteadores BGP reais, dois validadores, uma CA e um registro simulado, com uma história guiada sobre sequestros, caminhos forjados e vazamentos de rota.">
+<link rel="alternate" hreflang="en" href="../">
+<link rel="alternate" hreflang="pt-BR" href="./">
+<link rel="alternate" hreflang="es" href="../es/">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="./">RPKI SelfLab</a>
+    <nav>
+      <a href="#inside">O que tem dentro</a>
+      <a href="#story">A história</a>
+      <a href="#learning">Para aprender</a>
+      <a href="#start">Como começar</a>
+    </nav>
+    <div class="langs">
+      <a href="../" hreflang="en">EN</a>
+      <a href="../es/" hreflang="es">ES</a>
+      <a href="./" aria-current="page" hreflang="pt-BR">PT</a>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">Código aberto · Docker ou VM · English, Español, Português</div>
+    <h1>Um laboratório prático de ROA, ROV e ASPA, rodando no seu computador</h1>
+    <p class="lead">Roteadores BGP de verdade, dois validadores RPKI, uma CA e um registro simulado, tudo em contêineres. Uma história guiada mostra o que a validação de origem pega, o que escapa dela e o que o ASPA acrescenta.</p>
+    <div class="buttons">
+      <a class="btn primary" href="#start">Como começar</a>
+      <a class="btn" href="https://github.com/moreiras/rpki-selflab">Código no GitHub</a>
+      <a class="btn" href="https://github.com/moreiras/rpki-selflab/releases/latest">Máquina virtual pronta</a>
+    </div>
+    <figure class="hero-shot shot">
+      <a href="../img/pt/panel.webp"><img src="../img/pt/panel.webp" alt="O painel web do laboratório: o roteiro à esquerda, a topologia ao vivo no meio, os vereditos dos dois observadores embaixo" width="1400" height="788"></a>
+    </figure>
+  </div>
+</section>
+
+<section class="block" id="inside">
+  <div class="wrap">
+    <h2>O que tem dentro</h2>
+    <p class="intro">Tudo é software de verdade, não simulação. O mesmo experimento roda duas vezes, em duas pilhas independentes, então cada veredito é conferido por duas implementações.</p>
+    <div class="grid2">
+      <div>
+        <ul class="ticks">
+          <li>Roteadores <b>BIRD</b> e <b>OpenBGPD</b>: a origem, dois provedores, dois observadores que validam, um atacante e um peer.</li>
+          <li>Validadores <b>Routinator</b> e <b>FORT</b>, que alimentam os observadores pelo RTR versão 2, o que transporta o ASPA.</li>
+          <li><b>Krill</b> como CA do titular, onde as ROAs e o objeto ASPA são criados.</li>
+          <li>Um <b>registro simulado</b> (RIR/NIR), com âncora de confiança e repositório próprios. A delegação da CA e a publicação usam as mesmas trocas de XML de um registro real (RFC 8183, 6492 e 8181).</li>
+          <li>Um <b>painel web</b> com a topologia ao vivo, o roteiro, os terminais dos roteadores e as interfaces web, em abas.</li>
+          <li>Roda em Linux, macOS e Windows (WSL 2) com Docker, ou como máquina virtual pronta. <b>Não precisa de Internet</b> depois de instalado.</li>
+        </ul>
+      </div>
+      <figure class="shot" style="padding:10px">
+        <a href="../img/topology.pt.svg"><img src="../img/topology.pt.svg" alt="A topologia do laboratório: o registro e os dois validadores no alto, os observadores logo abaixo, os dois provedores, o AS666 e, embaixo, a origem, a sua CA e o peer" width="1000" height="730"></a>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="story">
+  <div class="wrap">
+    <h2>A história, em nove passos</h2>
+    <p class="intro">O roteiro é uma história só: três ataques, e qual verificação barra cada um. O AS64500 é multihomed e prefere o Provedor B; para o Provedor A, o backup, ele faz prepend duas vezes. Dois observadores recebem o prefixo dele pelos dois provedores. As capturas abaixo são o painel em cada passo.</p>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 1</div>
+        <h3>Uma linha de base limpa</h3>
+        <p>Os dois observadores recebem <code>203.0.113.0/24</code> pelos dois provedores e escolhem o caminho mais curto, pelo Provedor B. Ninguém valida nada ainda: as peças do RPKI existem, mas nenhum roteador conversa com um validador.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step1.webp"><img src="../img/pt/step1.webp" alt="Passo 1: topologia e vereditos, sem validação" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 2</div>
+        <h3>O sequestro ingênuo vence</h3>
+        <p>O AS666 anuncia o prefixo da origem como se fosse dele. O caminho, <code>666</code>, tem um salto contra dois e quatro, e nada mais distingue as rotas. Os links do atacante ficam laranja: os dois observadores estão usando a rota dele.</p>
+        <p class="lesson">Sem validação, o BGP não tem como distinguir um sequestro da rota verdadeira.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step2.webp"><img src="../img/pt/step2.webp" alt="Passo 2: o sequestro é a melhor rota nos dois observadores" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 3</div>
+        <h3>O ROV entra, marcando o que parece errado</h3>
+        <p>A origem cria as suas ROAs no Krill, e os observadores implantam a validação de origem na sua primeira forma, segura: as rotas inválidas só são marcadas e rebaixadas. O sequestro fica <span class="tag bad">Invalid</span> com <code>local_pref 10</code>, e o caminho do Provedor B volta a ser o selecionado.</p>
+        <p class="lesson">Implantar ROV exige três peças em qualquer roteador: uma sessão RTR, um teste em cada rota e uma ação sobre o resultado.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step3.webp"><img src="../img/pt/step3.webp" alt="Passo 3: o sequestro é marcado como ROV Invalid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 4</div>
+        <h3>O caminho forjado</h3>
+        <p>O AS666 agora anuncia <code>666 64500</code>, escrevendo a origem verdadeira no fim do caminho. O ROV só confere o último AS, então diz <span class="tag ok">Valid</span>, e a rota forjada ganha o desempate com a do Provedor B.</p>
+        <p class="lesson">A validação de origem não consegue distinguir dois caminhos quando a origem é a mesma.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step4.webp"><img src="../img/pt/step4.webp" alt="Passo 4: o caminho forjado é ROV Valid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 5</div>
+        <h3>O ASPA entra, também marcando primeiro</h3>
+        <p>A origem publica um objeto ASPA que lista só o Provedor A, e os observadores implantam a verificação ASPA. O caminho forjado fica <span class="tag bad">Invalid</span>: o salto 64500→666 nunca foi autorizado. Mas o caminho legítimo do Provedor B também fica, e os observadores recorrem ao backup.</p>
+        <p class="lesson">Um objeto ASPA precisa listar todos os provedores. Esquecer um desvia o tráfego da própria origem.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step5.webp"><img src="../img/pt/step5.webp" alt="Passo 5: o caminho forjado e o do Provedor B são ASPA Invalid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 6</div>
+        <h3>Você esqueceu um provedor</h3>
+        <p>Acrescentar o Provedor B ao objeto resolve: os dois caminhos legítimos voltam a ser <span class="tag ok">Valid</span> e o Provedor B é selecionado, enquanto o forjado continua rebaixado. A correção chega aos roteadores só por republicação e revalidação.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step6.webp"><img src="../img/pt/step6.webp" alt="Passo 6: os dois caminhos legítimos voltam a ser ASPA Valid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 7</div>
+        <h3>O peer vaza</h3>
+        <p>Um peer legítimo repassa ao Provedor A as rotas da origem que aprendeu no peering privado. Nada é forjado: <code>64501 64499 64500</code> é <span class="tag ok">Valid</span> para o ROV e <span class="tag bad">Invalid</span> para o ASPA, porque o 64499 não é um dos provedores da origem.</p>
+        <p class="lesson">Num vazamento ninguém mente sobre a origem; o que está errado é por onde a rota passou. O ROV não enxerga, o ASPA sim.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step7.webp"><img src="../img/pt/step7.webp" alt="Passo 7: o caminho vazado é ROV Valid e ASPA Invalid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 8</div>
+        <h3>Implantando de verdade: descartar</h3>
+        <p>As duas verificações passam de marcar para descartar, do jeito que um roteador de produção é configurado. As rotas forjada e vazada somem. Mas o caminho próprio do Provedor A continua ausente: o Provedor A segue anunciando o vazamento no lugar dele, e nenhuma política nos observadores muda isso.</p>
+        <p class="lesson">Marcar só ajuda enquanto existe uma alternativa válida. É o descarte que protege a rede.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step8.webp"><img src="../img/pt/step8.webp" alt="Passo 8: rotas inválidas descartadas" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Passo 9</div>
+        <h3>Arrumando a casa</h3>
+        <p>O peer corrige a sua política de exportação e o caminho próprio do Provedor A volta. Os observadores continuam totalmente implantados, com ROV e ASPA descartando.</p>
+      </div>
+      <figure class="shot"><a href="../img/pt/step9.webp"><img src="../img/pt/step9.webp" alt="Passo 9: o vazamento acabou e os dois caminhos legítimos voltaram" loading="lazy"></a></figure>
+    </article>
+
+    <h3 style="margin:30px 0 12px">O que pegou o quê</h3>
+    <div class="scroll-x">
+      <table class="recap">
+        <tr><th>Ataque</th><th>AS_PATH</th><th>ROV</th><th>ASPA</th></tr>
+        <tr><td>Sequestro ingênuo</td><td><code>666</code></td><td><span class="tag ok">pega</span></td><td>nada a conferir</td></tr>
+        <tr><td>Caminho forjado</td><td><code>666 64500</code></td><td><span class="tag bad">enganado</span></td><td><span class="tag ok">pega</span></td></tr>
+        <tr><td>Vazamento de rota</td><td><code>64501 64499 64500</code></td><td><span class="tag bad">não enxerga</span></td><td><span class="tag ok">pega</span></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="learning">
+  <div class="wrap">
+    <h2>Feito para aprender, e para ensinar</h2>
+    <p class="intro">Pensado para cursos práticos de RPKI, e útil para quem quer estudar por conta própria.</p>
+    <div class="cards">
+      <div class="card"><h3>Roteiro em três idiomas</h3><p>Português, espanhol e inglês. Cada bloco de comandos diz onde roda e abre o terminal certo.</p></div>
+      <div class="card"><h3>Desafios</h3><p>Alguns passos escondem a solução atrás de dicas e de um cronômetro; "Conferir meu laboratório" olha o estado real do lab.</p></div>
+      <div class="card"><h3>Pontos de controle</h3><p>Eles se marcam sozinhos quando o lab chega a cada passo, e qualquer comando de passo põe o lab de volta nos trilhos.</p></div>
+      <div class="card"><h3>A preparação também</h3><p>Crie a CA no Krill e faça os dois lados da delegação com o registro simulado.</p></div>
+      <div class="card"><h3>Suas próprias configurações</h3><p>Uma pasta <code>work/</code> para escrever a sua configuração de ROV e ASPA e carregá-la nos roteadores.</p></div>
+      <div class="card"><h3>Exercícios extras</h3><p>Upstream × downstream (e onde BIRD e OpenBGPD discordam), maxLength e um olhar por dentro do RTR.</p></div>
+    </div>
+    <div class="grid2" style="margin-top:26px">
+      <figure class="shot"><a href="../img/pt/challenge.webp"><img src="../img/pt/challenge.webp" alt="Um desafio do roteiro, com dicas, cronômetro e Conferir meu laboratório" loading="lazy"></a></figure>
+      <figure class="shot"><a href="../img/pt/registry.webp"><img src="../img/pt/registry.webp" alt="O painel do registro simulado" loading="lazy"></a></figure>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="start">
+  <div class="wrap">
+    <h2>Como começar</h2>
+    <div class="grid2">
+      <ol class="start">
+        <li><b>Instale o Docker</b> com o Compose v2 (Docker Desktop, OrbStack ou Docker Engine no Linux). No Windows, use o WSL 2 e trabalhe dentro do terminal do Ubuntu.</li>
+        <li><b>Baixe o laboratório:</b>
+          <pre>git clone https://github.com/moreiras/rpki-selflab.git
+cd rpki-selflab</pre>
+          ou baixe o código-fonte na <a href="https://github.com/moreiras/rpki-selflab/releases/latest">versão mais recente</a>.</li>
+        <li><b>Suba o laboratório</b> e abra <b>http://localhost:8080</b>:
+          <pre>./scripts/lab.sh up</pre></li>
+      </ol>
+      <div class="card">
+        <h3>Prefere não instalar o Docker?</h3>
+        <p>Cada <a href="https://github.com/moreiras/rpki-selflab/releases/latest">versão</a> também traz uma máquina virtual com tudo dentro (amd64 e arm64), com área de trabalho, navegador e terminal próprios. Detalhes em <a href="https://github.com/moreiras/rpki-selflab/blob/main/vm/README.pt.md">vm/README.pt.md</a>.</p>
+        <p style="margin-top:12px">O roteiro completo também pode ser lido no GitHub: <a href="https://github.com/moreiras/rpki-selflab/blob/main/guide/GUIDE.pt.md">guide/GUIDE.pt.md</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>RPKI SelfLab · código sob Apache-2.0, roteiro sob CC BY 4.0</span>
+    <span><a href="https://github.com/moreiras/rpki-selflab">github.com/moreiras/rpki-selflab</a></span>
+  </div>
+</footer>
+</body>
+</html>

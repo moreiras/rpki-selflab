@@ -4,6 +4,8 @@
 
 *[English](README.md) · [Español](README.es.md) · [Português](README.pt.md)*
 
+**Project site, with the lab's story illustrated step by step: https://moreiras.github.io/rpki-selflab/**
+
 A lab for RPKI (ROAs, ROV and ASPA) in containers, meant to run on any computer
 with Docker (Mac, Windows, or Linux, tested with OrbStack and Docker Desktop).
 It publishes ROAs and an ASPA object, then shows what **two different
@@ -289,6 +291,8 @@ guide/
 work/                       your own configuration files (writable from the panel's Lab terminal)
 web/nginx.conf              serves the panel and proxies Routinator
 vm/                         the virtual machine: Packer template, scripts, releases (see vm/README.md)
+docs/                       the project site (GitHub Pages): en/pt/es pages and screenshots;
+                            docs/tools/screenshots.py regenerates the screenshots
 scripts/
   lab.sh                    up / down / refresh / reset / doctor / clean-objects / step* (the story's commands)
   validate.sh               text summary of the lab's state

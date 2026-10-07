@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPKI SelfLab: a hands-on lab for ROA, ROV and ASPA</title>
+<meta name="description" content="A self-contained RPKI lab that runs on your own computer: real BGP routers, two validators, a CA and a simulated registry, with a guided story about hijacks, forged paths and route leaks.">
+<link rel="alternate" hreflang="en" href="./">
+<link rel="alternate" hreflang="pt-BR" href="pt/">
+<link rel="alternate" hreflang="es" href="es/">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="./">RPKI SelfLab</a>
+    <nav>
+      <a href="#inside">What's inside</a>
+      <a href="#story">The story</a>
+      <a href="#learning">For learning</a>
+      <a href="#start">Get started</a>
+    </nav>
+    <div class="langs">
+      <a href="./" aria-current="page" hreflang="en">EN</a>
+      <a href="es/" hreflang="es">ES</a>
+      <a href="pt/" hreflang="pt-BR">PT</a>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">Open source · Docker or VM · English, Español, Português</div>
+    <h1>A hands-on lab for ROA, ROV and ASPA, running on your own computer</h1>
+    <p class="lead">Real BGP routers, two RPKI validators, a CA and a simulated registry, all in containers. A guided story shows what origin validation catches, what slips past it, and what ASPA adds.</p>
+    <div class="buttons">
+      <a class="btn primary" href="#start">Get started</a>
+      <a class="btn" href="https://github.com/moreiras/rpki-selflab">Source on GitHub</a>
+      <a class="btn" href="https://github.com/moreiras/rpki-selflab/releases/latest">Ready-made VM</a>
+    </div>
+    <figure class="hero-shot shot">
+      <a href="img/en/panel.webp"><img src="img/en/panel.webp" alt="The lab's web panel: the guide on the left, the live topology in the middle, the verdicts of both observers below" width="1400" height="788"></a>
+    </figure>
+  </div>
+</section>
+
+<section class="block" id="inside">
+  <div class="wrap">
+    <h2>What's inside</h2>
+    <p class="intro">Everything is real software, not a simulation. The same experiment runs twice, on two independent stacks, so every verdict is checked by two implementations.</p>
+    <div class="grid2">
+      <div>
+        <ul class="ticks">
+          <li><b>BIRD</b> and <b>OpenBGPD</b> routers: the origin, two providers, two validating observers, an attacker and a peer.</li>
+          <li><b>Routinator</b> and <b>FORT</b> validators, feeding the observers over RTR version 2, which carries ASPA.</li>
+          <li><b>Krill</b> as the holder's CA, where the ROAs and the ASPA object are created.</li>
+          <li>A <b>simulated registry</b> (RIR/NIR) with its own trust anchor and repository. CA delegation and publication use the same XML exchanges as a real registry (RFC 8183, 6492 and 8181).</li>
+          <li>A <b>web panel</b> with the live topology, the guide, the routers' terminals and the web interfaces, in tabs.</li>
+          <li>Runs on Linux, macOS and Windows (WSL 2) with Docker, or as a ready-made virtual machine. <b>No Internet needed</b> once installed.</li>
+        </ul>
+      </div>
+      <figure class="shot" style="padding:10px">
+        <a href="img/topology.en.svg"><img src="img/topology.en.svg" alt="The lab's topology: the registry and the two validators at the top, the observers below them, the two providers, AS666 and, at the bottom, the origin, its CA and the peer" width="1000" height="730"></a>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="story">
+  <div class="wrap">
+    <h2>The story, in nine steps</h2>
+    <p class="intro">The guide is one story: three attacks, and which check stops each one. AS64500 is multihomed and prefers Provider B; it prepends twice towards Provider A, its backup. Two observers receive its prefix over both providers. The screenshots below are the panel at each step.</p>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 1</div>
+        <h3>A clean baseline</h3>
+        <p>Both observers receive <code>203.0.113.0/24</code> over both providers and pick Provider B's shorter path. Nobody validates anything yet: the RPKI pieces exist, but no router talks to a validator.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step1.webp"><img src="img/en/step1.webp" alt="Step 1: topology and verdicts, no validation" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 2</div>
+        <h3>The naive hijack wins</h3>
+        <p>AS666 announces the origin's prefix as its own. Its path, <code>666</code>, is one hop long against two and four, and nothing else tells the routes apart. The attacker's links turn orange: both observers are using its route.</p>
+        <p class="lesson">Without validation, BGP has no way to tell a hijack from the real thing.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step2.webp"><img src="img/en/step2.webp" alt="Step 2: the hijack is the best route on both observers" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 3</div>
+        <h3>ROV enters, marking what looks wrong</h3>
+        <p>The origin creates its ROAs in Krill, and the observers deploy origin validation in its safe first form: invalid routes are only marked and demoted. The hijack becomes <span class="tag bad">Invalid</span> with <code>local_pref 10</code>, and Provider B's path is selected again.</p>
+        <p class="lesson">Deploying ROV takes three pieces on any router: an RTR session, a test on every route, and an action on the result.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step3.webp"><img src="img/en/step3.webp" alt="Step 3: the hijack is marked ROV Invalid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 4</div>
+        <h3>The forged path</h3>
+        <p>AS666 now announces <code>666 64500</code>, writing the real origin at the end of the path. ROV only checks the last AS, so it says <span class="tag ok">Valid</span>, and the forged route wins the tie with Provider B.</p>
+        <p class="lesson">Origin validation can't tell two paths apart when the origin is the same.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step4.webp"><img src="img/en/step4.webp" alt="Step 4: the forged path is ROV Valid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 5</div>
+        <h3>ASPA enters, also marking first</h3>
+        <p>The origin publishes an ASPA object listing only Provider A, and the observers deploy ASPA verification. The forged path becomes <span class="tag bad">Invalid</span>: the hop 64500→666 was never authorized. But so does Provider B's legitimate path, and the observers fall back to the backup.</p>
+        <p class="lesson">An ASPA object must list every provider. Forgetting one diverts the origin's own traffic.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step5.webp"><img src="img/en/step5.webp" alt="Step 5: the forged path and Provider B's path are ASPA Invalid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 6</div>
+        <h3>You forgot a provider</h3>
+        <p>Adding Provider B to the object fixes it: both legitimate paths are <span class="tag ok">Valid</span> again and Provider B is selected, while the forged path stays demoted. The fix reaches the routers through republication and revalidation alone.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step6.webp"><img src="img/en/step6.webp" alt="Step 6: both legitimate paths ASPA Valid again" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 7</div>
+        <h3>The peer leaks</h3>
+        <p>A legitimate peer passes the origin's routes, learned over private peering, on to Provider A. Nothing is forged: <code>64501 64499 64500</code> is <span class="tag ok">Valid</span> for ROV and <span class="tag bad">Invalid</span> for ASPA, because 64499 is not one of the origin's providers.</p>
+        <p class="lesson">In a leak nobody lies about the origin; what's wrong is where the route went. ROV can't see it, ASPA can.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step7.webp"><img src="img/en/step7.webp" alt="Step 7: the leaked path is ROV Valid and ASPA Invalid" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 8</div>
+        <h3>Deploying for real: drop</h3>
+        <p>Both checks switch from marking to dropping, the way a production router is configured. The forged and the leaked routes disappear. Provider A's own path is still missing, though: Provider A keeps advertising the leak instead, and no policy on the observers can change that.</p>
+        <p class="lesson">Marking only helps while a valid alternative exists. Dropping is what protects the network.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step8.webp"><img src="img/en/step8.webp" alt="Step 8: invalid routes dropped" loading="lazy"></a></figure>
+    </article>
+
+    <article class="step">
+      <div>
+        <div class="num">Step 9</div>
+        <h3>Put it away</h3>
+        <p>The peer fixes its export policy and Provider A's own path comes back. The observers stay fully deployed, with ROV and ASPA both dropping.</p>
+      </div>
+      <figure class="shot"><a href="img/en/step9.webp"><img src="img/en/step9.webp" alt="Step 9: the leak is gone and both legitimate paths are back" loading="lazy"></a></figure>
+    </article>
+
+    <h3 style="margin:30px 0 12px">What caught what</h3>
+    <div class="scroll-x">
+      <table class="recap">
+        <tr><th>Attack</th><th>AS_PATH</th><th>ROV</th><th>ASPA</th></tr>
+        <tr><td>Naive hijack</td><td><code>666</code></td><td><span class="tag ok">catches it</span></td><td>nothing to check</td></tr>
+        <tr><td>Forged path</td><td><code>666 64500</code></td><td><span class="tag bad">fooled</span></td><td><span class="tag ok">catches it</span></td></tr>
+        <tr><td>Route leak</td><td><code>64501 64499 64500</code></td><td><span class="tag bad">can't see it</span></td><td><span class="tag ok">catches it</span></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="learning">
+  <div class="wrap">
+    <h2>Made for learning, and for teaching</h2>
+    <p class="intro">Built for hands-on RPKI courses, and usable by anyone who wants to study on their own.</p>
+    <div class="cards">
+      <div class="card"><h3>Guide in three languages</h3><p>English, Spanish and Portuguese. Every command block says where it runs and opens the right terminal.</p></div>
+      <div class="card"><h3>Challenges</h3><p>Some steps hide their solution behind hints and a timer; "Check my lab" looks at the lab's real state.</p></div>
+      <div class="card"><h3>Checkpoints</h3><p>They tick themselves as your lab reaches each step, and any step command puts the lab back on track.</p></div>
+      <div class="card"><h3>The preparation too</h3><p>Create the CA in Krill and play both sides of the delegation with the simulated registry.</p></div>
+      <div class="card"><h3>Your own configs</h3><p>A <code>work/</code> folder to write your own ROV and ASPA configuration and load it on the routers.</p></div>
+      <div class="card"><h3>Extra exercises</h3><p>Upstream vs downstream (and where BIRD and OpenBGPD disagree), maxLength, and a look inside RTR.</p></div>
+    </div>
+    <div class="grid2" style="margin-top:26px">
+      <figure class="shot"><a href="img/en/challenge.webp"><img src="img/en/challenge.webp" alt="A challenge in the guide, with hints, timer and Check my lab" loading="lazy"></a></figure>
+      <figure class="shot"><a href="img/en/registry.webp"><img src="img/en/registry.webp" alt="The simulated registry's panel" loading="lazy"></a></figure>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="start">
+  <div class="wrap">
+    <h2>Get started</h2>
+    <div class="grid2">
+      <ol class="start">
+        <li><b>Install Docker</b> with Compose v2 (Docker Desktop, OrbStack, or Docker Engine on Linux). On Windows, use WSL 2 and work inside its Ubuntu terminal.</li>
+        <li><b>Get the lab:</b>
+          <pre>git clone https://github.com/moreiras/rpki-selflab.git
+cd rpki-selflab</pre>
+          or download the source from <a href="https://github.com/moreiras/rpki-selflab/releases/latest">the latest release</a>.</li>
+        <li><b>Bring it up</b> and open <b>http://localhost:8080</b>:
+          <pre>./scripts/lab.sh up</pre></li>
+      </ol>
+      <div class="card">
+        <h3>Would rather not install Docker?</h3>
+        <p>Each <a href="https://github.com/moreiras/rpki-selflab/releases/latest">release</a> also has a virtual machine with everything inside (amd64 and arm64), with its own desktop, browser and terminal. Details in <a href="https://github.com/moreiras/rpki-selflab/blob/main/vm/README.md">vm/README.md</a>.</p>
+        <p style="margin-top:12px">The full guide is also readable on GitHub: <a href="https://github.com/moreiras/rpki-selflab/blob/main/guide/GUIDE.en.md">guide/GUIDE.en.md</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>RPKI SelfLab · code under Apache-2.0, guide under CC BY 4.0</span>
+    <span><a href="https://github.com/moreiras/rpki-selflab">github.com/moreiras/rpki-selflab</a></span>
+  </div>
+</footer>
+</body>
+</html>
