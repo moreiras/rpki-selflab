@@ -8,7 +8,7 @@
 // comments:
 //
 //   ```cmd @observer1       a command, run on that box (or @lab, @host, @krill...)
-//   ```output @observer2    what the command prints
+//   ```output @observer3    what the command prints
 //   ```conf @observer1      a configuration excerpt
 //   > [!IMPORTANT]          GitHub-style alerts (NOTE, TIP, IMPORTANT, WARNING, CAUTION)
 //   <!-- checkpoint: ID -->                       live checklist (checks.js)
@@ -286,7 +286,7 @@ function esc(s) {
 
 // ------------------------------------------------------------ code blocks --
 const NODE_TARGETS = ["krill", "rir", "routinator", "fort", "origin", "provider-a", "provider-b",
-                      "observer1", "observer2", "attacker", "peer"];
+                      "observer1", "observer2", "observer3", "attacker", "peer"];
 
 // A command rewritten for the student's own terminal: docker exec into the
 // box, through sh -c when the line needs a shell (pipes, &&, redirections).

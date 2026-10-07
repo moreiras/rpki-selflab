@@ -12,6 +12,7 @@ let lastState = null;
 let prevState = null;
 let labValuesApplied = false;
 const events = [];
+const OBSERVERS = ["observer1", "observer2", "observer3"];
 
 const $ = id => document.getElementById(id);
 
@@ -377,6 +378,21 @@ function renderPanel(id) {
     h += `<div class="section"><h3>${esc(t("rtr_tables"))}</h3><dl class="info">` +
          `<dt>ROA v4</dt><dd>${tb.roa4 ?? "—"}</dd><dt>ROA v6</dt><dd>${tb.roa6 ?? "—"}</dd><dt>ASPA</dt><dd>${tb.aspa ?? "—"}</dd></dl></div>`;
   }
+  if (id === "observer2" && nodeData && nodeData.rpki) {
+    const rp = nodeData.rpki;
+    const run = rp.last_run ? new Date(rp.last_run).toLocaleTimeString() : "—";
+    h += `<div class="section"><h3>${esc(t("rpki_client_title"))}</h3><dl class="info">` +
+         `<dt>${esc(t("rpki_client_last"))}</dt><dd>${esc(run)}${rp.ok === false ? ` <span class="tag Invalid">${esc(t("rpki_client_failed"))}</span>` : ""}</dd>` +
+         `<dt>VRPs</dt><dd>${rp.vrps ?? "—"}</dd><dt>ASPAs</dt><dd>${rp.aspas ?? "—"}</dd>` +
+         `<dt>${esc(t("rpki_client_file"))}</dt><dd class="mono">${esc(rp.file || "")}</dd></dl>`;
+    if ((rp.vrp_list || []).length) {
+      h += `<table class="verdicts"><tbody>` +
+           rp.vrp_list.map(x => `<tr><td class="mono">${esc(x.prefix)}</td><td class="mono">max ${esc(x.maxLength)}</td><td class="mono">${esc(x.asn)}</td></tr>`).join("") +
+           `</tbody></table>`;
+    }
+    if ((rp.aspa_list || []).length) h += `<pre>${esc(rp.aspa_list.map(a => `AS${a.customer} => ${a.providers.map(p => "AS" + p).join(", ")}`).join("\n"))}</pre>`;
+    h += `</div>`;
+  }
   if (id === "routinator" && state.routinator) {
     const r = state.routinator;
     h += `<div class="section"><h3>${esc(t("validated_set"))}</h3><dl class="info">` +
@@ -410,9 +426,14 @@ function renderPanel(id) {
   $("panel").querySelectorAll("[data-web]").forEach(b => b.onclick = () => openWeb(b.dataset.web));
 }
 
+// clicking an observer also shows its verdicts in the bottom tabs
+function onNodeClick(id) {
+  if (OBSERVERS.includes(id)) selectBottomTab(id);
+  renderPanel(id);
+}
 document.querySelectorAll(".node").forEach(el => {
-  el.addEventListener("click", () => renderPanel(el.dataset.id));
-  el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); renderPanel(el.dataset.id); } });
+  el.addEventListener("click", () => onNodeClick(el.dataset.id));
+  el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNodeClick(el.dataset.id); } });
 });
 
 // ---------------------------------------------------------------- topology --
@@ -440,7 +461,7 @@ function paint(state) {
   $("clock").textContent = state.error ? (t("error_prefix") + state.error) : "";
   const nodes = state.nodes || {};
 
-  for (const id of ["origin", "provider-a", "provider-b", "observer1", "observer2"]) {
+  for (const id of ["origin", "provider-a", "provider-b", "observer1", "observer2", "observer3"]) {
     const d = nodes[id];
     if (!d) { setStatus(id, "—", ""); continue; }
     const bgp = (d.protocols || []).filter(p => p.type === "BGP");
@@ -449,14 +470,27 @@ function paint(state) {
               !d.up ? "error" : (bgp.length && up === bgp.length) ? "ok" : "warn");
   }
 
-  // the observers' deployment stage: one badge for both, orange if they disagree
+  // observer2's box also says what rpki-client validated on the same host
+  const o2 = nodes.observer2 || {};
+  if (o2.up && o2.rpki) {
+    const el = $("s-observer2");
+    const rp = o2.rpki;
+    const rpki = rp.vrps == null ? "—" : `${rp.vrps} VRP · ${rp.aspas ?? 0} ASPA`;
+    el.textContent = `${el.textContent} · ${rpki}`;
+    if (rp.ok === false) el.setAttribute("fill", "var(--warn)");
+  }
+
+  // the observers' deployment stage: one badge for all three, orange if they
+  // disagree
   const stg = state.stage || {};
   const badge = $("stage-badge");
-  const a = stg.observer1, b = stg.observer2;
+  const obsStages = OBSERVERS.map(o => stg[o]);
+  const a = obsStages[0];
   badge.classList.remove("mark", "drop", "mixed");
-  if (!a || !b) badge.textContent = t("stage_unknown");
-  else if (a !== b) { badge.textContent = t("stage_mixed", { a, b }); badge.classList.add("mixed"); }
-  else {
+  if (obsStages.some(x => !x)) badge.textContent = t("stage_unknown");
+  else if (obsStages.some(x => x !== a)) {
+    badge.textContent = t("stage_mixed", { list: obsStages.join(" / ") }); badge.classList.add("mixed");
+  } else {
     badge.textContent = t("stage_" + a.replace("-", "_"));
     if (a.endsWith("mark")) badge.classList.add("mark");
     else if (a.endsWith("drop")) badge.classList.add("drop");
@@ -483,6 +517,12 @@ function paint(state) {
   const local = (g.MODE || "local") === "local";
   $("n-registry").textContent = local ? (g.RIR_NAME || "LabNIC") : "beta.registro.br";
   $("n-holder").textContent = g.HOLDER_NAME || "ACME Internet Ltda.";
+  // the ASNs in the boxes follow lab.conf
+  for (const [id, key] of [["origin", "ORIGIN_ASN"], ["provider-a", "PROVIDER_A_ASN"], ["provider-b", "PROVIDER_B_ASN"],
+                           ["observer1", "OBSERVER1_ASN"], ["observer2", "OBSERVER2_ASN"], ["observer3", "OBSERVER3_ASN"],
+                           ["attacker", "ATTACKER_ASN"], ["peer", "PEER_ASN"]]) {
+    if (g[key]) $(`n-${id}-asn`).textContent = "AS" + g[key];
+  }
   if (local) setStatus("registry", (state.rir || {}).up ? t("status_up") : t("status_stopped"), (state.rir || {}).up ? "ok" : "error");
   else setStatus("registry", t("status_external"), "");
 
@@ -509,18 +549,49 @@ function paint(state) {
 let changedRows = new Map();      // row key -> expiry (ms)
 function routeKey(obs, x) { return `${obs}|${x.net}|${norm(x.proto)}`; }
 
+// Which observers disagree with the others on some route's verdicts: a route
+// (prefix + who it came from) that at least two observers hold, where one
+// says something the others don't. An observer with an empty table is
+// restarting, not disagreeing, and is left out.
+function divergentObservers(state) {
+  const verdicts = new Map();   // route -> Map(observer -> "rov/aspa")
+  for (const obs of OBSERVERS) for (const x of routesFor(state, obs)) {
+    const key = `${x.net}|${norm(x.proto)}`;
+    if (!verdicts.has(key)) verdicts.set(key, new Map());
+    verdicts.get(key).set(obs, `${x.rov}/${x.aspa}`);
+  }
+  const out = new Set();
+  for (const byObs of verdicts.values()) {
+    if (byObs.size < 2) continue;
+    const count = new Map();
+    for (const v of byObs.values()) count.set(v, (count.get(v) || 0) + 1);
+    if (count.size < 2) continue;
+    const top = Math.max(...count.values());
+    const ties = [...count.values()].filter(c => c === top).length > 1;
+    for (const [obs, v] of byObs) if (ties || count.get(v) < top) out.add(obs);
+  }
+  return out;
+}
+
+const bottomTab = () => PREF.get("bottom-tab", "observer1");
+
 function paintVerdicts(state) {
-  const rows = [];
-  for (const obs of ["observer1", "observer2"]) for (const x of routesFor(state, obs)) rows.push([obs, x]);
+  const div = divergentObservers(state);
+  document.querySelectorAll("#bottom-tabs button[data-bottom]").forEach(b => {
+    const d = b.querySelector(".diverge");
+    if (d) d.classList.toggle("hidden", !div.has(b.dataset.bottom));
+  });
+  const obs = OBSERVERS.includes(bottomTab()) ? bottomTab() : "observer1";
+  const rows = routesFor(state, obs);
   const tb = document.querySelector("#tab-verdicts tbody");
   const now = Date.now();
   if (!rows.length) {
-    tb.innerHTML = `<tr><td colspan="7" style="color:var(--text-weak)">${esc(t("no_routes"))}</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="6" style="color:var(--text-weak)">${esc(t("no_routes"))}</td></tr>`;
     return;
   }
-  tb.innerHTML = rows.map(([obs, x]) => {
+  tb.innerHTML = rows.map(x => {
     const changed = (changedRows.get(routeKey(obs, x)) || 0) > now;
-    return `<tr${changed ? ' class="changed"' : ""}><td class="mono">${esc(obs)}</td>` +
+    return `<tr${changed ? ' class="changed"' : ""}>` +
            `<td class="mono">${esc(x.net)}${x.best ? ` <span class="tag best">${esc(t("best"))}</span>` : ""}</td>` +
            `<td>${esc(fromLabel(x.proto))}</td><td class="mono">${esc(x.path)}</td>` +
            `<td>${tag(x.rov)}</td><td>${tag(x.aspa)}</td><td class="mono">${x.local_pref ?? x.pref ?? ""}</td></tr>`;
@@ -545,7 +616,8 @@ function paintLinks(state, atk, peerNode) {
   const flows = [];
   // each provider link is coloured by that path's ASPA verdict at that observer
   for (const [linkId, obs, prov] of [["e-a-obs1", "observer1", "provider-a"], ["e-b-obs1", "observer1", "provider-b"],
-                                     ["e-a-obs2", "observer2", "provider-a"], ["e-b-obs2", "observer2", "provider-b"]]) {
+                                     ["e-a-obs2", "observer2", "provider-a"], ["e-b-obs2", "observer2", "provider-b"],
+                                     ["e-a-obs3", "observer3", "provider-a"], ["e-b-obs3", "observer3", "provider-b"]]) {
     const route = routesFor(state, obs).find(x => norm(x.proto).startsWith(prov));
     const v = route ? route.aspa : null;
     setLink(linkId, v === "Valid" ? "good" : v === "Invalid" ? "bad" : null);
@@ -555,7 +627,7 @@ function paintLinks(state, atk, peerNode) {
 
   // AS666's links: red when what it announces is flagged or dropped,
   // orange when an observer is accepting it
-  for (const [linkId, obs] of [["e-atk-obs1", "observer1"], ["e-atk-obs2", "observer2"]]) {
+  for (const [linkId, obs] of [["e-atk-obs1", "observer1"], ["e-atk-obs2", "observer2"], ["e-atk-obs3", "observer3"]]) {
     const route = routesFor(state, obs).find(x => norm(x.proto).startsWith("attacker"));
     const flagged = !route || route.rov === "Invalid" || route.aspa === "Invalid";
     setLink(linkId, atk.announcing ? (flagged ? "bad" : "warn") : null);
@@ -567,7 +639,7 @@ function paintLinks(state, atk, peerNode) {
   const peeringUp = (peerNode.protocols || []).some(p => p.name === "origin_v4" && p.state === "up");
   setLink("e-peer-org", peeringUp ? "good" : null);
   const peerAsn = String((state.config || {}).PEER_ASN || "64499");
-  const leaked = [...routesFor(state, "observer1"), ...routesFor(state, "observer2")]
+  const leaked = OBSERVERS.flatMap(o => routesFor(state, o))
     .filter(x => String(x.path).split(/\s+/).includes(peerAsn));
   const leakAccepted = leaked.some(x => x.rov !== "Invalid" && x.aspa !== "Invalid");
   setLink("e-peer-a", peerNode.leaking ? (leakAccepted ? "warn" : "bad") : null);
@@ -575,8 +647,12 @@ function paintLinks(state, atk, peerNode) {
 
   // RTR links: BIRD reports the session as an RPKI protocol, OpenBGPD as RTR
   const rtr1 = (((state.nodes || {}).observer1 || {}).protocols || []).find(p => p.type === "RPKI");
-  const rtr2 = (((state.nodes || {}).observer2 || {}).protocols || []).find(p => p.type === "RTR");
-  for (const [linkId, pr] of [["e-rtr1", rtr1], ["e-rtr2", rtr2]]) setLink(linkId, pr ? (pr.state === "up" ? "good" : "bad") : null);
+  const rtr3 = (((state.nodes || {}).observer3 || {}).protocols || []).find(p => p.type === "RTR");
+  for (const [linkId, pr] of [["e-rtr1", rtr1], ["e-rtr3", rtr3]]) setLink(linkId, pr ? (pr.state === "up" ? "good" : "bad") : null);
+  // observer2 fetches the repository itself: green while rpki-client's last
+  // run worked and found something, red when it failed
+  const rp = ((state.nodes || {}).observer2 || {}).rpki;
+  setLink("e-rrdp-obs2", !rp || rp.ok == null ? null : rp.ok === false ? "bad" : rp.vrps ? "good" : null);
 
   const layer = $("flow-layer");
   const want = flows.map(([id, c]) => `${id}:${c}`).join(",");
@@ -629,11 +705,14 @@ function diffEvents(a, b) {
   const atkAsn = cfg.ATTACKER_ASN || "666";
 
   const sa = a.stage || {}, sb = b.stage || {};
-  if (sb.observer1 && sb.observer1 === sb.observer2 && (sa.observer1 !== sb.observer1 || sa.observer2 !== sb.observer2)) {
+  if (sb.observer1 && OBSERVERS.every(o => sb[o] === sb.observer1) && OBSERVERS.some(o => sa[o] !== sb[o])) {
     out.push([t("ev_stage", { stage: `<b>${esc(t("stage_" + sb.observer1.replace("-", "_")))}</b>` }), "info", true]);
   }
   const aa = (a.nodes || {}).attacker || {}, ab = (b.nodes || {}).attacker || {};
-  const atkPath = s => { const r = routesFor(s, "observer1").find(x => norm(x.proto).startsWith("attacker")) || routesFor(s, "observer2").find(x => norm(x.proto).startsWith("attacker")); return r ? String(r.path) : ""; };
+  const atkPath = s => {
+    const r = OBSERVERS.flatMap(o => routesFor(s, o)).find(x => norm(x.proto).startsWith("attacker"));
+    return r ? String(r.path) : "";
+  };
   if (!aa.announcing && ab.announcing) {
     const p = atkPath(b);
     const kind = !p ? "" : p.split(/\s+/).length > 1 ? t("kind_forged", { path: p }) : t("kind_simple", { path: p });
@@ -660,6 +739,8 @@ function diffEvents(a, b) {
   validatorEvent("Routinator", ra.vrps, rb.vrps, ra.aspas, rb.aspas);
   const fa = a.fort || {}, fb = b.fort || {};
   validatorEvent("FORT", fa.roas, fb.roas, fa.aspas, fb.aspas);
+  const ca = ((a.nodes || {}).observer2 || {}).rpki || {}, cb = ((b.nodes || {}).observer2 || {}).rpki || {};
+  validatorEvent("rpki-client", ca.vrps, cb.vrps, ca.aspas, cb.aspas);
   const ka = a.krill || {}, kb = b.krill || {};
   if (kb.ca && ka.ca && (ka.roas || []).length !== (kb.roas || []).length) out.push([t("ev_krill_roas", { n: (kb.roas || []).length }), "info", true]);
   const aspaStr = k => (k.aspas || []).map(x => `AS${x.customer} → ${x.providers.map(p => "AS" + p).join(", ")}`).join("; ");
@@ -667,11 +748,12 @@ function diffEvents(a, b) {
     out.push([aspaStr(kb) ? t("ev_krill_aspa", { list: esc(aspaStr(kb)) }) : t("ev_krill_noaspa"), "info", true]);
 
   const now = Date.now();
-  for (const obs of ["observer1", "observer2"]) {
+  for (const obs of OBSERVERS) {
     const before = new Map(routesFor(a, obs).map(x => [routeKey(obs, x), x]));
     const after = new Map(routesFor(b, obs).map(x => [routeKey(obs, x), x]));
     // a whole table emptied or refilled at once is the router restarting
-    // (observer2 restarts on every stage change): one line, not one per route
+    // (the OpenBGPD observers restart on every stage change): one line, not
+    // one per route
     if (before.size && !after.size) { out.push([t("ev_table_empty", { obs }), "info", false]); continue; }
     if (!before.size && after.size) {
       out.push([t("ev_table_full", { obs, n: after.size }), "info", false]);
@@ -701,11 +783,17 @@ function diffEvents(a, b) {
   if (rest > 0) toast(esc(t("ev_more", { n: rest })), "info", 4000);
 }
 
-document.querySelectorAll("#bottom-tabs button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("#bottom-tabs button").forEach(x => x.classList.toggle("active", x === b));
-  $("bottom-verdicts").classList.toggle("hidden", b.dataset.bottom !== "verdicts");
-  $("bottom-events").classList.toggle("hidden", b.dataset.bottom !== "events");
-});
+// The bottom tabs: one per observer (its verdicts) plus Events. The choice
+// is remembered per browser, like the column widths.
+function selectBottomTab(name) {
+  PREF.set("bottom-tab", name);
+  document.querySelectorAll("#bottom-tabs button").forEach(x => x.classList.toggle("active", x.dataset.bottom === name));
+  $("bottom-verdicts").classList.toggle("hidden", name === "events");
+  $("bottom-events").classList.toggle("hidden", name !== "events");
+  if (name !== "events" && lastState) paintVerdicts(lastState);
+}
+document.querySelectorAll("#bottom-tabs button").forEach(b => b.onclick = () => selectBottomTab(b.dataset.bottom));
+selectBottomTab(PREF.get("bottom-tab", "observer1"));
 
 function paintLegend() {
   $("legend").innerHTML =
@@ -733,7 +821,7 @@ function translateStatic() {
   document.querySelectorAll("[data-i18n-title]").forEach(el => el.setAttribute("title", t(el.dataset.i18nTitle)));
   document.querySelectorAll("[data-i18n-aria]").forEach(el => el.setAttribute("aria-label", t(el.dataset.i18nAria)));
   $("svg-topology").setAttribute("aria-label", t("h1"));
-  for (const id of ["origin", "provider-a", "provider-b", "observer1", "observer2", "attacker", "peer"]) {
+  for (const id of ["origin", "provider-a", "provider-b", "observer1", "observer2", "observer3", "attacker", "peer"]) {
     const key = id.replace("-", "_");
     $(`n-${id}-title`).textContent = t(`svg_title_${key}`);
     $(`n-${id}-role`).textContent = t(`svg_role_${key}`);

@@ -83,28 +83,34 @@
             </marker>
           </defs>
 
-          <!-- RPKI links. Krill <-> LabNIC is routed around the right edge so it
-               doesn't cross the observer boxes; both validators pull the same
-               repository over RRDP. -->
-          <path class="link rpki" d="M800,595 L968,595 L968,54 L596,54"/>
-          <path class="link rpki" d="M430,88.5 L430,140 L130,140 L130,190.5"/>
-          <path class="link rpki" d="M550,88.5 L550,140 L850,140 L850,190.5"/>
-          <path class="link rpki" id="e-rtr1" d="M217.9,225 L272.9,225"/>
-          <path class="link rpki" id="e-rtr2" d="M763,225 L710.1,225"/>
+          <!-- RPKI links. Routinator and FORT pull the repository over RRDP and
+               hand the result to their observer over RTR. observer2 pulls it
+               itself: rpki-client runs on the router's own host, so the RRDP
+               line goes straight to it. Krill <-> registry is routed around the
+               right edge so it doesn't cross anything. -->
+          <path class="link rpki" d="M800,595 L968,595 L968,34 L596,34"/>
+          <path class="link rpki" d="M384,62 L185,62 L185,110"/>
+          <path class="link rpki" id="e-rrdp-obs2" d="M490,88.5 L490,205"/>
+          <path class="link rpki" d="M596,62 L795,62 L795,110"/>
+          <path class="link rpki" id="e-rtr1" d="M185,174 L185,205"/>
+          <path class="link rpki" id="e-rtr3" d="M795,174 L795,205"/>
           <text class="label" x="976" y="350" transform="rotate(-90 976 350)">RFC 6492 / 8181</text>
-          <text class="label" x="144" y="133" text-anchor="end">RRDP</text>
-          <text class="label" x="700" y="133">RRDP</text>
-          <text class="label" x="245.4" y="181" text-anchor="middle">RTR :3323</text>
-          <text class="label" x="736.6" y="181" text-anchor="middle">RTR :3323</text>
+          <text class="label" x="290" y="55" text-anchor="middle">RRDP</text>
+          <text class="label" x="498" y="150">RRDP</text>
+          <text class="label" x="690" y="55" text-anchor="middle">RRDP</text>
+          <text class="label" x="193" y="193">RTR :3323</text>
+          <text class="label" x="803" y="193">RTR :3323</text>
 
           <!-- BGP links. The origin is a customer of both providers, and each
-               provider hands the same prefix to BOTH observers. -->
+               provider hands the same prefix to ALL three observers. -->
           <path class="link bgp" id="e-org-a" d="M450,554.8 L328,455.2" marker-end="url(#arrow)"/>
           <path class="link bgp" id="e-org-b" d="M530,554.8 L652,455.2" marker-end="url(#arrow)"/>
-          <path class="link bgp" id="e-a-obs1" d="M288,374.8 L343,265.2" marker-end="url(#arrow)"/>
-          <path class="link bgp" id="e-a-obs2" d="M378,374.8 L575,265.2" marker-end="url(#arrow)"/>
-          <path class="link bgp" id="e-b-obs1" d="M597,374.8 L403,265.2" marker-end="url(#arrow)"/>
-          <path class="link bgp" id="e-b-obs2" d="M692,374.8 L650,265.2" marker-end="url(#arrow)"/>
+          <path class="link bgp" id="e-a-obs1" d="M270,374.8 L150,285.5" marker-end="url(#arrow)"/>
+          <path class="link bgp" id="e-a-obs2" d="M340,374.8 L420,285.5" marker-end="url(#arrow)"/>
+          <path class="link bgp" id="e-a-obs3" d="M400,374.8 L730,285.5" marker-end="url(#arrow)"/>
+          <path class="link bgp" id="e-b-obs1" d="M580,374.8 L255,285.5" marker-end="url(#arrow)"/>
+          <path class="link bgp" id="e-b-obs2" d="M640,374.8 L560,285.5" marker-end="url(#arrow)"/>
+          <path class="link bgp" id="e-b-obs3" d="M710,374.8 L835,285.5" marker-end="url(#arrow)"/>
           <!-- peer: a bilateral peering link with the origin, plus transit from
                Provider A. The route leak travels over the transit link. -->
           <path class="link bgp" id="e-peer-org" d="M325.1,595 L399.9,595"/>
@@ -112,8 +118,9 @@
           <text class="label" x="362" y="588" text-anchor="middle">peering</text>
 
           <!-- AS666: a customer of the observers, at the same level as the providers -->
-          <path class="link bgp hostile" id="e-atk-obs1" d="M462,378 L430,265.2" marker-end="url(#arrow)"/>
-          <path class="link bgp hostile" id="e-atk-obs2" d="M518,378 L550,265.2" marker-end="url(#arrow)"/>
+          <path class="link bgp hostile" id="e-atk-obs1" d="M445,378 L205,285.5" marker-end="url(#arrow)"/>
+          <path class="link bgp hostile" id="e-atk-obs2" d="M490,378 L490,285.5" marker-end="url(#arrow)"/>
+          <path class="link bgp hostile" id="e-atk-obs3" d="M535,378 L780,285.5" marker-end="url(#arrow)"/>
 
           <text class="label" x="380" y="515">eBGP</text>
           <text class="label" x="590" y="515">eBGP</text>
@@ -121,9 +128,10 @@
           <!-- animated dots over the links that carry routes (app.js) -->
           <g id="flow-layer"></g>
 
-          <!-- same-organization groupings -->
-          <rect class="org-group" x="28" y="169.8" width="440.1" height="110.5"/>
-          <rect class="org-group" x="514.9" y="169.8" width="438" height="110.5"/>
+          <!-- same-organization groupings: each separate validator with its
+               observer, and the origin with its CA -->
+          <rect class="org-group" x="83" y="100" width="204" height="195.5"/>
+          <rect class="org-group" x="693" y="100" width="204" height="195.5"/>
           <rect class="org-group" x="384.9" y="539.8" width="445" height="110.5"/>
           <text class="org-label" id="n-holder" x="607" y="532.8" text-anchor="middle">ACME Internet Ltda.</text>
 
@@ -137,44 +145,54 @@
           </g>
 
           <g class="node" data-id="routinator" tabindex="0">
-            <rect x="43" y="190.5" width="174.9" height="69"/>
-            <use class="ico" href="#ico-server" x="49.4" y="196.2" width="23.5" height="23.5"/>
-            <text class="title" x="130" y="213.5" text-anchor="middle">Routinator</text>
-            <text class="role" x="130" y="229.6" text-anchor="middle" id="n-routinator-role">validator · RTR</text>
-            <text class="status" id="s-routinator" x="130" y="248" text-anchor="middle">&#8212;</text>
-          </g>
-
-          <g class="node" data-id="observer1" tabindex="0">
-            <rect x="272.9" y="184.8" width="180.2" height="80.5"/>
-            <use class="ico" href="#ico-router" x="279.3" y="190.5" width="23.5" height="23.5"/>
-            <text class="title" x="363" y="211.2" text-anchor="middle" id="n-observer1-title">observer1</text>
-            <text class="asn" x="363" y="228.4" text-anchor="middle">AS64510</text>
-            <text class="role" x="363" y="244.6" text-anchor="middle" id="n-observer1-role">BIRD · ROV + ASPA</text>
-            <text class="status" id="s-observer1" x="363" y="259.5" text-anchor="middle">&#8212;</text>
-          </g>
-
-          <g class="node" data-id="observer2" tabindex="0">
-            <rect x="529.9" y="184.8" width="180.2" height="80.5"/>
-            <use class="ico" href="#ico-router" x="536.3" y="190.5" width="23.5" height="23.5"/>
-            <text class="title" x="620" y="211.2" text-anchor="middle" id="n-observer2-title">observer2</text>
-            <text class="asn" x="620" y="228.4" text-anchor="middle">AS64511</text>
-            <text class="role" x="620" y="244.6" text-anchor="middle" id="n-observer2-role">OpenBGPD · ROV + ASPA</text>
-            <text class="status" id="s-observer2" x="620" y="259.5" text-anchor="middle">&#8212;</text>
+            <rect x="97.5" y="110" width="175" height="64"/>
+            <use class="ico" href="#ico-server" x="103.9" y="115.7" width="23.5" height="23.5"/>
+            <text class="title" x="185" y="131" text-anchor="middle">Routinator</text>
+            <text class="role" x="185" y="147" text-anchor="middle" id="n-routinator-role">validator · RTR</text>
+            <text class="status" id="s-routinator" x="185" y="165" text-anchor="middle">&#8212;</text>
           </g>
 
           <g class="node" data-id="fort" tabindex="0">
-            <rect x="763" y="190.5" width="174.9" height="69"/>
-            <use class="ico" href="#ico-server" x="769.4" y="196.2" width="23.5" height="23.5"/>
-            <text class="title" x="850" y="213.5" text-anchor="middle">FORT</text>
-            <text class="role" x="850" y="229.6" text-anchor="middle" id="n-fort-role">validator · RTR</text>
-            <text class="status" id="s-fort" x="850" y="248" text-anchor="middle">&#8212;</text>
+            <rect x="707.5" y="110" width="175" height="64"/>
+            <use class="ico" href="#ico-server" x="713.9" y="115.7" width="23.5" height="23.5"/>
+            <text class="title" x="795" y="131" text-anchor="middle">FORT</text>
+            <text class="role" x="795" y="147" text-anchor="middle" id="n-fort-role">validator · RTR</text>
+            <text class="status" id="s-fort" x="795" y="165" text-anchor="middle">&#8212;</text>
+          </g>
+
+          <g class="node" data-id="observer1" tabindex="0">
+            <rect x="95" y="205" width="180" height="80.5"/>
+            <use class="ico" href="#ico-router" x="101.4" y="210.7" width="23.5" height="23.5"/>
+            <text class="title" x="185" y="231.4" text-anchor="middle" id="n-observer1-title">observer1</text>
+            <text class="asn" x="185" y="248.6" text-anchor="middle" id="n-observer1-asn">AS64509</text>
+            <text class="role" x="185" y="264.8" text-anchor="middle" id="n-observer1-role">BIRD · ROV + ASPA</text>
+            <text class="status" id="s-observer1" x="185" y="279.7" text-anchor="middle">&#8212;</text>
+          </g>
+
+          <!-- observer2: router and validator on the same host, so one box -->
+          <g class="node" data-id="observer2" tabindex="0">
+            <rect x="370" y="205" width="240" height="80.5"/>
+            <use class="ico" href="#ico-router" x="376.4" y="210.7" width="23.5" height="23.5"/>
+            <text class="title" x="490" y="231.4" text-anchor="middle" id="n-observer2-title">observer2</text>
+            <text class="asn" x="490" y="248.6" text-anchor="middle" id="n-observer2-asn">AS64510</text>
+            <text class="role" x="490" y="264.8" text-anchor="middle" id="n-observer2-role">OpenBGPD + rpki-client</text>
+            <text class="status" id="s-observer2" x="490" y="279.7" text-anchor="middle">&#8212;</text>
+          </g>
+
+          <g class="node" data-id="observer3" tabindex="0">
+            <rect x="705" y="205" width="180" height="80.5"/>
+            <use class="ico" href="#ico-router" x="711.4" y="210.7" width="23.5" height="23.5"/>
+            <text class="title" x="795" y="231.4" text-anchor="middle" id="n-observer3-title">observer3</text>
+            <text class="asn" x="795" y="248.6" text-anchor="middle" id="n-observer3-asn">AS64511</text>
+            <text class="role" x="795" y="264.8" text-anchor="middle" id="n-observer3-role">OpenBGPD · ROV + ASPA</text>
+            <text class="status" id="s-observer3" x="795" y="279.7" text-anchor="middle">&#8212;</text>
           </g>
 
           <g class="node" data-id="provider-a" tabindex="0">
             <rect x="237.9" y="374.8" width="180.2" height="80.5"/>
             <use class="ico" href="#ico-router" x="244.3" y="380.5" width="23.5" height="23.5"/>
             <text class="title" x="328" y="401.2" text-anchor="middle" id="n-provider-a-title">Provider A</text>
-            <text class="asn" x="328" y="418.4" text-anchor="middle">AS64501</text>
+            <text class="asn" id="n-provider-a-asn" x="328" y="418.4" text-anchor="middle">AS64501</text>
             <text class="role" x="328" y="434.6" text-anchor="middle" id="n-provider-a-role">upstream of the origin</text>
             <text class="status" id="s-provider-a" x="328" y="449.5" text-anchor="middle">&#8212;</text>
           </g>
@@ -183,7 +201,7 @@
             <rect x="561.9" y="374.8" width="180.2" height="80.5"/>
             <use class="ico" href="#ico-router" x="568.3" y="380.5" width="23.5" height="23.5"/>
             <text class="title" x="652" y="401.2" text-anchor="middle" id="n-provider-b-title">Provider B</text>
-            <text class="asn" x="652" y="418.4" text-anchor="middle">AS64502</text>
+            <text class="asn" id="n-provider-b-asn" x="652" y="418.4" text-anchor="middle">AS64502</text>
             <text class="role" x="652" y="434.6" text-anchor="middle" id="n-provider-b-role">upstream of the origin</text>
             <text class="status" id="s-provider-b" x="652" y="449.5" text-anchor="middle">&#8212;</text>
           </g>
@@ -192,7 +210,7 @@
             <rect x="399.9" y="554.8" width="180.2" height="80.5"/>
             <use class="ico" href="#ico-router" x="406.3" y="560.5" width="23.5" height="23.5"/>
             <text class="title" x="490" y="581.2" text-anchor="middle" id="n-origin-title">origin</text>
-            <text class="asn" x="490" y="598.5" text-anchor="middle">AS64500</text>
+            <text class="asn" id="n-origin-asn" x="490" y="598.5" text-anchor="middle">AS64500</text>
             <text class="role" x="490" y="614.5" text-anchor="middle" id="n-origin-role">originates the prefixes</text>
             <text class="status" id="s-origin" x="490" y="629.5" text-anchor="middle">&#8212;</text>
           </g>
@@ -201,7 +219,7 @@
             <rect x="425.3" y="378" width="129.3" height="77"/>
             <use class="ico" href="#ico-router" x="431.7" y="383.7" width="23.5" height="23.5"/>
             <text class="title" x="490" y="399.8" text-anchor="middle" id="n-attacker-title">attacker</text>
-            <text class="asn" x="490" y="415.9" text-anchor="middle">AS666</text>
+            <text class="asn" id="n-attacker-asn" x="490" y="415.9" text-anchor="middle">AS666</text>
             <text class="role" x="490" y="432" text-anchor="middle" id="n-attacker-role">hijacker</text>
             <text class="status" id="s-attacker" x="490" y="447" text-anchor="middle">&#8212;</text>
           </g>
@@ -210,7 +228,7 @@
             <rect x="144.9" y="554.8" width="180.2" height="80.5"/>
             <use class="ico" href="#ico-router" x="151.3" y="560.5" width="23.5" height="23.5"/>
             <text class="title" x="235" y="581.2" text-anchor="middle" id="n-peer-title">peer</text>
-            <text class="asn" x="235" y="598.5" text-anchor="middle">AS64499</text>
+            <text class="asn" id="n-peer-asn" x="235" y="598.5" text-anchor="middle">AS64499</text>
             <text class="role" x="235" y="614.5" text-anchor="middle" id="n-peer-role">peers with the origin</text>
             <text class="status" id="s-peer" x="235" y="629.5" text-anchor="middle">&#8212;</text>
           </g>
@@ -228,8 +246,12 @@
     <div class="splitter horizontal" id="split-bottom" role="separator" aria-orientation="horizontal"></div>
     <div class="bottom-box">
       <div class="bottom-head">
+        <!-- one tab per observer (app.js remembers the choice); a "≠" on a tab
+             means that observer's verdicts differ from the others' -->
         <span class="segmented" id="bottom-tabs">
-          <button data-bottom="verdicts" class="active" data-i18n="verdicts_title">Verdicts</button>
+          <button data-bottom="observer1"><span data-i18n="tab_observer1">observer1</span><span class="diverge hidden" data-i18n-title="diverge_tip">≠</span></button>
+          <button data-bottom="observer2"><span data-i18n="tab_observer2">observer2</span><span class="diverge hidden" data-i18n-title="diverge_tip">≠</span></button>
+          <button data-bottom="observer3"><span data-i18n="tab_observer3">observer3</span><span class="diverge hidden" data-i18n-title="diverge_tip">≠</span></button>
           <button data-bottom="events" data-i18n="events_title">Events</button>
         </span>
         <span class="legend" id="legend"></span>
@@ -237,10 +259,10 @@
       <div class="bottom-scroll" id="bottom-verdicts">
         <table class="verdicts" id="tab-verdicts">
           <thead><tr>
-            <th data-i18n="th_observer">Observer</th><th data-i18n="th_prefix">Prefix</th><th data-i18n="th_received">Received from</th>
+            <th data-i18n="th_prefix">Prefix</th><th data-i18n="th_received">Received from</th>
             <th>AS_PATH</th><th>ROV</th><th>ASPA</th><th>local_pref</th>
           </tr></thead>
-          <tbody><tr><td colspan="7" data-i18n="verdicts_waiting">waiting for data…</td></tr></tbody>
+          <tbody><tr><td colspan="6" data-i18n="verdicts_waiting">waiting for data…</td></tr></tbody>
         </table>
       </div>
       <div class="bottom-scroll hidden" id="bottom-events"><ul class="events" id="events"></ul></div>
