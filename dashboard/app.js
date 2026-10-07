@@ -23,6 +23,7 @@ const layout = {
   guide: PREF.get("guide-visible", "1") === "1",
   guideW: +PREF.get("guide-w", 0) || 0,
   dockW: +PREF.get("dock-w", 0) || 0,
+  bottomH: +PREF.get("bottom-h", 0) || 0,   // 0 = CSS default (auto, capped)
   dock: null,                 // null | "normal" | "wide"
   mobileView: PREF.get("mobile-view", "guide"),
 };
@@ -59,10 +60,22 @@ function applyLayout() {
     cols.push("minmax(0,1fr)", "340px");
   }
   main.style.gridTemplateColumns = cols.join(" ");
+  applyBottomHeight();
   $("btn-guide-toggle").textContent = layout.guide ? "◧" : "▤";
   $("btn-guide-toggle").title = t(layout.guide ? "hide_guide" : "show_guide");
   $("dock-wide").textContent = layout.dock === "wide" ? "⤡" : "⤢";
   $("dock-wide").title = t(layout.dock === "wide" ? "dock_narrow" : "dock_widen");
+}
+
+// Height of the Verdicts/Events box under the topology, set by dragging the
+// horizontal splitter; clamped so neither half can be squeezed away.
+function applyBottomHeight() {
+  const pane = $("center-pane"), box = pane.querySelector(".bottom-box");
+  if (!layout.bottomH) { pane.style.gridTemplateRows = ""; box.style.maxHeight = ""; return; }
+  if (pane.clientHeight < 300) return;                 // hidden or tiny: leave as is
+  const h = Math.round(Math.min(Math.max(layout.bottomH, 90), pane.clientHeight - 160));
+  pane.style.gridTemplateRows = `minmax(0, 1fr) 6px ${h}px`;
+  box.style.maxHeight = "none";
 }
 
 function setGuideVisible(on) {
@@ -71,14 +84,15 @@ function setGuideVisible(on) {
   applyLayout();
 }
 
-function makeSplitter(el, onDrag) {
+function makeSplitter(el, onDrag, onStart) {
   el.addEventListener("pointerdown", e => {
     e.preventDefault();
+    if (onStart) onStart(e.clientX, e.clientY);
     el.classList.add("dragging");
     el.setPointerCapture(e.pointerId);
     // iframes swallow pointer events mid-drag; mute them meanwhile
     document.querySelectorAll("iframe").forEach(f => f.style.pointerEvents = "none");
-    const move = ev => onDrag(ev.clientX);
+    const move = ev => onDrag(ev.clientX, ev.clientY);
     const up = () => {
       el.classList.remove("dragging");
       document.querySelectorAll("iframe").forEach(f => f.style.pointerEvents = "");
@@ -91,6 +105,15 @@ function makeSplitter(el, onDrag) {
 }
 makeSplitter($("split-guide"), x => { layout.guideW = x; PREF.set("guide-w", x); applyLayout(); });
 makeSplitter($("split-dock"), x => { layout.dockW = window.innerWidth - x; PREF.set("dock-w", layout.dockW); applyLayout(); });
+// dragging moves the box's top edge by exactly as much as the pointer moved
+let bottomDrag = null;
+makeSplitter($("split-bottom"), (x, y) => {
+  layout.bottomH = Math.round(bottomDrag.h + bottomDrag.y - y);
+  PREF.set("bottom-h", layout.bottomH); applyBottomHeight();
+}, (x, y) => {
+  bottomDrag = { y, h: $("center-pane").querySelector(".bottom-box").getBoundingClientRect().height };
+});
+$("split-bottom").addEventListener("dblclick", () => { layout.bottomH = 0; PREF.set("bottom-h", 0); applyBottomHeight(); });
 window.addEventListener("resize", applyLayout);
 document.querySelectorAll("#mobile-tabs button").forEach(b => b.onclick = () => {
   layout.mobileView = b.dataset.view; PREF.set("mobile-view", layout.mobileView); applyLayout();
@@ -118,6 +141,10 @@ function openDock(key, label, url, kind) {
     f.dataset.key = key;
     f.title = label;
     f.className = kind === "term" ? "term" : "web";
+    // every tab is another origin (krill.localhost, console.localhost...):
+    // without this, Krill's "copy XML" and the terminals' copy/paste are
+    // silently blocked by the browser's permissions policy
+    f.allow = "clipboard-read; clipboard-write";
     f.src = url;
     $("dock-frames").appendChild(f);
     if (key === "web:krill") toast(t("krill_login_toast"), "info", 9000);
