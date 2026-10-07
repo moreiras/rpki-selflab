@@ -30,7 +30,7 @@ RUN git clone --depth 1 --branch "${FORT_VERSION}" \
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libcurl4 libxml2 libjansson4 libssl3 libmicrohttpd12 \
-        ca-certificates tini \
+        ca-certificates tini vim nano \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/local/bin/fort /usr/local/bin/fort

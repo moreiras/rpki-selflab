@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 The rpki-selflab authors
+# ==============================================================================
+# Optional: publishes each service's own port on the host, besides the
+# panel's 8080.
+#
+# Nothing in the lab needs these: every web app is reachable through
+# http://<name>.localhost:8080. They're for connecting outside tools straight
+# to a service (your own router to a validator's RTR port, krillc on the host
+# to Krill's API, ...). ./scripts/lab.sh adds this file when lab.conf has
+# EXPOSE_PORTS=yes; they're off by default because ports like 3000 and 8081
+# are often already taken by other software on the same computer.
+# ==============================================================================
+
+services:
+  krill:
+    ports:
+      - "3000:3000"      # Krill API and UI (HTTPS, self-signed)
+  rir:
+    ports:
+      - "3001:3000"      # the simulated registry's Krill (MODE=local)
+  rir-web:
+    ports:
+      - "8081:8081"      # the registry panel (MODE=local)
+  routinator:
+    ports:
+      - "3323:3323"      # RTR
+      - "8323:8323"      # HTTP UI and API
+  fort:
+    ports:
+      - "3324:3323"      # RTR
+  console:
+    ports:
+      - "7681:7681"      # ttyd

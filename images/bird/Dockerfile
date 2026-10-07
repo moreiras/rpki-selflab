@@ -5,7 +5,8 @@
 # in BIRD since version 2.16 (Dec/2024).
 FROM alpine:3.22
 
-RUN apk add --no-cache bird tini iproute2 bash tcpdump
+# vim and nano: students edit configurations from the panel's terminals
+RUN apk add --no-cache bird tini iproute2 bash tcpdump vim nano
 
 # Default paths from the Alpine package, so "birdc" works with no arguments:
 #   config: /etc/bird.conf      socket: /run/bird.ctl

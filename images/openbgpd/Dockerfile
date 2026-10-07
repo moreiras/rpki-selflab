@@ -10,7 +10,8 @@
 # ASPA support and "rtr ... min-version 2" require OpenBGPD 8.x.
 FROM alpine:3.22
 
-RUN apk add --no-cache openbgpd tini bash iproute2 tcpdump
+# vim and nano: students edit configurations from the panel's terminals
+RUN apk add --no-cache openbgpd tini bash iproute2 tcpdump vim nano
 
 # bgpd drops privileges to _bgpd and chroots into /var/empty. The Alpine
 # package ships neither, so create them here or bgpd exits with

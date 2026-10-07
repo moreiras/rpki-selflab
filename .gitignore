@@ -3,3 +3,8 @@
 __pycache__/
 *.pyc
 .claude/
+
+# the student's own configuration files (work/README*.md stay tracked)
+work/*
+!work/README.md
+!work/README.*.md

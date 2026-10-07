@@ -3,7 +3,9 @@
 # Browser terminal (ttyd) + the lab's state collector.
 FROM alpine:3.22
 
-RUN apk add --no-cache ttyd docker-cli docker-cli-compose bash python3 tini curl jq ncurses
+# vim and nano: the "Lab commands" terminal is where students edit files in work/
+RUN apk add --no-cache ttyd docker-cli docker-cli-compose bash python3 tini curl jq ncurses \
+        vim nano
 
 COPY menu.sh   /usr/local/bin/menu.sh
 COPY status.py /usr/local/bin/status.py
