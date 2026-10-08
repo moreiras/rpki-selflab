@@ -45,14 +45,16 @@ while read -r image ctx dockerfile; do
     file="$out/$(echo "$image" | tr '/:' '__').tar"
     echo "==> $image ($platform)"
     if [ "$ctx" != "-" ]; then
-        args=(--platform "$platform" -t "$image" -o "type=docker,dest=$file")
+        # --pull: always fetch the base images for THIS platform, never reuse a
+        # same-named image in the local store that was built for another one
+        args=(--pull --platform "$platform" -t "$image" -o "type=docker,dest=$file")
         [ "$dockerfile" != "-" ] && args+=(-f "$ctx/$dockerfile")
         docker buildx build "${args[@]}" "$ctx"
     else
         # a prebuilt image: re-tag it through a one-line Dockerfile, so the
         # architecture can be chosen without pulling it into the local store
         printf 'FROM --platform=%s %s\n' "$platform" "$image" > "$tmp/Dockerfile"
-        docker buildx build --platform "$platform" -t "$image" \
+        docker buildx build --pull --platform "$platform" -t "$image" \
             -o "type=docker,dest=$file" "$tmp"
     fi
 done < "$tmp/images.txt"
