@@ -15,9 +15,11 @@ FROM nlnetlabs/rtrtr:v0.3.3 AS rtrtr
 
 FROM alpine:3.22
 
-# vim and nano: students edit configurations from the panel's terminals
+# vim and nano: students edit configurations from the panel's terminals.
+# libgcc: the amd64 build of rtrtr links libgcc_s dynamically (the arm64 one
+# is static), and without it rtrtr doesn't even start.
 RUN apk add --no-cache openbgpd rpki-client ca-certificates tini bash iproute2 \
-        tcpdump vim nano
+        tcpdump vim nano libgcc
 
 # bgpd drops privileges to _bgpd and chroots into /var/empty. The Alpine
 # package ships neither (see images/openbgpd/Dockerfile).

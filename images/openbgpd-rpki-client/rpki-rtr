@@ -12,9 +12,16 @@
 # the validator, and routers that only speak RTR connect to it. Here it runs
 # on observer2 itself so that nothing else in the lab has to change.
 CONF=/etc/rtrtr.conf
+PIDFILE=/run/rtrtr.pid
+LOG=/var/log/rtrtr.log
+
+# Tracked by PID rather than with pgrep, which doesn't see the process when
+# the image runs under emulation (an amd64 image on an arm64 host, say).
+running() { [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
+
 case "${1:-status}" in
   start)
-    if pgrep -x rtrtr >/dev/null; then
+    if running; then
         echo "rtrtr: already running"; exit 0
     fi
     cat > "$CONF" <<'C'
@@ -36,25 +43,35 @@ type = "rtr"
 listen = ["[::]:3323"]      # IPv6 and IPv4 both
 unit = "rpki-client"
 C
-    rtrtr -c "$CONF" >/dev/null 2>&1 &
+    # rtrtr logs to its file once running; anything it prints before that
+    # (a missing library, a bad config) goes to the same file
+    rtrtr -c "$CONF" >>"$LOG" 2>&1 &
+    echo $! > "$PIDFILE"
     # A router that connects before RTRTR has read the file gets "No Data
     # Available" and, on OpenBGPD, waits its 10-minute retry timer. Wait for
     # the unit to be healthy before saying it's ready.
     for _ in 1 2 3 4 5 6 7 8 9 10; do
+        running || break
         wget -qO- http://127.0.0.1:8323/status 2>/dev/null \
             | grep -q "unit_status: healthy" && break
         sleep 1
     done
-    if pgrep -x rtrtr >/dev/null; then
+    if running; then
         wget -qO- http://127.0.0.1:8323/status 2>/dev/null | sed -n 's/^rpki-client vrps: /rtrtr: payloads loaded: /p'
         echo "rtrtr: listening on port 3323"
     else
-        echo "rtrtr: failed to start, see /var/log/rtrtr.log" >&2; exit 1
+        echo "rtrtr: failed to start:" >&2
+        tail -5 "$LOG" >&2
+        exit 1
     fi ;;
   stop)
-    pkill -x rtrtr 2>/dev/null && echo "rtrtr: stopped" || echo "rtrtr: not running" ;;
+    if running; then
+        kill "$(cat "$PIDFILE")" && rm -f "$PIDFILE" && echo "rtrtr: stopped"
+    else
+        echo "rtrtr: not running"
+    fi ;;
   status)
-    if pgrep -x rtrtr >/dev/null; then
+    if running; then
         wget -qO- http://127.0.0.1:8323/status 2>/dev/null
     else
         echo "rtrtr: not running"
