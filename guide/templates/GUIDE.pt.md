@@ -1759,6 +1759,18 @@ O caminho pelo Provedor B agora aparece como Invalid nos três observadores.
 
    ```cmd @observer3
    cp /etc/openbgpd-lab/observer3-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload
+   ```
+
+   O papel de uma sessão é negociado quando ela abre, então só recarregar não
+   o muda. Reinicie as duas sessões do Provedor B, espere uns dez segundos
+   para voltarem, e olhe:
+
+   ```cmd @observer3
+   bgpctl neighbor 10.200.6.10 clear
+   bgpctl neighbor fd00:6::10 clear
+   ```
+
+   ```cmd @observer3
    bgpctl show rib {{ORIGIN_V4}}
    ```
 
@@ -1813,13 +1825,22 @@ O caminho pelo Provedor B agora aparece como Invalid nos três observadores.
    ```
 
 6. Mais um caso de borda, já que você está aqui: passe o AS{{ATTACKER_ASN}} de
-   volta para o seu sequestro ingênuo (`./scripts/lab.sh
-   step2-hijack-simple`). Com **um só AS** no caminho não há salto
-   cliente→provedor para verificar, então o ASPA não tem nada a dizer sobre
-   *quem pode originar um prefixo*: isso nunca foi trabalho dele. O BIRD
-   chama esse caminho de `Valid` (`({{OBSERVER1_ASN}}, 2, 2)`), o OpenBGPD de
-   `Unknown` (`?`). Mais um caso de borda lido de dois jeitos. Volte com
-   `./scripts/lab.sh step9-hijack-off`.
+   volta para o seu sequestro ingênuo, deixando os observadores como estão (o
+   `./scripts/lab.sh step2-hijack-simple` também tiraria a validação deles):
+
+   ```cmd @attacker
+   birdc 'configure "/etc/bird-simple.conf"'
+   ```
+
+   ```cmd @observer3
+   bgpctl show rib {{ORIGIN_V4}}
+   ```
+
+   Com **um só AS** no caminho não há salto cliente→provedor para verificar,
+   então o ASPA não tem nada a dizer sobre *quem pode originar um prefixo*:
+   isso nunca foi trabalho dele. A rota aparece com ASPA `Valid` no OpenBGPD
+   (o `V` depois do traço em `!-V`) e no BIRD (`({{OBSERVER1_ASN}}, 2, 2)`), e quem a
+   sinaliza é o ROV (o `!`). Volte com `./scripts/lab.sh step9-hijack-off`.
 
 ### B. ASN certo, prefixo específico demais
 

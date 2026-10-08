@@ -1705,6 +1705,18 @@ The path through Provider B now reads Invalid on all three observers.
 
    ```cmd @observer3
    cp /etc/openbgpd-lab/observer3-extra-a-role-customer.conf /etc/bgpd.conf && bgpctl reload
+   ```
+
+   A session's role is negotiated when it opens, so a reload alone doesn't
+   change it. Reset the two Provider B sessions, wait ten seconds or so for
+   them to come back, and look:
+
+   ```cmd @observer3
+   bgpctl neighbor 10.200.6.10 clear
+   bgpctl neighbor fd00:6::10 clear
+   ```
+
+   ```cmd @observer3
    bgpctl show rib 203.0.113.0/24
    ```
 
@@ -1758,11 +1770,22 @@ The path through Provider B now reads Invalid on all three observers.
    ```
 
 6. One more edge case, while you're here: switch AS666 back to its naive
-   hijack (`./scripts/lab.sh step2-hijack-simple`). With **one AS** in the path
-   there's no customer→provider hop to check, so ASPA has nothing to say about
-   *who may originate a prefix*; that was never its job. BIRD calls such a path
-   `Valid` (`(64509, 2, 2)`), OpenBGPD `Unknown` (`?`). Another corner case
-   read two ways. Go back with `./scripts/lab.sh step9-hijack-off`.
+   hijack, leaving the observers as they are (`./scripts/lab.sh
+   step2-hijack-simple` would also take validation off them):
+
+   ```cmd @attacker
+   birdc 'configure "/etc/bird-simple.conf"'
+   ```
+
+   ```cmd @observer3
+   bgpctl show rib 203.0.113.0/24
+   ```
+
+   With **one AS** in the path there's no customer→provider hop to check, so
+   ASPA has nothing to say about *who may originate a prefix*; that was never
+   its job. The route reads ASPA `Valid` on OpenBGPD (the `V` after the dash
+   in `!-V`) and on BIRD (`(64509, 2, 2)`), and it's ROV that flags it
+   (the `!`). Go back with `./scripts/lab.sh step9-hijack-off`.
 
 ### B. Right ASN, prefix too specific
 
