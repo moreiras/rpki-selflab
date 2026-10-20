@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPKI SelfLab - LACNOG 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff; --ink: #2b2f36; --weak: #8a909c; --line: #e6e8ec;
+    --accent: #6d4fd6; --ok: #0e9467; --bad: #d63a3a;
+    --sans: "Inter", -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #1d1f24; font-family: var(--sans); color: var(--ink); }
+  .deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+  .slide {
+    position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px;
+    transform-origin: center center; background: var(--bg);
+    padding: 72px 96px; display: none; flex-direction: column; gap: 28px;
+  }
+  .slide.active { display: flex; }
+  h1 { font-size: 72px; line-height: 1.05; margin: 0; font-weight: 700; letter-spacing: -2px; }
+  h2 { font-size: 52px; line-height: 1.1; margin: 0; font-weight: 700; letter-spacing: -1.2px; }
+  p { font-size: 32px; line-height: 1.35; margin: 0; font-weight: 400; }
+  .weak { color: var(--weak); }
+  .accent { color: var(--accent); }
+  .center { justify-content: center; }
+  .fig { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .fig img, .fig video { max-width: 100%; max-height: 100%; border-radius: 12px; }
+  .fig img.shadow { box-shadow: 0 4px 30px rgba(20, 25, 40, .12); }
+  .cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; flex: 1; min-height: 0; align-items: center; }
+  .list { display: flex; flex-direction: column; gap: 22px; }
+  .list p { font-size: 34px; }
+  .list p b { font-weight: 600; }
+
+  /* title */
+  .title h1 { font-size: 88px; }
+  .title .sub { font-size: 36px; color: var(--weak); font-weight: 300; }
+  .title .by { margin-top: 48px; font-size: 26px; }
+  .title .by span { color: var(--weak); }
+
+  /* install */
+  .term { background: #f4f5f7; border-radius: 16px; padding: 36px 44px; font: 28px/1.75 var(--mono); color: var(--ink); }
+  .term .p { color: var(--weak); user-select: none; }
+  .term .c { color: var(--weak); font-size: 24px; }
+  .term .url { color: var(--accent); font-weight: 600; }
+
+  /* story */
+  .story { display: grid; grid-template-columns: auto 1fr auto; column-gap: 40px; row-gap: 34px; align-items: baseline; margin-top: 20px; }
+  .story .n { font-size: 30px; color: var(--weak); font-weight: 300; }
+  .story .what { font-size: 40px; font-weight: 600; }
+  .story .who { font-size: 34px; font-weight: 600; text-align: right; }
+  .story .rov { color: var(--ok); }
+  .story .aspa { color: var(--accent); }
+
+  /* video */
+  .video { padding: 0; background: #fff; }
+  .video video { width: 100%; height: 100%; object-fit: contain; border-radius: 0; }
+  .video .play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 120px; height: 120px;
+                 border-radius: 50%; border: 0; background: rgba(43, 47, 54, .85); color: #fff; font-size: 48px;
+                 padding-left: 10px; cursor: pointer; }
+  .video.playing .play { display: none; }
+
+  /* call to action */
+  .cta { gap: 44px; }
+  .cta .big { font-size: 56px; line-height: 1.12; font-weight: 700; letter-spacing: -1.2px; }
+  .cta .big .accent { display: block; }
+  .cta .big { max-width: 800px; font-size: 50px; }
+  .cta .link { margin-top: auto; font-size: 30px; font-family: var(--mono); color: var(--ink); text-decoration: none; }
+  .cta .qr { position: absolute; right: 96px; bottom: 72px; width: 300px; height: 300px; }
+  .cta .link span { color: var(--weak); font-family: var(--sans); font-size: 24px; display: block; margin-bottom: 6px; }
+
+  .hud { position: fixed; right: 14px; bottom: 10px; color: #9aa; font: 12px var(--mono); opacity: .6; }
+  .notes { display: none; }
+  body.show-notes .notes {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; max-height: 34vh; overflow: auto;
+    background: #111; color: #ddd; font: 17px/1.45 var(--sans); padding: 14px 22px; z-index: 5;
+  }
+  @media print {
+    @page { size: 1280px 720px; margin: 0; }
+    html, body { background: #fff; }
+    .deck { width: auto; height: auto; overflow: visible; }
+    .slide { display: flex !important; position: relative; left: 0; top: 0; transform: none !important;
+             page-break-after: always; break-after: page; }
+    .hud, .notes { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- 1 -->
+<section class="slide title center">
+  <h1>RPKI SelfLab</h1>
+  <p class="sub">ROA, ROV and ASPA in a lab<br>that runs on your laptop</p>
+  <p class="by">Antonio M. Moreiras <span>· NIC.br · LACNOG 2026</span></p>
+  <div class="notes">(~20 s) No RPKI intro today: just the lab, what it does and how to use it.</div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <h2>A whole RPKI ecosystem<br><span class="weak">in containers</span></h2>
+  <div class="cols">
+    <div class="fig"><img src="topology.svg" alt="The lab's topology"></div>
+    <div class="list">
+      <p><b>Real BGP</b> <span class="weak">BIRD, OpenBGPD</span></p>
+      <p><b>3 validators</b> <span class="weak">Routinator, FORT, rpki-client</span></p>
+      <p><b>Your own CA</b> <span class="weak">Krill</span></p>
+      <p><b>A simulated RIR</b> <span class="weak">real XML exchanges</span></p>
+      <p><b>Offline</b> <span class="weak">Docker or a ready VM</span></p>
+    </div>
+  </div>
+  <div class="notes">(~50 s) Everything is real software: two BGP implementations, three validators, Krill as the operator's CA, and a simulated RIR (LabNIC) where the student does the delegation and publication with the same RFC 6492/8183 exchanges as with a real RIR. Three observers: BIRD+Routinator, OpenBGPD+rpki-client, OpenBGPD+FORT, so you see three implementations judge the same objects. No Internet needed after download.</div>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <h2>Runs on your laptop, <span class="weak">in Docker</span></h2>
+  <div class="term">
+    <div><span class="p">$ </span>git clone https://github.com/moreiras/rpki-selflab</div>
+    <div><span class="p">$ </span>cd rpki-selflab</div>
+    <div><span class="p">$ </span>./scripts/lab.sh up <span class="c">&nbsp;# docker compose up -d</span></div>
+    <div><span class="p">→ </span><span class="url">http://localhost:8080</span></div>
+  </div>
+  <p class="weak" style="margin-top:auto; font-size:26px">Mac · Windows (WSL 2) · Linux · or a ready-made VM<br>No Internet needed after the first download</p>
+  <div class="notes">(~25 s) Everything runs locally: one command builds the images and brings up the containers (it's docker compose up -d underneath, after generating the configuration from lab.conf), and the panel opens at localhost:8080. Docker Desktop or OrbStack on a Mac, WSL 2 on Windows, or the prebuilt virtual machine if you'd rather not install Docker.</div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <h2>Follow the guide, <span class="weak">watch the network</span></h2>
+  <div class="fig"><img class="shadow" src="panel.webp" alt="The lab's web panel"></div>
+  <div class="notes">(~30 s) The web panel: guide on the left (English, Spanish, Portuguese), live topology in the middle, the verdicts each observer gives to every route below it. Built-in terminals, challenges with hints, and checkpoints that tick themselves when your lab gets there.</div>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <h2>One story, <span class="weak">three attacks</span></h2>
+  <div class="story">
+    <div class="n">1</div><div class="what">Naive hijack</div><div class="who rov">ROV</div>
+    <div class="n">2</div><div class="what">Forged path</div><div class="who aspa">ASPA</div>
+    <div class="n">3</div><div class="what">Route leak</div><div class="who aspa">ASPA</div>
+  </div>
+  <p class="weak" style="margin-top:auto">…plus real mistakes, like an ASPA that forgets a provider.</p>
+  <div class="notes">(~40 s) Nine steps. AS666 hijacks the prefix: ROV stops it. AS666 forges the path to end in the real origin: ROV says Valid, only ASPA catches it. A peer leaks the routes to its provider: nobody lies about the origin, ASPA catches it. Along the way, an ASPA object missing a provider takes the origin's preferred path away. Let's see it.</div>
+</section>
+
+<!-- 6 -->
+<section class="slide video">
+  <video id="demo" src="demo.mp4" preload="auto" playsinline></video>
+  <button class="play" id="play" aria-label="Play the demo">▶</button>
+  <div class="notes">(2:50) Demo video. Space / click on the video plays and pauses; arrow keys move between slides.</div>
+</section>
+
+<!-- 7 -->
+<section class="slide center">
+  <h2>Use it</h2>
+  <div class="list">
+    <p><b>Courses</b> <span class="weak">and self-study</span></p>
+    <p><b>Rehearse</b> <span class="weak">before touching production</span></p>
+    <p><b>Compare</b> <span class="weak">implementations side by side</span></p>
+    <p><b>Free</b> <span class="weak">Apache-2.0 · CC BY 4.0 · EN ES PT</span></p>
+  </div>
+  <div class="notes">(~30 s) Made for NIC.br courses but it's free for anyone: use it in your own trainings, study alone, test an ASPA object before publishing it, see how BIRD and OpenBGPD, Routinator, FORT and rpki-client disagree.</div>
+</section>
+
+<!-- 8 -->
+<section class="slide cta">
+  <p class="big">Already publishing ROAs?<span class="accent">Publish your ASPA this week.</span></p>
+  <p class="big">Running an IXP?<span class="accent">Validate on your route servers.</span></p>
+  <a class="link" href="https://moreiras.github.io/rpki-selflab/"><span>Try it first:</span>moreiras.github.io/rpki-selflab</a>
+  <img class="qr" src="qr.svg" alt="QR code for moreiras.github.io/rpki-selflab">
+  <div class="notes">(~30 s) If you publish ROAs, you're one object away from ASPA: list all your providers, and rehearse it in the lab first. IXPs: route servers are where validation protects the most networks at once. Thank you.</div>
+</section>
+
+</div>
+<div class="hud" id="hud"></div>
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  const demo = document.getElementById("demo");
+  let i = Math.max(0, Math.min(slides.length - 1, (parseInt(location.hash.slice(1)) || 1) - 1));
+  function fit() {
+    const s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    slides.forEach(el => el.style.transform = `translate(-50%, -50%) scale(${s})`);
+  }
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((el, k) => el.classList.toggle("active", k === i));
+    if (!slides[i].contains(demo)) demo.pause();
+    document.getElementById("hud").textContent = `${i + 1} / ${slides.length}  ·  N: notes`;
+    history.replaceState(null, "", "#" + (i + 1));
+  }
+  function toggleVideo() { demo.paused ? demo.play() : demo.pause(); }
+  demo.addEventListener("play", () => demo.parentElement.classList.add("playing"));
+  demo.addEventListener("pause", () => demo.parentElement.classList.remove("playing"));
+  document.addEventListener("keydown", e => {
+    const onVideo = slides[i].contains(demo);
+    if (e.key === " " && onVideo) { e.preventDefault(); toggleVideo(); return; }
+    if (["ArrowRight", "PageDown", " "].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    if (["ArrowLeft", "PageUp"].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+    if (e.key === "n" || e.key === "N") document.body.classList.toggle("show-notes");
+  });
+  document.addEventListener("click", e => {
+    if (e.target.closest("a")) return;
+    if (e.target === demo || e.target.id === "play") { toggleVideo(); return; }
+    show(i + (e.clientX > innerWidth / 3 ? 1 : -1));
+  });
+  window.addEventListener("resize", fit);
+  fit(); show(i);
+</script>
+</body>
+</html>
